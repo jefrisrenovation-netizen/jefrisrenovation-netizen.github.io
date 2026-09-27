@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Jefris">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Jefris Renovation</title>
 <style>
 :root{--red:#d71920;--dark:#171717;--bg:#f2f3f5}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:var(--bg);color:#18181b;padding-bottom:env(safe-area-inset-bottom)}
@@ -43,7 +43,7 @@ h2{font-size:18px;margin:0 0 4px}.muted{color:#6b7280;font-size:13px}.table{over
 </section>
 
 <section class="card">
- <h2 id="title">Controle de Horas</h2><div class="muted">Registre cada dia de trabalho.</div>
+ <h2 id="title">Controle de Horas</h2><div class="muted">Registre cada dia de trabalho. A pausa padrão é de 30 minutos.</div>
  <div class="table">
  <table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Pausa (min)</th><th>Horas</th><th>Local de trabalho</th><th></th></tr></thead>
  <tbody id="rows"></tbody></table>
@@ -62,24 +62,34 @@ async function installApp(){if(deferredPrompt){deferredPrompt.prompt();deferredP
 function key(){return $("employee").value+"|"+$("month").value}
 function save(){localStorage.setItem("jefris.employees",JSON.stringify(employees));localStorage.setItem("jefris.records",JSON.stringify(records))}
 function fill(){ $("employee").innerHTML=employees.map(e=>`<option>${esc(e)}</option>`).join(""); render()}
-function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function minutes(a,b,p){if(!a||!b)return 0;let x=a.split(":").map(Number),y=b.split(":").map(Number),m=y[0]*60+y[1]-x[0]*60-x[1];if(m<0)m+=1440;return Math.max(0,m-(+p||0))}
 function fmt(m){return Math.floor(m/60)+"h"+String(m%60).padStart(2,"0")}
+function refreshCalculated(){
+ let list=records[key()]||[];
+ document.querySelectorAll("#rows tr").forEach((row,i)=>{
+   const r=list[i];
+   if(r) row.children[4].innerHTML="<b>"+fmt(minutes(r.in,r.out,r.pause))+"</b>";
+ });
+ $("total").textContent=fmt(list.reduce((s,r)=>s+minutes(r.in,r.out,r.pause),0));
+}
 function render(){
- let list=records[key()]||[];$("title").textContent=($("employee").value||"Funcionário")+" — "+new Date($("month").value+"-01T12:00:00").toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
+ let list=records[key()]||[];
+ let monthLabel=$("month").value?new Date($("month").value+"-01T12:00:00").toLocaleDateString("pt-BR",{month:"long",year:"numeric"}):"";
+ $("title").textContent=($("employee").value||"Funcionário")+(monthLabel?" — "+monthLabel:"");
  $("rows").innerHTML=list.map((r,i)=>`<tr>
  <td><input type="date" value="${r.date||""}" onchange="upd(${i},'date',this.value)"></td>
  <td><input type="time" value="${r.in||""}" onchange="upd(${i},'in',this.value)"></td>
  <td><input type="time" value="${r.out||""}" onchange="upd(${i},'out',this.value)"></td>
- <td><input type="number" min="0" value="${r.pause||0}" onchange="upd(${i},'pause',this.value)"></td>
- <td><b>${fmt(minutes(r.in,r.out,r.pause))}</b></td>
+ <td><input type="number" min="0" value="${r.pause ?? 30}" onchange="upd(${i},'pause',this.value)"></td>
+ <td><b>${fmt(minutes(r.in,r.out,r.pause ?? 30))}</b></td>
  <td><input value="${esc(r.place||"")}" placeholder="Ex.: Bruxelas" onchange="upd(${i},'place',this.value)"></td>
  <td><button class="danger" style="width:auto;padding:8px" onclick="del(${i})">×</button></td></tr>`).join("");
- $("total").textContent=fmt(list.reduce((s,r)=>s+minutes(r.in,r.out,r.pause),0))
+ $("total").textContent=fmt(list.reduce((s,r)=>s+minutes(r.in,r.out,r.pause ?? 30),0));
 }
 function addEmployee(){let n=$("newEmployee").value.trim();if(!n)return;if(!employees.includes(n))employees.push(n);save();fill();$("employee").value=n;$("newEmployee").value="";render()}
-function addRow(){let k=key();records[k]=records[k]||[];records[k].push({date:$("month").value+"-01",in:"",out:"",pause:0,place:""});save();render()}
-function upd(i,p,v){records[key()][i][p]=v;save();render()}
+function addRow(){let k=key();records[k]=records[k]||[];records[k].push({date:$("month").value+"-01",in:"",out:"",pause:30,place:""});save();render()}
+function upd(i,p,v){records[key()][i][p]=p==='pause'?(v===''?30:Number(v)):v;save();refreshCalculated()}
 function del(i){records[key()].splice(i,1);save();render()}
 let now=new Date();$("month").value=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");$("employee").addEventListener("change",render);$("month").addEventListener("change",render);fill();
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js"));
