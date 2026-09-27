@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#151515">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jefris">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Jefris Renovation</title>
+<style>
+:root{--red:#d71920;--dark:#171717;--bg:#f2f3f5;--green:#087f5b}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:var(--bg);color:#18181b;padding-bottom:env(safe-area-inset-bottom)}header{background:var(--dark);color:#fff;padding:18px 16px 16px;padding-top:calc(18px + env(safe-area-inset-top));position:sticky;top:0;z-index:5}.brand{display:flex;align-items:center;gap:12px}.brand img{width:58px;height:58px;object-fit:contain;background:#fff;border-radius:10px}.brand h1{font-size:20px;margin:0}.brand small{opacity:.75}main{max-width:1050px;margin:auto;padding:14px}.card{background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 2px 10px #0001}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(min-width:800px){.grid{grid-template-columns:repeat(4,1fr)}}label{font-size:12px;font-weight:700;display:block;margin:4px 0}input,select,button{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px;font-size:15px;background:#fff}button{background:var(--red);color:#fff;border:0;font-weight:700}.secondary{background:#e5e7eb;color:#18181b}.danger{background:#b91c1c}.green{background:var(--green)}h2{font-size:18px;margin:0 0 4px}.muted{color:#6b7280;font-size:13px}.table{overflow:auto}table{width:100%;border-collapse:collapse;min-width:820px}th,td{padding:9px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:12px;background:#fafafa}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}.stat{background:#f8fafc;border-radius:12px;padding:10px;text-align:center}.stat b{display:block;font-size:18px}.stat span{font-size:11px;color:#6b7280}.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1}.install{background:#fff1f2;border:1px solid #fecdd3;color:#991b1b}.login{text-align:center}.hidden{display:none!important}.status{font-size:13px;margin-top:8px}.ok{color:#087f5b}.err{color:#b91c1c}
+</style>
+</head>
+<body>
+<header><div class="brand"><img src="jefris-logo.jpeg" alt="Jefris Renovation"><div><h1>Jefris Renovation</h1><small>Controle de Horas</small></div></div></header>
+<main>
+<section id="loginCard" class="card login">
+<h2>Acesso ao Jefris</h2><div class="muted">Entre para sincronizar seus dados entre iPhone e computador.</div>
+<input id="email" type="email" placeholder="Seu e-mail" autocomplete="email" style="margin-top:12px">
+<button class="green" onclick="login()" style="margin-top:8px">Enviar link de acesso</button>
+<div id="loginStatus" class="status"></div>
+</section>
+
+<div id="app" class="hidden">
+<section class="card">
+<div class="grid">
+<div><label>Funcionário</label><select id="employee"></select></div>
+<div><label>Mês</label><input id="month" type="month"></div>
+<div><label>Novo funcionário</label><input id="newEmployee" placeholder="Nome completo"></div>
+<div><label>&nbsp;</label><button onclick="addEmployee()">Adicionar</button></div>
+</div>
+<div class="actions">
+<button class="install" id="installBtn" style="display:none" onclick="installApp()">＋ Instalar na tela inicial</button>
+<button class="secondary" onclick="window.print()">Imprimir / PDF</button>
+<button class="secondary" onclick="logout()">Sair</button>
+</div>
+<div id="cloudStatus" class="status"></div>
+</section>
+
+<section class="card">
+<h2 id="title">Controle de Horas</h2><div class="muted">Cada mês fica separado por funcionário. Pausa padrão: 30 minutos.</div>
+<div class="table"><table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Pausa (min)</th><th>Horas</th><th>Local de trabalho</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="actions"><button onclick="addRow()">＋ Adicionar dia</button></div>
+<div class="summary">
+<div class="stat"><b id="total">0h00</b><span>Horas do mês</span></div>
+<div class="stat"><b id="fullDays">0</b><span>Dias completos</span></div>
+<div class="stat"><b id="halfDays">0</b><span>Meios dias</span></div>
+<div class="stat"><b id="equivDays">0</b><span>Dias equivalentes</span></div>
+</div>
+</section>
+</div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL="https://nnrelfuewfhkirgzbwsi.supabase.co";
+const SUPABASE_KEY="sb_publishable_3GY1ZI3m6ZLejVqHGL7Pnw_ZnnViDwb";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=id=>document.getElementById(id);
+let user=null,employees=[],records=[],deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").style.display="block"});
+async function installApp(){if(deferredPrompt){await deferredPrompt.prompt();deferredPrompt=null;$("installBtn").style.display="none"}else alert("No iPhone: abra no Safari, toque em Compartilhar e depois em “Adicionar à Tela de Início”.")}
+function setStatus(msg,ok=true){$("cloudStatus").textContent=msg;$("cloudStatus").className="status "+(ok?"ok":"err")}
+function setLogin(msg,ok=false){$("loginStatus").textContent=msg;$("loginStatus").className="status "+(ok?"ok":"err")}
+async function login(){
+ const email=$("email").value.trim();
+ if(!email){setLogin("Digite seu e-mail.");return}
+ setLogin("Enviando link...",true);
+ const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin,shouldCreateUser:true}});
+ if(error)setLogin(error.message);else setLogin("Link enviado. Abra seu e-mail e toque no link para entrar.",true);
+}
+async function logout(){await sb.auth.signOut();location.reload()}
+function monthStart(){return $("month").value+"-01"}
+function monthEnd(){let [y,m]=$("month").value.split("-").map(Number);return new Date(y,m,0).toISOString().slice(0,10)}
+function minutes(a,b,p){if(!a||!b)return 0;let x=a.split(":").map(Number),y=b.split(":").map(Number),m=y[0]*60+y[1]-x[0]*60-x[1];if(m<0)m+=1440;return Math.max(0,m-(+p||0))}
+function fmt(m){return Math.floor(m/60)+"h"+String(m%60).padStart(2,"0")}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+async function loadEmployees(){
+ const {data,error}=await sb.from("employees").select("*").eq("owner_id",user.id).eq("active",true).order("name");
+ if(error){setStatus("Erro ao carregar funcionários: "+error.message,false);return}
+ employees=data||[];
+ if(!employees.length) await migrateLocal();
+ $("employee").innerHTML=employees.map(e=>'<option value="'+e.id+'">'+esc(e.name)+'</option>').join("");
+ if(!employees.length){setStatus("Adicione o primeiro funcionário.",true);return}
+ await loadRecords();
+}
+async function migrateLocal(){
+ const localEmployees=JSON.parse(localStorage.getItem("jefris.employees")||"[]");
+ for(const name of localEmployees){
+  const {data}=await sb.from("employees").insert({owner_id:user.id,name,active:true}).select().single();
+  if(data)employees.push(data);
+ }
+ const localRecords=JSON.parse(localStorage.getItem("jefris.records")||"{}");
+ for(const k of Object.keys(localRecords)){
+  const parts=k.split("|"),name=parts[0],emp=employees.find(e=>e.name===name);
+  if(!emp)continue;
+  for(const r of localRecords[k]){
+   if(!r.date)continue;
+   await sb.from("work_days").upsert({owner_id:user.id,employee_id:emp.id,work_date:r.date,entry_time:r.in||null,exit_time:r.out||null,break_minutes:r.pause??30,workplace:r.place||null,notes:null},{onConflict:"employee_id,work_date"});
+  }
+ }
+ if(Object.keys(localRecords).length)setStatus("Dados antigos deste aparelho foram sincronizados na nuvem.",true);
+}
+async function loadRecords(){
+ const id=$("employee").value;if(!id)return;
+ const {data,error}=await sb.from("work_days").select("*").eq("owner_id",user.id).eq("employee_id",id).gte("work_date",monthStart()).lte("work_date",monthEnd()).order("work_date");
+ if(error){setStatus("Erro ao carregar dias: "+error.message,false);return}
+ records=data||[];render();
+}
+async function addEmployee(){
+ const name=$("newEmployee").value.trim();if(!name)return;
+ const {data,error}=await sb.from("employees").insert({owner_id:user.id,name,active:true}).select().single();
+ if(error){setStatus("Erro: "+error.message,false);return}
+ employees.push(data);$("newEmployee").value="";$("employee").innerHTML=employees.map(e=>'<option value="'+e.id+'">'+esc(e.name)+'</option>').join("");$("employee").value=data.id;await loadRecords();
+}
+function render(){
+ const emp=employees.find(e=>e.id===$("employee").value);
+ let label=$("month").value?new Date($("month").value+"-01T12:00:00").toLocaleDateString("pt-BR",{month:"long",year:"numeric"}):"";
+ $("title").textContent=(emp?emp.name:"Funcionário")+(label?" — "+label:"");
+ $("rows").innerHTML=records.map((r,i)=>'<tr>'+
+ '<td><input type="date" value="'+(r.work_date||"")+'" onchange="upd('+i+',\\'work_date\\',this.value)"></td>'+
+ '<td><input type="time" value="'+(r.entry_time||"").slice(0,5)+'" onchange="upd('+i+',\\'entry_time\\',this.value)"></td>'+
+ '<td><input type="time" value="'+(r.exit_time||"").slice(0,5)+'" onchange="upd('+i+',\\'exit_time\\',this.value)"></td>'+
+ '<td><input type="number" min="0" value="'+(r.break_minutes??30)+'" onchange="upd('+i+',\\'break_minutes\\',this.value)"></td>'+
+ '<td><b>'+fmt(minutes(r.entry_time,r.exit_time,r.break_minutes??30))+'</b></td>'+
+ '<td><input value="'+esc(r.workplace||"")+'" placeholder="Ex.: Bruxelas" onchange="upd('+i+',\\'workplace\\',this.value)"></td>'+
+ '<td><button class="danger" style="width:auto;padding:8px" onclick="del('+i+')">×</button></td></tr>').join("");
+ refreshCalculated();
+}
+function refreshCalculated(){
+ let total=0,full=0,half=0;
+ records.forEach(r=>{let m=minutes(r.entry_time,r.exit_time,r.break_minutes??30);total+=m;if(m>0){if(m>240)full++;else half++}});
+ document.querySelectorAll("#rows tr").forEach((row,i)=>row.children[4].innerHTML="<b>"+fmt(minutes(records[i].entry_time,records[i].exit_time,records[i].break_minutes??30))+"</b>");
+ $("total").textContent=fmt(total);$("fullDays").textContent=full;$("halfDays").textContent=half;$("equivDays").textContent=(full+half/2).toFixed(1).replace(".0","");
+}
+async function addRow(){
+ let d=monthStart();
+ const used=new Set(records.map(r=>r.work_date));
+ const [yy,mm]=($("month").value||monthStart().slice(0,7)).split("-").map(Number);
+ const days=new Date(yy,mm,0).getDate();
+ for(let n=1;n<=days;n++){const cand=$("month").value+"-"+String(n).padStart(2,"0");if(!used.has(cand)){d=cand;break}}
+ const {data,error}=await sb.from("work_days").insert({owner_id:user.id,employee_id:$("employee").value,work_date:d,entry_time:null,exit_time:null,break_minutes:30,workplace:null}).select().single();
+ if(error){setStatus(error.message,false);return}
+ records.push(data);records.sort((a,b)=>a.work_date.localeCompare(b.work_date));render();
+}
+async function upd(i,p,v){
+ const payload={};
+ if(p==="work_date")payload.work_date=v;
+ else if(p==="entry_time")payload.entry_time=v||null;
+ else if(p==="exit_time")payload.exit_time=v||null;
+ else if(p==="break_minutes")payload.break_minutes=v===""?30:Number(v);
+ else if(p==="workplace")payload.workplace=v||null;
+ const {data,error}=await sb.from("work_days").update(payload).eq("id",records[i].id).eq("owner_id",user.id).select().single();
+ if(error){setStatus(error.message,false);return}
+ records[i]=data;refreshCalculated();
+}
+async function del(i){const {error}=await sb.from("work_days").delete().eq("id",records[i].id).eq("owner_id",user.id);if(error){setStatus(error.message,false);return}records.splice(i,1);render()}
+$("employee").addEventListener("change",loadRecords);
+$("month").addEventListener("change",loadRecords);
+let now=new Date();$("month").value=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+async function start(){
+ const {data}=await sb.auth.getSession();user=data.session?.user||null;
+ if(!user)return;
+ $("loginCard").classList.add("hidden");$("app").classList.remove("hidden");setStatus("Conectado à nuvem.",true);await loadEmployees();
+}
+sb.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;if(user)start()});
+start();
+if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js"));
+</script>
+</body></html>
