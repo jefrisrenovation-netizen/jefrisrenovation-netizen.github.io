@@ -59,10 +59,12 @@ body{background:#fff!important;padding:0!important;margin:0!important}
 .brand img{
   display:block!important;
   visibility:visible!important;
-  width:45px!important;
-  height:45px!important;
+  width:60px!important;
+  height:60px!important;
   object-fit:contain!important;
   background:#fff!important;
+  -webkit-print-color-adjust:exact!important;
+  print-color-adjust:exact!important;
 }
 .brand h1{
   color:#18181b!important;
@@ -74,12 +76,19 @@ body{background:#fff!important;padding:0!important;margin:0!important}
 .card{box-shadow:none!important;border-radius:0!important;padding:0!important;margin:0!important;width:100%!important}
 .table{overflow:visible!important;width:100%!important}
 table{width:100%!important;min-width:0!important;table-layout:fixed!important}
-th,td{padding:5px!important;font-size:10px!important;border:1px solid #ccc!important;overflow:hidden!important}
+th,td{padding:5px!important;font-size:10px!important;border:1px solid #ccc!important;overflow:hidden!important;box-sizing:border-box!important}
 th:nth-child(1),td:nth-child(1){width:13%}
 th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){width:9%}
 th:nth-child(4),td:nth-child(4){width:10%}
 th:nth-child(5),td:nth-child(5){width:9%}
 th:nth-child(6),td:nth-child(6){width:42%}
+td:nth-child(6) input{
+  width:100%!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
+  overflow:visible!important;
+  white-space:normal!important;
+}
 th:nth-child(7),td:nth-child(7){display:none!important}
 input{border:0!important;padding:2px!important;width:100%!important;font-size:10px!important;background:transparent!important}
 .summary{margin-top:10px!important}
