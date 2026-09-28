@@ -129,7 +129,7 @@ async function login(){
   const email=$("email").value.trim();
   if(!email){setLogin("Digite seu e-mail.");return}
   setLogin("Enviando link...",true);
-  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin,shouldCreateUser:true}});
+  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:"https://jefrisrenovation-netizen.github.io/",shouldCreateUser:true}});
   if(error)setLogin(error.message);else setLogin("Link enviado. Abra seu e-mail e toque no link para entrar.",true);
 }
 async function logout(){await sb.auth.signOut();location.reload()}
