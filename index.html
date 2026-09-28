@@ -44,7 +44,33 @@ th,td{padding:9px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:1
 @page{size:A4 landscape;margin:10mm}
 body{background:#fff!important;padding:0!important;margin:0!important}
 .no-print,#loginCard{display:none!important}
-main{max-width:none!important;width:100%!important;padding:0!important;margin:0!important}
+  header{
+  display:block!important;
+  position:static!important;
+  background:#fff!important;
+  color:#18181b!important;
+  padding:0 0 8px 0!important;
+}
+.brand{
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+}
+.brand img{
+  display:block!important;
+  visibility:visible!important;
+  width:45px!important;
+  height:45px!important;
+  object-fit:contain!important;
+  background:#fff!important;
+}
+.brand h1{
+  color:#18181b!important;
+  font-size:16px!important;
+}
+.brand small{
+  color:#6b7280!important;
+}main{max-width:none!important;width:100%!important;padding:0!important;margin:0!important}
 .card{box-shadow:none!important;border-radius:0!important;padding:0!important;margin:0!important;width:100%!important}
 .table{overflow:visible!important;width:100%!important}
 table{width:100%!important;min-width:0!important;table-layout:fixed!important}
