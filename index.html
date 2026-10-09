@@ -126,6 +126,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 
   <div class="actions">
     <button onclick="addEmployee()">Adicionar funcionário</button>
+    <button class="danger" onclick="deleteEmployee()">Excluir funcionário</button>
     <button class="secondary" onclick="window.print()">Imprimir / PDF</button>
     <button class="secondary" onclick="logout()">Sair</button>
   </div>
@@ -153,11 +154,17 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
     </table>
   </div>
 
+  <div class="no-print" style="margin-top:12px"><label>Data do próximo dia (pode alterar)</label><input id="newDate" type="date"></div>
   <div class="actions no-print">
     <button onclick="addRow()">＋ Adicionar dia</button>
   </div>
 
-  <div class="summary">
+  <div class="grid" style="margin-top:14px">
+<div><label>Valor por diária (€)</label><input id="dailyRate" type="number" min="0" step="0.01" onchange="savePayment()"></div>
+<div><label>Adiantamento do mês (€)</label><input id="advance" type="number" min="0" step="0.01" onchange="savePayment()"></div>
+</div>
+<div class="summary"><div class="stat"><b id="gross">€ 0,00</b><span>Total: dias equivalentes × diária</span></div><div class="stat"><b id="balance">€ 0,00</b><span>Saldo a receber após adiantamento</span></div></div>
+<div class="summary">
     <div class="stat"><b id="total">0h00</b><span>Horas do mês</span></div>
     <div class="stat"><b id="fullDays">0</b><span>Dias completos</span></div>
     <div class="stat"><b id="halfDays">0</b><span>Meios dias</span></div>
@@ -174,7 +181,7 @@ const SUPABASE_URL="https://nnrelfuewfhkirgzbwsi.supabase.co";
 const SUPABASE_KEY="sb_publishable_3GY1ZI3m6ZLejVqHGL7Pnw_ZnnViDwb";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=id=>document.getElementById(id);
-let user=null,employees=[],records=[];
+let user=null,employees=[],records=[],payment={},loadVersion=0,starting=false,startedFor=null;
 
 function setStatus(msg,ok=true){$("cloudStatus").textContent=msg;$("cloudStatus").className="status "+(ok?"ok":"err")}
 function setLogin(msg,ok=false){$("loginStatus").textContent=msg;$("loginStatus").className="status "+(ok?"ok":"err")}
@@ -193,7 +200,7 @@ function ym(){return $("year").value+"-"+$("month").value}
 function monthStart(){return ym()+"-01"}
 function monthEnd(){
   const y=Number($("year").value),m=Number($("month").value);
-  return new Date(y,m,0).toISOString().slice(0,10);
+  return `${y}-${pad(m)}-${pad(new Date(y,m,0).getDate())}`;
 }
 function monthName(){
   return new Date(Number($("year").value),Number($("month").value)-1,1)
@@ -243,7 +250,7 @@ async function loadEmployees(){
   if(error){setStatus("Erro ao carregar funcionários: "+error.message,false);return}
   employees=data||[];
   $("employee").innerHTML=employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join("");
-  if(!employees.length){setStatus("Adicione o primeiro funcionário.",true);render();return}
+  if(!employees.length){records=[];payment={};$("dailyRate").value=0;$("advance").value=0;setStatus("Adicione o primeiro funcionário.",true);render();return}
   await loadRecords();
 }
 
@@ -261,16 +268,24 @@ async function addEmployee(){
 }
 
 async function loadRecords(){
+  const version=++loadVersion;
   const id=$("employee").value;
-  if(!id){records=[];render();return}
+  if(!id){records=[];payment={};$("dailyRate").value=0;$("advance").value=0;render();return}
   updateMonthUI();
   const {data,error}=await sb.from("work_days").select("*")
     .eq("owner_id",user.id).eq("employee_id",id)
     .gte("work_date",monthStart()).lte("work_date",monthEnd())
     .order("work_date");
   if(error){setStatus("Erro ao carregar dias: "+error.message,false);return}
+  if(version!==loadVersion)return;
   records=data||[];
+  const result=await sb.from("monthly_payments").select("*").eq("owner_id",user.id).eq("employee_id",id).eq("month",monthStart()).maybeSingle();
+  if(version!==loadVersion)return;
+  payment=result.data||{};
+  $("dailyRate").value=payment.daily_rate??0;
+  $("advance").value=payment.advance??0;
   render();
+  if(result.error)setStatus("Os valores precisam da atualização do banco de dados: "+result.error.message,false);
 }
 
 function renderHistory(){
@@ -299,6 +314,10 @@ function render(){
       <td><input value="${esc(r.workplace||"")}" placeholder="Ex.: Bruxelas" onchange="upd(${i},'workplace',this.value)"></td>
       <td><button class="danger no-print" style="width:auto;padding:8px" onclick="del(${i})">×</button></td>
     </tr>`).join("");
+  const last=records.reduce((max,r)=>Math.max(max,Number(r.work_date.slice(-2))),0);
+  const days=Number(monthEnd().slice(-2));
+  $("newDate").min=monthStart();$("newDate").max=monthEnd();
+  $("newDate").value=last<days?ym()+"-"+pad(last+1):"";
   refreshCalculated();
 }
 
@@ -315,29 +334,30 @@ function refreshCalculated(){
   $("total").textContent=fmt(total);
   $("fullDays").textContent=full;
   $("halfDays").textContent=half;
+  const rate=Number($("dailyRate").value)||0,advance=Number($("advance").value)||0;
+  const money=n=>n.toLocaleString("pt-BE",{style:"currency",currency:"EUR"});
+  $("gross").textContent=money((full+half/2)*rate);
+  $("balance").textContent=money((full+half/2)*rate-advance);
   $("equivDays").textContent=(full+half/2).toFixed(1).replace(".0","");
 }
 
 async function addRow(){
   if(!$("employee").value){setStatus("Primeiro adicione um funcionário.",false);return}
-  const used=new Set(records.map(r=>r.work_date));
-  const y=Number($("year").value),m=Number($("month").value),days=new Date(y,m,0).getDate();
-  let d=null;
-  for(let n=1;n<=days;n++){
-    const cand=`${y}-${pad(m)}-${pad(n)}`;
-    if(!used.has(cand)){d=cand;break}
-  }
-  if(!d){setStatus("Todos os dias deste mês já foram adicionados.",false);return}
+  const d=$("newDate").value;
+  if(!d||d<monthStart()||d>monthEnd()){setStatus("Escolha uma data deste mês para adicionar.",false);return}
+  if(records.some(r=>r.work_date===d)){setStatus("Esta data já foi adicionada.",false);return}
   const {data,error}=await sb.from("work_days").insert({
     owner_id:user.id,employee_id:$("employee").value,work_date:d,
-    entry_time:null,exit_time:null,break_minutes:30,workplace:null
+    entry_time:"08:00",exit_time:"17:30",break_minutes:30,workplace:null
   }).select().single();
   if(error){setStatus(error.message,false);return}
   records.push(data);records.sort((a,b)=>a.work_date.localeCompare(b.work_date));render();
 }
 
 async function upd(i,p,v){
+  const record=records[i];if(!record)return;
   const payload={};
+  if(p==="work_date"&&(!v||v<monthStart()||v>monthEnd()||records.some(r=>r.id!==record.id&&r.work_date===v))){render();setStatus("Escolha uma data livre dentro deste mês.",false);return}
   if(p==="work_date")payload.work_date=v;
   else if(p==="entry_time")payload.entry_time=v||null;
   else if(p==="exit_time")payload.exit_time=v||null;
@@ -345,9 +365,9 @@ async function upd(i,p,v){
   else if(p==="workplace")payload.workplace=v||null;
 
   const {data,error}=await sb.from("work_days").update(payload)
-    .eq("id",records[i].id).eq("owner_id",user.id).select().single();
-  if(error){setStatus("Erro ao salvar: "+error.message,false);return}
-  records[i]=data;
+    .eq("id",record.id).eq("owner_id",user.id).select().single();
+  if(error){render();setStatus("Erro ao salvar: "+error.message,false);return}
+  const index=records.findIndex(r=>r.id===record.id);if(index<0)return;records[index]=data;
   if(p==="work_date"){
     records.sort((a,b)=>a.work_date.localeCompare(b.work_date));
     render();
@@ -356,31 +376,65 @@ async function upd(i,p,v){
   }
 }
 
+async function deleteEmployee(){
+  const id=$("employee").value,emp=employees.find(e=>e.id===id);
+  if(!emp)return;
+  if(!confirm("Excluir "+emp.name+" da equipe? O histórico será preservado."))return;
+  const {data,error}=await sb.from("employees").update({active:false}).eq("id",id).eq("owner_id",user.id).select("id");
+  if(error||!data?.length){setStatus("Não foi possível excluir: "+(error?.message||"verifique a permissão de atualização no banco"),false);return}
+  records=[];await loadEmployees();setStatus("Funcionário excluído da equipe. Histórico preservado.");
+}
+async function savePayment(){
+  const id=$("employee").value;if(!id)return;
+  const payload={owner_id:user.id,employee_id:id,month:monthStart(),daily_rate:Number($("dailyRate").value)||0,advance:Number($("advance").value)||0};
+  if(payload.daily_rate<0||payload.advance<0){setStatus("Use valores iguais ou maiores que zero.",false);return}
+  const {error}=await sb.from("monthly_payments").upsert(payload,{onConflict:"owner_id,employee_id,month"});
+  if(error){setStatus("Erro ao salvar valores: "+error.message,false);return}
+  payment=payload;refreshCalculated();setStatus("Valores salvos na nuvem.");
+}
 async function del(i){
   if(!confirm("Excluir este dia?"))return;
-  const {error}=await sb.from("work_days").delete()
-    .eq("id",records[i].id).eq("owner_id",user.id);
-  if(error){setStatus(error.message,false);return}
-  records.splice(i,1);render();
+  const id=records[i].id;
+  const {data,error}=await sb.from("work_days").delete()
+    .eq("id",id).eq("owner_id",user.id).select("id");
+  if(error||!data?.length){setStatus("Não foi possível excluir o dia: "+(error?.message||"verifique a permissão de exclusão no banco"),false);return}
+  records=records.filter(r=>r.id!==id);render();setStatus("Dia excluído e alteração salva.");
 }
 
+function lockForm(locked){document.querySelectorAll("#app input,#app select,#app button").forEach(el=>el.disabled=locked)}
+let saving=false;
+for(const name of ["addEmployee","addRow","upd","del","deleteEmployee","savePayment"]){
+  const original={addEmployee,addRow,upd,del,deleteEmployee,savePayment}[name];
+  const guarded=async(...args)=>{if(saving)return;saving=true;lockForm(true);try{return await original(...args)}catch(error){setStatus("Falha de conexão: "+error.message,false)}finally{saving=false;lockForm(false)}};
+  if(name==="addEmployee")addEmployee=guarded;
+  if(name==="addRow")addRow=guarded;
+  if(name==="upd")upd=guarded;
+  if(name==="del")del=guarded;
+  if(name==="deleteEmployee")deleteEmployee=guarded;
+  if(name==="savePayment")savePayment=guarded;
+}
 $("employee").addEventListener("change",loadRecords);
 $("year").addEventListener("change",()=>{updateMonthUI();loadRecords()});
 $("month").addEventListener("change",()=>{updateMonthUI();loadRecords()});
 
 async function start(){
+  if(starting)return;starting=true;
+  try{
   const {data}=await sb.auth.getSession();
   user=data.session?.user||null;
-  if(!user)return;
+  if(!user||startedFor===user.id)return;
   $("loginCard").classList.add("hidden");
   $("app").classList.remove("hidden");
   setupSelectors();
   setStatus("Conectado à nuvem.",true);
-  await loadEmployees();
+  await loadEmployees();startedFor=user.id;
+  }finally{starting=false}
 }
-sb.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;if(user)start()});
+sb.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;if(user)setTimeout(start,0)});
 start();
-if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js"));
+if("serviceWorker"in navigator)window.addEventListener("load",async()=>{
+  try{const registration=await navigator.serviceWorker.register("sw.js",{updateViaCache:"none"});await registration.update()}catch(error){console.warn("Atualização do aplicativo indisponível",error)}
+});
 </script>
 </body>
 </html>
