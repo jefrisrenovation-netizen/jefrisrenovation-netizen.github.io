@@ -42,6 +42,10 @@ th,td{padding:9px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:1
 @media(max-width:600px){.summary{grid-template-columns:repeat(2,1fr)}.actions{flex-direction:column}.grid{grid-template-columns:1fr}}
 @media print{
 @page{size:A4 landscape;margin:10mm}
+body.print-company #app>section:not(#companyReport){display:none!important}
+body:not(.print-company) #companyReport{display:none!important}
+body.print-company #companyReport th,body.print-company #companyReport td{width:auto!important;display:table-cell!important}
+body.print-company #companyReport table{table-layout:auto!important}
 body{background:#fff!important;padding:0!important;margin:0!important}
 .no-print,#loginCard{display:none!important}
   header{
@@ -127,6 +131,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
   <div class="actions">
     <button onclick="addEmployee()">Adicionar funcionário</button>
     <button class="danger" onclick="deleteEmployee()">Excluir funcionário</button>
+    <button class="secondary" onclick="showCompanyReport()">Relatório mensal da Jefris</button>
     <button class="secondary" onclick="window.print()">Imprimir / PDF</button>
     <button class="secondary" onclick="logout()">Sair</button>
   </div>
@@ -172,6 +177,14 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
   </div>
 </section>
 
+<section id="companyReport" class="card hidden">
+<h2>Relatório mensal — Jefris Renovation</h2>
+<div id="reportMonth" class="muted"></div>
+<div class="actions no-print"><button class="secondary" onclick="printCompanyReport()">Imprimir relatório / PDF</button><button class="secondary" onclick="closeCompanyReport()">Fechar relatório</button></div>
+<div class="table"><table><thead><tr><th>Funcionário</th><th>Dias equivalentes</th><th>Diária (€)</th><th>Total (€)</th><th>Adiantamento (€)</th><th>Saldo (€)</th></tr></thead><tbody id="reportRows"></tbody></table></div>
+<div class="summary"><div class="stat"><b id="reportGross"></b><span>Total das diárias</span></div><div class="stat"><b id="reportAdvance"></b><span>Adiantamentos</span></div><div class="stat"><b id="reportBalance"></b><span>Saldo total da equipe</span></div><div class="stat"><b id="reportDue"></b><span>Total a pagar (saldos positivos)</span></div></div>
+<p id="reportNote" class="muted"></p>
+</section>
 </div>
 </main>
 
@@ -231,6 +244,7 @@ function setupSelectors(){
 }
 
 function updateMonthUI(){
+  closeCompanyReport();
   $("monthLabel").textContent=monthName();
   renderHistory();
 }
@@ -385,6 +399,7 @@ async function deleteEmployee(){
   records=[];await loadEmployees();setStatus("Funcionário excluído da equipe. Histórico preservado.");
 }
 async function savePayment(){
+  closeCompanyReport();
   const id=$("employee").value;if(!id)return;
   const payload={owner_id:user.id,employee_id:id,month:monthStart(),daily_rate:Number($("dailyRate").value)||0,advance:Number($("advance").value)||0};
   if(payload.daily_rate<0||payload.advance<0){setStatus("Use valores iguais ou maiores que zero.",false);return}
@@ -401,6 +416,40 @@ async function del(i){
   records=records.filter(r=>r.id!==id);render();setStatus("Dia excluído e alteração salva.");
 }
 
+function closeCompanyReport(){ $("companyReport").classList.add("hidden"); }
+function printCompanyReport(){document.body.classList.add("print-company");window.print();document.body.classList.remove("print-company")}
+window.addEventListener("afterprint",()=>document.body.classList.remove("print-company"));
+async function showCompanyReport(){
+  if(saving){setStatus("Aguarde o salvamento para abrir o relatório.",false);return}
+  const selectedMonth=ym();setStatus("Carregando relatório mensal...");
+  try{
+    const results=await Promise.all([
+      sb.from("employees").select("*").eq("owner_id",user.id).order("name"),
+      sb.from("work_days").select("*").eq("owner_id",user.id).gte("work_date",monthStart()).lte("work_date",monthEnd()),
+      sb.from("monthly_payments").select("*").eq("owner_id",user.id).eq("month",monthStart())
+    ]);
+    if(selectedMonth!==ym())return;
+    for(const result of results)if(result.error)throw result.error;
+    const [staff,days,payments]=results.map(result=>result.data||[]);
+    const report=buildCompanyReport(staff,days,payments);
+    const money=n=>n.toLocaleString("pt-BE",{style:"currency",currency:"EUR"});
+    $("reportRows").innerHTML=report.rows.map(r=>`<tr><td>${esc(r.name)}${r.active===false?' (retirado da equipe)':''}</td><td>${r.days.toLocaleString("pt-BR")}</td><td>${money(r.rate)}</td><td>${money(r.gross)}</td><td>${money(r.advance)}</td><td>${money(r.balance)}</td></tr>`).join("");
+    $("reportMonth").textContent=monthName();
+    $("reportGross").textContent=money(report.gross);$("reportAdvance").textContent=money(report.advance);$("reportBalance").textContent=money(report.balance);$("reportDue").textContent=money(report.due);
+    $("reportNote").textContent=report.rows.length?"Meio dia conta como 0,5 diária. Saldos negativos não reduzem o pagamento devido aos outros funcionários."+(report.rows.some(r=>r.days>0&&r.rate===0)?" Atenção: há funcionário com dias trabalhados e diária ainda não preenchida.":""):"Nenhum registro de trabalho ou pagamento neste mês.";
+    $("companyReport").classList.remove("hidden");$("companyReport").scrollIntoView({behavior:"smooth"});setStatus("Relatório carregado com os dados salvos na nuvem.");
+  }catch(error){closeCompanyReport();setStatus("Erro ao carregar relatório: "+error.message,false)}
+}
+function buildCompanyReport(staff,days,payments){
+  const rows=staff.filter(e=>days.some(d=>d.employee_id===e.id)||payments.some(p=>p.employee_id===e.id&&(Number(p.daily_rate)||Number(p.advance)))).map(e=>{
+    const equivalent=days.filter(d=>d.employee_id===e.id).reduce((total,d)=>{const m=minutes(d.entry_time,d.exit_time,d.break_minutes??30);return total+(m>240?1:m>0?0.5:0)},0);
+    const payment=payments.find(p=>p.employee_id===e.id)||{};
+    const rate=Number(payment.daily_rate)||0,advance=Number(payment.advance)||0,gross=Math.round(equivalent*rate*100)/100;
+    return {...e,days:equivalent,rate,advance,gross,balance:Math.round((gross-advance)*100)/100};
+  });
+  const sum=key=>Math.round(rows.reduce((total,r)=>total+r[key],0)*100)/100;
+  return {rows,gross:sum("gross"),advance:sum("advance"),balance:sum("balance"),due:Math.round(rows.reduce((total,r)=>total+Math.max(0,r.balance),0)*100)/100};
+}
 function lockForm(locked){document.querySelectorAll("#app input,#app select,#app button").forEach(el=>el.disabled=locked)}
 let saving=false;
 for(const name of ["addEmployee","addRow","upd","del","deleteEmployee","savePayment"]){
