@@ -121,34 +121,35 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 <div id="app" class="hidden">
 <section class="card no-print">
   <h2 id="profileHeading">Configurações da conta</h2>
+  <p id="accountModeHint" class="muted"></p>
   <div class="grid" style="margin-top:10px">
-    <div><label>Tipo de conta</label><select id="accountType"><option value="business">Empresa</option><option value="individual">Individual</option></select></div>
-    <div><label>Idioma</label><select id="languageCode" onchange="applyLanguage()"><option value="fr">Français</option><option value="pt-PT">Português (Portugal)</option><option value="pt-BR">Português (Brasil)</option><option value="en">English</option></select></div>
-    <div><label>Moeda padrão</label><select id="preferredCurrency"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option><option value="BRL">BRL (R$)</option></select></div>
-    <div><label>Nome da empresa / perfil</label><input id="companyName" maxlength="160" placeholder="Nome da empresa"></div>
-    <div><label>Número TVA / NIF</label><input id="vatNumber" maxlength="80"></div>
-    <div><label>Endereço</label><input id="companyAddress" maxlength="300"></div>
-    <div><label>Telefone</label><input id="companyPhone" maxlength="80"></div>
-    <div><label>E-mail</label><input id="companyEmail" type="email" maxlength="160"></div>
-    <div><label>URL do logotipo (https://)</label><input id="companyLogo" type="url" placeholder="https://..."></div>
+    <div><label data-i18n="accountType">Tipo de conta</label><select id="accountType" onchange="updateAccountMode()"><option value="business" data-i18n="business">Empresa</option><option value="individual" data-i18n="individual">Individual</option></select></div>
+    <div><label data-i18n="language">Idioma</label><select id="languageCode" onchange="applyLanguage()"><option value="fr">Français</option><option value="pt-PT">Português (Portugal)</option><option value="pt-BR">Português (Brasil)</option><option value="en">English</option></select></div>
+    <div><label data-i18n="defaultCurrency">Moeda padrão</label><select id="preferredCurrency"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option><option value="BRL">BRL (R$)</option></select></div>
+    <div><label data-i18n="profileName">Nome da empresa / perfil</label><input id="companyName" maxlength="160" placeholder="Nome da empresa"></div>
+    <div><label data-i18n="taxNumber">Número TVA / NIF</label><input id="vatNumber" maxlength="80"></div>
+    <div><label data-i18n="address">Endereço</label><input id="companyAddress" maxlength="300"></div>
+    <div><label data-i18n="phone">Telefone</label><input id="companyPhone" maxlength="80"></div>
+    <div><label data-i18n="email">E-mail</label><input id="companyEmail" type="email" maxlength="160"></div>
+    <div><label data-i18n="logo">URL do logotipo (https://)</label><input id="companyLogo" type="url" placeholder="https://..."></div>
     <div style="align-self:end"><button onclick="saveProfile()" id="saveProfileButton">Salvar configurações</button></div>
   </div>
 </section>
 
 <section class="card no-print">
   <div class="grid">
-    <div><label>Funcionário</label><select id="employee"></select></div>
-    <div><label>Ano</label><select id="year"></select></div>
-    <div><label>Mês</label><select id="month"></select></div>
-    <div><label>Novo funcionário</label><input id="newEmployee" placeholder="Nome completo"></div>
+    <div><label data-i18n="worker">Funcionário</label><select id="employee"></select></div>
+    <div><label data-i18n="year">Ano</label><select id="year"></select></div>
+    <div><label data-i18n="month">Mês</label><select id="month"></select></div>
+    <div><label data-i18n="newWorker">Novo funcionário</label><input id="newEmployee" placeholder="Nome completo"></div>
   </div>
 
   <div class="actions">
-    <button onclick="addEmployee()">Adicionar funcionário</button>
-    <button class="danger" onclick="deleteEmployee()">Excluir funcionário</button>
-    <button class="secondary" onclick="showCompanyReport()">Relatório mensal da Jefris</button>
-    <button class="secondary" onclick="window.print()">Imprimir / PDF</button>
-    <button class="secondary" onclick="logout()">Sair</button>
+    <button onclick="addEmployee()" data-i18n="addWorker">Adicionar funcionário</button>
+    <button class="danger" onclick="deleteEmployee()" data-i18n="removeWorker">Excluir funcionário</button>
+    <button id="companyReportButton" class="secondary" onclick="showCompanyReport()" data-i18n="companyReport">Relatório mensal da equipe</button>
+    <button class="secondary" onclick="window.print()" data-i18n="print">Imprimir / PDF</button>
+    <button class="secondary" onclick="logout()" data-i18n="logout">Sair</button>
   </div>
 
   <div class="month-nav">
@@ -163,12 +164,12 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 
 <section class="card">
   <div class="sheet-title" id="title">Folha mensal</div>
-  <div class="sheet-sub">Cada funcionário tem sua própria folha em cada mês. Configure o horário padrão de cada funcionário abaixo.</div>
+  <div class="sheet-sub" data-i18n="sheetHelp">Cada funcionário tem sua própria folha em cada mês. Configure o horário padrão de cada funcionário abaixo.</div>
   <div class="grid no-print" style="margin-top:12px">
-    <div><label>Entrada padrão</label><input id="defaultEntry" type="time" value="08:00"></div>
-    <div><label>Saída padrão</label><input id="defaultExit" type="time" value="17:30"></div>
-    <div><label>Pausa padrão (minutos)</label><input id="defaultBreak" type="number" min="0" step="1" value="30"></div>
-    <div style="align-self:end"><button class="secondary" onclick="saveEmployeeDefaults()">Salvar horário padrão</button></div>
+    <div><label data-i18n="defaultEntry">Entrada padrão</label><input id="defaultEntry" type="time" value="08:00"></div>
+    <div><label data-i18n="defaultExit">Saída padrão</label><input id="defaultExit" type="time" value="17:30"></div>
+    <div><label data-i18n="defaultBreak">Pausa padrão (minutos)</label><input id="defaultBreak" type="number" min="0" step="1" value="30"></div>
+    <div style="align-self:end"><button class="secondary" onclick="saveEmployeeDefaults()" data-i18n="saveDefaults">Salvar horário padrão</button></div>
   </div>
 
   <div class="table" style="margin-top:12px">
@@ -180,18 +181,18 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
     </table>
   </div>
 
-  <div class="no-print" style="margin-top:12px"><label>Data do próximo dia (pode alterar)</label><input id="newDate" type="date"></div>
+  <div class="no-print" style="margin-top:12px"><label data-i18n="newDate">Data do próximo dia (pode alterar)</label><input id="newDate" type="date"></div>
   <div class="actions no-print">
-    <button onclick="addRow()">＋ Adicionar dia</button>
+    <button onclick="addRow()" data-i18n="addDay">＋ Adicionar dia</button>
   </div>
 
   <div class="grid" style="margin-top:14px">
-<div><label>Forma de pagamento</label><select id="paymentMode" onchange="savePayment()"><option value="daily">Por diária</option><option value="hourly">Por hora</option><option value="fixed">Salário fixo mensal</option></select></div>
-<div><label>Moeda</label><select id="currencyCode" onchange="savePayment()"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option><option value="BRL">BRL (R$)</option></select></div>
-<div id="dailyRateField"><label>Valor por diária</label><input id="dailyRate" type="number" min="0" step="0.01" onchange="savePayment()"></div>
-<div id="hourlyRateField" class="hidden"><label>Valor por hora</label><input id="hourlyRate" type="number" min="0" step="0.01" onchange="savePayment()"></div>
-<div id="fixedSalaryField" class="hidden"><label>Salário fixo mensal</label><input id="fixedSalary" type="number" min="0" step="0.01" onchange="savePayment()"></div>
-<div><label>Adiantamento do mês (€)</label><input id="advance" type="number" min="0" step="0.01" onchange="savePayment()"></div>
+<div><label data-i18n="paymentMode">Forma de pagamento</label><select id="paymentMode" onchange="savePayment()"><option value="daily" data-i18n="daily">Por diária</option><option value="hourly" data-i18n="hourly">Por hora</option><option value="fixed" data-i18n="fixed">Salário fixo mensal</option></select></div>
+<div><label data-i18n="currency">Moeda</label><select id="currencyCode" onchange="savePayment()"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option><option value="BRL">BRL (R$)</option></select></div>
+<div id="dailyRateField"><label data-i18n="dailyRate">Valor por diária</label><input id="dailyRate" type="number" min="0" step="0.01" onchange="savePayment()"></div>
+<div id="hourlyRateField" class="hidden"><label data-i18n="hourlyRate">Valor por hora</label><input id="hourlyRate" type="number" min="0" step="0.01" onchange="savePayment()"></div>
+<div id="fixedSalaryField" class="hidden"><label data-i18n="fixedSalary">Salário fixo mensal</label><input id="fixedSalary" type="number" min="0" step="0.01" onchange="savePayment()"></div>
+<div><label data-i18n="advance">Adiantamento do mês</label><input id="advance" type="number" min="0" step="0.01" onchange="savePayment()"></div>
 </div>
 <div class="summary"><div class="stat"><b id="gross">€ 0,00</b><span>Total bruto do mês</span></div><div class="stat"><b id="balance">€ 0,00</b><span>Saldo a receber após adiantamento</span></div></div>
 <div class="summary">
@@ -222,7 +223,14 @@ const $=id=>document.getElementById(id);
 let user=null,employees=[],records=[],payment={},profile={},loadVersion=0,starting=false,startedFor=null;
 const PROFILE_FIELDS={account_type:"accountType",company_name:"companyName",vat_number:"vatNumber",address:"companyAddress",phone:"companyPhone",email:"companyEmail",logo_url:"companyLogo",language_code:"languageCode",preferred_currency:"preferredCurrency"};
 const UI_LABELS={fr:{heading:"Paramètres du compte",save:"Enregistrer",subtitle:"Gestion des heures de travail"}, "pt-PT":{heading:"Definições da conta",save:"Guardar",subtitle:"Controlo de horas de trabalho"},"pt-BR":{heading:"Configurações da conta",save:"Salvar",subtitle:"Controle de horas de trabalho"},en:{heading:"Account settings",save:"Save settings",subtitle:"Work hours tracking"}};
-function applyLanguage(){const lang=$("languageCode").value;document.documentElement.lang=lang;const labels=UI_LABELS[lang]||UI_LABELS.fr;$("profileHeading").textContent=labels.heading;$("saveProfileButton").textContent=labels.save;$("brandSubtitle").textContent=labels.subtitle;}
+const TRANSLATIONS={
+fr:{accountType:"Type de compte",business:"Entreprise",individual:"Particulier",language:"Langue",defaultCurrency:"Devise par défaut",profileName:"Nom de l’entreprise / profil",taxNumber:"Numéro TVA / fiscal",address:"Adresse",phone:"Téléphone",email:"E-mail",logo:"URL du logo (https://)",worker:"Employé / profil",year:"Année",month:"Mois",newWorker:"Nouvel employé / profil",addWorker:"Ajouter",removeWorker:"Retirer",companyReport:"Rapport mensuel de l’équipe",print:"Imprimer / PDF",logout:"Déconnexion",sheetHelp:"Chaque profil dispose d’une feuille mensuelle. Définissez les horaires par défaut ci-dessous.",defaultEntry:"Début par défaut",defaultExit:"Fin par défaut",defaultBreak:"Pause par défaut (minutes)",saveDefaults:"Enregistrer les horaires",newDate:"Date du prochain jour",addDay:"＋ Ajouter un jour",paymentMode:"Mode de paiement",daily:"Par jour",hourly:"Par heure",fixed:"Salaire mensuel fixe",currency:"Devise",dailyRate:"Tarif journalier",hourlyRate:"Tarif horaire",fixedSalary:"Salaire mensuel fixe",advance:"Avance du mois",hintBusiness:"Gérez les employés et le rapport de votre entreprise.",hintIndividual:"Suivez vos propres heures : créez un profil avec votre nom. Vos données existantes restent disponibles."},
+"pt-PT":{accountType:"Tipo de conta",business:"Empresa",individual:"Particular",language:"Idioma",defaultCurrency:"Moeda predefinida",profileName:"Nome da empresa / perfil",taxNumber:"NIF / IVA",address:"Morada",phone:"Telefone",email:"E-mail",logo:"URL do logótipo (https://)",worker:"Trabalhador / perfil",year:"Ano",month:"Mês",newWorker:"Novo trabalhador / perfil",addWorker:"Adicionar",removeWorker:"Remover",companyReport:"Relatório mensal da equipa",print:"Imprimir / PDF",logout:"Sair",sheetHelp:"Cada perfil tem a sua folha mensal. Configure os horários predefinidos.",defaultEntry:"Entrada predefinida",defaultExit:"Saída predefinida",defaultBreak:"Pausa predefinida (minutos)",saveDefaults:"Guardar horário",newDate:"Data do próximo dia",addDay:"＋ Adicionar dia",paymentMode:"Tipo de pagamento",daily:"Por dia",hourly:"Por hora",fixed:"Salário mensal fixo",currency:"Moeda",dailyRate:"Valor diário",hourlyRate:"Valor por hora",fixedSalary:"Salário mensal fixo",advance:"Adiantamento do mês",hintBusiness:"Gira os trabalhadores e o relatório da empresa.",hintIndividual:"Registe as suas horas: crie um perfil com o seu nome. Os dados existentes continuam disponíveis."},
+"pt-BR":{accountType:"Tipo de conta",business:"Empresa",individual:"Individual",language:"Idioma",defaultCurrency:"Moeda padrão",profileName:"Nome da empresa / perfil",taxNumber:"CNPJ / número fiscal",address:"Endereço",phone:"Telefone",email:"E-mail",logo:"URL do logotipo (https://)",worker:"Funcionário / perfil",year:"Ano",month:"Mês",newWorker:"Novo funcionário / perfil",addWorker:"Adicionar",removeWorker:"Remover",companyReport:"Relatório mensal da equipe",print:"Imprimir / PDF",logout:"Sair",sheetHelp:"Cada perfil tem sua folha mensal. Configure os horários padrão.",defaultEntry:"Entrada padrão",defaultExit:"Saída padrão",defaultBreak:"Pausa padrão (minutos)",saveDefaults:"Salvar horário",newDate:"Data do próximo dia",addDay:"＋ Adicionar dia",paymentMode:"Forma de pagamento",daily:"Por diária",hourly:"Por hora",fixed:"Salário fixo mensal",currency:"Moeda",dailyRate:"Valor por diária",hourlyRate:"Valor por hora",fixedSalary:"Salário fixo mensal",advance:"Adiantamento do mês",hintBusiness:"Gerencie funcionários e o relatório da empresa.",hintIndividual:"Controle suas próprias horas: crie um perfil com seu nome. Os dados existentes continuam disponíveis."},
+en:{accountType:"Account type",business:"Business",individual:"Individual",language:"Language",defaultCurrency:"Default currency",profileName:"Company / profile name",taxNumber:"Tax / VAT number",address:"Address",phone:"Phone",email:"Email",logo:"Logo URL (https://)",worker:"Worker / profile",year:"Year",month:"Month",newWorker:"New worker / profile",addWorker:"Add",removeWorker:"Remove",companyReport:"Team monthly report",print:"Print / PDF",logout:"Log out",sheetHelp:"Each profile has a monthly timesheet. Set default working hours below.",defaultEntry:"Default start",defaultExit:"Default end",defaultBreak:"Default break (minutes)",saveDefaults:"Save default hours",newDate:"Next day date",addDay:"＋ Add day",paymentMode:"Payment method",daily:"Daily",hourly:"Hourly",fixed:"Fixed monthly salary",currency:"Currency",dailyRate:"Daily rate",hourlyRate:"Hourly rate",fixedSalary:"Fixed monthly salary",advance:"Monthly advance",hintBusiness:"Manage workers and your business report.",hintIndividual:"Track your own hours: create a profile with your name. Existing records remain available."}
+};
+function updateAccountMode(){const lang=$("languageCode").value;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;const individual=$("accountType").value==="individual";$("accountModeHint").textContent=individual?t.hintIndividual:t.hintBusiness;$("companyReportButton").classList.toggle("hidden",individual);if(individual)closeCompanyReport();}
+function applyLanguage(){const lang=$("languageCode").value;document.documentElement.lang=lang;const labels=UI_LABELS[lang]||UI_LABELS.fr;$("profileHeading").textContent=labels.heading;$("saveProfileButton").textContent=labels.save;$("brandSubtitle").textContent=labels.subtitle;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;document.querySelectorAll("[data-i18n]").forEach(el=>{if(t[el.dataset.i18n])el.textContent=t[el.dataset.i18n]});updateAccountMode();}
 function updateBrand(){const name=$("companyName").value.trim();$("brandName").textContent="Contrôle des Heures";const logo=$("companyLogo").value.trim();$("brandLogo").src=/^https:\/\//i.test(logo)?logo:"jefris-logo.jpeg";$("brandLogo").alt=name||"Logo";}
 async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus("Erro ao carregar perfil: "+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"business",company_name:"Jefris Renovation",language_code:"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
 async function saveProfile(){const payload={owner_id:user.id};for(const [field,id] of Object.entries(PROFILE_FIELDS))payload[field]=$(id).value.trim();if(payload.logo_url&&!/^https:\/\//i.test(payload.logo_url)){setStatus("Use uma URL HTTPS válida para o logotipo.",false);return}const {data,error}=await sb.from("app_profiles").upsert(payload,{onConflict:"owner_id"}).select("*").single();if(error){setStatus("Erro ao salvar perfil: "+error.message,false);return}profile=data;applyLanguage();updateBrand();setStatus("Configurações salvas na nuvem.");}
@@ -335,7 +343,7 @@ async function loadRecords(){
   $("hourlyRate").value=payment.hourly_rate??0;
   $("fixedSalary").value=payment.fixed_salary??0;
   $("paymentMode").value=payment.payment_mode||"daily";
-  $("currencyCode").value=payment.currency_code||"EUR";
+  $("currencyCode").value=payment.currency_code||profile.preferred_currency||"EUR";
   updatePaymentFields();
   $("advance").value=payment.advance??0;
   render();
