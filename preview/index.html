@@ -560,7 +560,8 @@ function printSelectedReport(mode){
   const logo=document.getElementById("brandLogo")?.src||"";
   const escapeHTML=s=>String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
   popup.document.open();
-  popup.document.write('<!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório - '+escapeHTML(company)+'</title>'+style+'</head><body><header><img src="'+escapeHTML(logo)+'" alt=""><h1>'+escapeHTML(company)+'</h1></header>'+report.outerHTML+'</body></html>');
+  popup.document.write('<!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório - '+escapeHTML(company)+'</title>'+style+'</head><body><header><img src="'+escapeHTML(logo)+'" alt=""><h1>'+escapeHTML(company)+'</h1></header>'+report.outerHTML+'<footer style="text-align:center;padding:20px;font-size:14px" class="no-print"><a href="/privacy.html" target="_blank" rel="noopener">Confidentialité / Privacidade</a> · <a href="mailto:jefrisrenovation@gmail.com">Assistance / Suporte</a></footer>
+</body></html>');
   popup.document.close();
   popup.focus();
   // User can use Safari Share > Print if its print dialog does not open automatically.
