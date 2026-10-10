@@ -171,10 +171,14 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
   </div>
 
   <div class="grid" style="margin-top:14px">
-<div><label>Valor por diária (€)</label><input id="dailyRate" type="number" min="0" step="0.01" onchange="savePayment()"></div>
+<div><label>Forma de pagamento</label><select id="paymentMode" onchange="savePayment()"><option value="daily">Por diária</option><option value="hourly">Por hora</option><option value="fixed">Salário fixo mensal</option></select></div>
+<div><label>Moeda</label><select id="currencyCode" onchange="savePayment()"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option><option value="BRL">BRL (R$)</option></select></div>
+<div id="dailyRateField"><label>Valor por diária</label><input id="dailyRate" type="number" min="0" step="0.01" onchange="savePayment()"></div>
+<div id="hourlyRateField" class="hidden"><label>Valor por hora</label><input id="hourlyRate" type="number" min="0" step="0.01" onchange="savePayment()"></div>
+<div id="fixedSalaryField" class="hidden"><label>Salário fixo mensal</label><input id="fixedSalary" type="number" min="0" step="0.01" onchange="savePayment()"></div>
 <div><label>Adiantamento do mês (€)</label><input id="advance" type="number" min="0" step="0.01" onchange="savePayment()"></div>
 </div>
-<div class="summary"><div class="stat"><b id="gross">€ 0,00</b><span>Total: dias equivalentes × diária</span></div><div class="stat"><b id="balance">€ 0,00</b><span>Saldo a receber após adiantamento</span></div></div>
+<div class="summary"><div class="stat"><b id="gross">€ 0,00</b><span>Total bruto do mês</span></div><div class="stat"><b id="balance">€ 0,00</b><span>Saldo a receber após adiantamento</span></div></div>
 <div class="summary">
     <div class="stat"><b id="total">0h00</b><span>Horas do mês</span></div>
     <div class="stat"><b id="fullDays">0</b><span>Dias completos</span></div>
@@ -187,7 +191,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 <h2>Relatório mensal — Jefris Renovation</h2>
 <div id="reportMonth" class="muted"></div>
 <div class="actions no-print"><button class="secondary" onclick="printCompanyReport()">Imprimir relatório / PDF</button><button class="secondary" onclick="closeCompanyReport()">Fechar relatório</button></div>
-<div class="table"><table><thead><tr><th>Funcionário</th><th>Dias equivalentes</th><th>Diária (€)</th><th>Total (€)</th><th>Adiantamento (€)</th><th>Saldo (€)</th></tr></thead><tbody id="reportRows"></tbody></table></div>
+<div class="table"><table><thead><tr><th>Funcionário</th><th>Dias equivalentes</th><th>Pagamento</th><th>Total</th><th>Adiantamento</th><th>Saldo</th></tr></thead><tbody id="reportRows"></tbody></table></div>
 <div class="summary"><div class="stat"><b id="reportGross"></b><span>Total das diárias</span></div><div class="stat"><b id="reportAdvance"></b><span>Adiantamentos</span></div><div class="stat"><b id="reportBalance"></b><span>Saldo total da equipe</span></div><div class="stat"><b id="reportDue"></b><span>Total a pagar (saldos positivos)</span></div></div>
 <p id="reportNote" class="muted"></p>
 </section>
@@ -307,6 +311,11 @@ async function loadRecords(){
   $("defaultExit").value=String(emp?.default_exit_time||"17:30").slice(0,5);
   $("defaultBreak").value=emp?.default_break_minutes??30;
   $("dailyRate").value=payment.daily_rate??0;
+  $("hourlyRate").value=payment.hourly_rate??0;
+  $("fixedSalary").value=payment.fixed_salary??0;
+  $("paymentMode").value=payment.payment_mode||"daily";
+  $("currencyCode").value=payment.currency_code||"EUR";
+  updatePaymentFields();
   $("advance").value=payment.advance??0;
   render();
   if(result.error)setStatus("Os valores precisam da atualização do banco de dados: "+result.error.message,false);
@@ -345,6 +354,20 @@ function render(){
   refreshCalculated();
 }
 
+function updatePaymentFields(){
+  const mode=$("paymentMode").value;
+  $("dailyRateField").classList.toggle("hidden",mode!=="daily");
+  $("hourlyRateField").classList.toggle("hidden",mode!=="hourly");
+  $("fixedSalaryField").classList.toggle("hidden",mode!=="fixed");
+}
+function calculateGross(minutesWorked,equivalent,p){
+  const mode=p.payment_mode||"daily";
+  const raw=mode==="hourly"?(minutesWorked/60)*(Number(p.hourly_rate)||0):mode==="fixed"?(Number(p.fixed_salary)||0):equivalent*(Number(p.daily_rate)||0);
+  return Math.round(raw*100)/100;
+}
+function formatMoney(n,currency="EUR"){
+  return Number(n).toLocaleString("pt-BR",{style:"currency",currency});
+}
 function refreshCalculated(){
   let total=0,full=0,half=0;
   records.forEach(r=>{
@@ -358,10 +381,11 @@ function refreshCalculated(){
   $("total").textContent=fmt(total);
   $("fullDays").textContent=full;
   $("halfDays").textContent=half;
-  const rate=Number($("dailyRate").value)||0,advance=Number($("advance").value)||0;
-  const money=n=>n.toLocaleString("pt-BE",{style:"currency",currency:"EUR"});
-  $("gross").textContent=money((full+half/2)*rate);
-  $("balance").textContent=money((full+half/2)*rate-advance);
+  const advance=Number($("advance").value)||0;
+  const currency=$("currencyCode").value;
+  const gross=calculateGross(total,full+half/2,{payment_mode:$("paymentMode").value,daily_rate:$("dailyRate").value,hourly_rate:$("hourlyRate").value,fixed_salary:$("fixedSalary").value});
+  $("gross").textContent=formatMoney(gross,currency);
+  $("balance").textContent=formatMoney(gross-advance,currency);
   $("equivDays").textContent=(full+half/2).toFixed(1).replace(".0","");
 }
 
@@ -420,11 +444,11 @@ async function deleteEmployee(){
 async function savePayment(){
   closeCompanyReport();
   const id=$("employee").value;if(!id)return;
-  const payload={owner_id:user.id,employee_id:id,month:monthStart(),daily_rate:Number($("dailyRate").value)||0,advance:Number($("advance").value)||0};
-  if(payload.daily_rate<0||payload.advance<0){setStatus("Use valores iguais ou maiores que zero.",false);return}
+  const payload={owner_id:user.id,employee_id:id,month:monthStart(),payment_mode:$("paymentMode").value,currency_code:$("currencyCode").value,daily_rate:Number($("dailyRate").value)||0,hourly_rate:Number($("hourlyRate").value)||0,fixed_salary:Number($("fixedSalary").value)||0,advance:Number($("advance").value)||0};
+  if([payload.daily_rate,payload.hourly_rate,payload.fixed_salary,payload.advance].some(v=>!Number.isFinite(v)||v<0)){setStatus("Use valores iguais ou maiores que zero.",false);return}
   const {error}=await sb.from("monthly_payments").upsert(payload,{onConflict:"owner_id,employee_id,month"});
   if(error){setStatus("Erro ao salvar valores: "+error.message,false);return}
-  payment=payload;refreshCalculated();setStatus("Valores salvos na nuvem.");
+  payment=payload;updatePaymentFields();refreshCalculated();setStatus("Valores salvos na nuvem.");
 }
 async function del(i){
   if(!confirm("Excluir este dia?"))return;
@@ -451,20 +475,27 @@ async function showCompanyReport(){
     for(const result of results)if(result.error)throw result.error;
     const [staff,days,payments]=results.map(result=>result.data||[]);
     const report=buildCompanyReport(staff,days,payments);
-    const money=n=>n.toLocaleString("pt-BE",{style:"currency",currency:"EUR"});
-    $("reportRows").innerHTML=report.rows.map(r=>`<tr><td>${esc(r.name)}${r.active===false?' (retirado da equipe)':''}</td><td>${r.days.toLocaleString("pt-BR")}</td><td>${money(r.rate)}</td><td>${money(r.gross)}</td><td>${money(r.advance)}</td><td>${money(r.balance)}</td></tr>`).join("");
+    $("reportRows").innerHTML=report.rows.map(r=>`<tr><td>${esc(r.name)}${r.active===false?' (retirado da equipe)':''}</td><td>${r.days.toLocaleString("pt-BR")}</td><td>${esc(r.modeLabel)}: ${formatMoney(r.rate,r.currency)}</td><td>${formatMoney(r.gross,r.currency)}</td><td>${formatMoney(r.advance,r.currency)}</td><td>${formatMoney(r.balance,r.currency)}</td></tr>`).join("");
     $("reportMonth").textContent=monthName();
+    const currencies=[...new Set(report.rows.map(r=>r.currency))];
+    const single=currencies.length<=1;
+    const money=n=>single?formatMoney(n,currencies[0]||"EUR"):"—";
     $("reportGross").textContent=money(report.gross);$("reportAdvance").textContent=money(report.advance);$("reportBalance").textContent=money(report.balance);$("reportDue").textContent=money(report.due);
-    $("reportNote").textContent=report.rows.length?"Meio dia conta como 0,5 diária. Saldos negativos não reduzem o pagamento devido aos outros funcionários."+(report.rows.some(r=>r.days>0&&r.rate===0)?" Atenção: há funcionário com dias trabalhados e diária ainda não preenchida.":""):"Nenhum registro de trabalho ou pagamento neste mês.";
+    $("reportNote").textContent=report.rows.length?(single?"Meio dia conta como 0,5 diária para pagamentos diários. Saldos negativos não reduzem os valores devidos aos demais funcionários.":"Há pagamentos em moedas diferentes. Os totais consolidados estão ocultos para evitar somar moedas sem conversão."):"Nenhum registro de trabalho ou pagamento neste mês.";
     $("companyReport").classList.remove("hidden");$("companyReport").scrollIntoView({behavior:"smooth"});setStatus("Relatório carregado com os dados salvos na nuvem.");
   }catch(error){closeCompanyReport();setStatus("Erro ao carregar relatório: "+error.message,false)}
 }
 function buildCompanyReport(staff,days,payments){
-  const rows=staff.filter(e=>days.some(d=>d.employee_id===e.id)||payments.some(p=>p.employee_id===e.id&&(Number(p.daily_rate)||Number(p.advance)))).map(e=>{
-    const equivalent=days.filter(d=>d.employee_id===e.id).reduce((total,d)=>{const m=minutes(d.entry_time,d.exit_time,d.break_minutes??30);return total+(m>240?1:m>0?0.5:0)},0);
-    const payment=payments.find(p=>p.employee_id===e.id)||{};
-    const rate=Number(payment.daily_rate)||0,advance=Number(payment.advance)||0,gross=Math.round(equivalent*rate*100)/100;
-    return {...e,days:equivalent,rate,advance,gross,balance:Math.round((gross-advance)*100)/100};
+  const rows=staff.filter(e=>days.some(d=>d.employee_id===e.id)||payments.some(p=>p.employee_id===e.id)).map(e=>{
+    const employeeDays=days.filter(d=>d.employee_id===e.id);
+    const minutesWorked=employeeDays.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
+    const equivalent=employeeDays.reduce((sum,d)=>{const m=minutes(d.entry_time,d.exit_time,d.break_minutes??30);return sum+(m>240?1:m>0?0.5:0)},0);
+    const p=payments.find(p=>p.employee_id===e.id)||{};
+    const mode=p.payment_mode||"daily",currency=p.currency_code||"EUR";
+    const rate=Number(mode==="hourly"?p.hourly_rate:mode==="fixed"?p.fixed_salary:p.daily_rate)||0;
+    const advance=Number(p.advance)||0,gross=calculateGross(minutesWorked,equivalent,p);
+    const modeLabel=mode==="hourly"?"Por hora":mode==="fixed"?"Fixo mensal":"Por diária";
+    return {...e,days:equivalent,rate,advance,gross,currency,modeLabel,balance:Math.round((gross-advance)*100)/100};
   });
   const sum=key=>Math.round(rows.reduce((total,r)=>total+r[key],0)*100)/100;
   return {rows,gross:sum("gross"),advance:sum("advance"),balance:sum("balance"),due:Math.round(rows.reduce((total,r)=>total+Math.max(0,r.balance),0)*100)/100};
