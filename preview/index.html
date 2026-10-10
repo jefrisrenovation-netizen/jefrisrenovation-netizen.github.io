@@ -546,18 +546,26 @@ async function showIndividualReport(){
 }
 function closeCompanyReport(){ $("companyReport").classList.add("hidden"); }
 function printSelectedReport(mode){
-  document.body.classList.remove("print-company","print-individual");
-  document.body.classList.add(mode);
-  const report=document.getElementById(mode==="print-company"?"companyReport":"individualReport");
-  const wasHidden=report.classList.contains("hidden");
+  const source=document.getElementById(mode==="print-company"?"companyReport":"individualReport");
+  if(!source||source.classList.contains("hidden")){setStatus("Abra o relatório antes de imprimir.",false);return}
+  // A separate print document prevents Safari from including the employee timesheet.
+  const popup=window.open("","_blank");
+  if(!popup){setStatus("O Safari bloqueou a janela de impressão. Permita pop-ups e tente novamente.",false);return}
+  const report=source.cloneNode(true);
+  report.querySelectorAll(".no-print").forEach(el=>el.remove());
   report.classList.remove("hidden");
-  const cleanup=()=>{document.body.classList.remove(mode);if(wasHidden)report.classList.add("hidden");window.removeEventListener("afterprint",cleanup)};
-  window.addEventListener("afterprint",cleanup);
-  window.print();
-  // iOS Safari may return from print before its preview closes; afterprint handles cleanup.
+  const company=profile.company_name||"Contrôle des Heures";
+  const style=`<style>@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#171717;margin:18px}header{display:flex;align-items:center;gap:12px;margin-bottom:20px}header img{width:60px;height:60px;object-fit:contain}h1{font-size:20px;margin:0}h2{font-size:19px;margin:10px 0}p{color:#555}.table{overflow:visible}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #ccc;padding:7px 5px;text-align:left;font-size:11px;overflow-wrap:anywhere}th{background:#f2f2f2}.summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.stat{border:1px solid #ddd;border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:4px}.stat b{font-size:16px}.stat span{font-size:11px;color:#555}.hidden{display:block}tr{break-inside:avoid}@media print{body{margin:0}header{margin-bottom:12px}}</style>`;
+  const logo=document.getElementById("brandLogo")?.src||"";
+  const escapeHTML=s=>String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+  popup.document.open();
+  popup.document.write('<!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório - '+escapeHTML(company)+'</title>'+style+'</head><body><header><img src="'+escapeHTML(logo)+'" alt=""><h1>'+escapeHTML(company)+'</h1></header>'+report.outerHTML+'</body></html>');
+  popup.document.close();
+  popup.focus();
+  // User can use Safari Share > Print if its print dialog does not open automatically.
+  popup.addEventListener("load",()=>popup.print(),{once:true});
 }
 function printCompanyReport(){printSelectedReport("print-company")}
-window.addEventListener("afterprint",()=>document.body.classList.remove("print-company"));
 async function showCompanyReport(){
   if(saving){setStatus("Aguarde o salvamento para abrir o relatório.",false);return}
   const selectedMonth=ym();setStatus("Carregando relatório mensal...");
