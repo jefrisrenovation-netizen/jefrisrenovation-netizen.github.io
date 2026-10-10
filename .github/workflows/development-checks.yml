@@ -42,3 +42,14 @@ jobs:
           assert.equal(g(0,0,{payment_mode:'fixed',fixed_salary:2500}),2500);
           console.log('JavaScript syntax and 9 calculation assertions passed');
           JS
+      - name: Package test build (not production)
+        run: |
+          mkdir -p /tmp/controle-preview
+          cp index.html manifest.webmanifest sw.js icon-192.png icon-512.png /tmp/controle-preview/
+          if test -f jefris-logo.jpeg; then cp jefris-logo.jpeg /tmp/controle-preview/; fi
+          printf '%s\n' 'Development build only. Open index.html with a local HTTP server; authentication redirect is configured for the production URL and may require a separate authorized redirect URL for this preview.' > /tmp/controle-preview/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: controle-des-heures-test-build
+          path: /tmp/controle-preview/
+          retention-days: 7
