@@ -144,14 +144,14 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
     <div><label data-i18n="worker">Funcionário</label><select id="employee"></select></div>
     <div><label data-i18n="year">Ano</label><select id="year"></select></div>
     <div><label data-i18n="month">Mês</label><select id="month"></select></div>
-    <div><label data-i18n="newWorker">Novo funcionário</label><input id="newEmployee" placeholder="Nome completo"></div>
+    <div><label data-i18n="newWorker">Novo funcionário</label><input id="newEmployee" placeholder="Nom complet"></div>
   </div>
 
   <div class="actions">
     <button onclick="addEmployee()" data-i18n="addWorker">Adicionar funcionário</button>
     <button class="danger" onclick="deleteEmployee()" data-i18n="removeWorker">Excluir funcionário</button>
     <button id="companyReportButton" class="secondary" onclick="showCompanyReport()" data-i18n="companyReport">Relatório mensal da equipe</button>
-    <button id="individualReportButton" class="secondary" onclick="showIndividualReport()" data-i18n="individualReport">Relatório individual</button>
+    <button id="individualReportButton" class="secondary" onclick="showIndividualReport()" data-i18n="individualReport">Rapport individuel</button>
     <button class="secondary" onclick="window.print()" data-i18n="print">Imprimir / PDF</button>
     <button class="secondary" onclick="logout()" data-i18n="logout">Sair</button>
   </div>
@@ -167,7 +167,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 </section>
 
 <section class="card">
-  <div class="sheet-title" id="title">Folha mensal</div>
+  <div class="sheet-title" id="title">Feuille mensuelle</div>
   <div class="sheet-sub" data-i18n="sheetHelp">Cada funcionário tem sua própria folha em cada mês. Configure o horário padrão de cada funcionário abaixo.</div>
   <div class="grid no-print" style="margin-top:12px">
     <div><label data-i18n="defaultEntry">Entrada padrão</label><input id="defaultEntry" type="time" value="08:00"></div>
@@ -207,11 +207,11 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
   </div>
 </section>
 
-<section id="individualReport" class="card hidden"><h2 id="individualReportTitle">Relatório individual</h2><p id="individualReportMonth" class="muted"></p><div class="actions no-print"><button class="secondary" onclick="printIndividualReport()">Imprimir relatório / PDF</button><button class="secondary" onclick="closeIndividualReport()">Fechar relatório</button></div><div class="table"><table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Pausa (min)</th><th>Horas</th><th>Local</th></tr></thead><tbody id="individualReportRows"></tbody></table></div><div id="individualReportSummary" class="summary"></div></section>
+<section id="individualReport" class="card hidden"><h2 id="individualReportTitle">Rapport individuel</h2><p id="individualReportMonth" class="muted"></p><div class="actions no-print"><button class="secondary" onclick="printIndividualReport()">Partager le rapport PDF</button><button class="secondary" onclick="closeIndividualReport()">Fermer le rapport</button></div><div class="table"><table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Pausa (min)</th><th>Horas</th><th>Local</th></tr></thead><tbody id="individualReportRows"></tbody></table></div><div id="individualReportSummary" class="summary"></div></section>
 <section id="companyReport" class="card hidden">
-<h2>Relatório mensal — Jefris Renovation</h2>
+<h2>Rapport mensuel de l’équipe</h2>
 <div id="reportMonth" class="muted"></div>
-<div class="actions no-print"><button class="secondary" onclick="printCompanyReport()">Imprimir relatório / PDF</button><button class="secondary" onclick="closeCompanyReport()">Fechar relatório</button></div>
+<div class="actions no-print"><button class="secondary" onclick="printCompanyReport()">Partager le rapport PDF</button><button class="secondary" onclick="closeCompanyReport()">Fermer le rapport</button></div>
 <div class="table"><table><thead><tr><th>Funcionário</th><th>Dias equivalentes</th><th>Pagamento</th><th>Total</th><th>Adiantamento</th><th>Saldo</th></tr></thead><tbody id="reportRows"></tbody></table></div>
 <div class="summary"><div class="stat"><b id="reportGross"></b><span>Total das diárias</span></div><div class="stat"><b id="reportAdvance"></b><span>Adiantamentos</span></div><div class="stat"><b id="reportBalance"></b><span>Saldo total da equipe</span></div><div class="stat"><b id="reportDue"></b><span>Total a pagar (saldos positivos)</span></div></div>
 <p id="reportNote" class="muted"></p>
@@ -230,14 +230,14 @@ const PROFILE_FIELDS={account_type:"accountType",company_name:"companyName",vat_
 const UI_LABELS={fr:{heading:"Paramètres du compte",save:"Enregistrer",subtitle:"Gestion des heures de travail"}, "pt-PT":{heading:"Definições da conta",save:"Guardar",subtitle:"Controlo de horas de trabalho"},"pt-BR":{heading:"Configurações da conta",save:"Salvar",subtitle:"Controle de horas de trabalho"},en:{heading:"Account settings",save:"Save settings",subtitle:"Work hours tracking"}};
 const TRANSLATIONS={
 fr:{accountType:"Type de compte",business:"Entreprise",individual:"Particulier",language:"Langue",defaultCurrency:"Devise par défaut",profileName:"Nom de l’entreprise / profil",taxNumber:"Numéro TVA / fiscal",address:"Adresse",phone:"Téléphone",email:"E-mail",logo:"URL du logo (https://)",worker:"Employé / profil",year:"Année",month:"Mois",newWorker:"Nouvel employé / profil",addWorker:"Ajouter",removeWorker:"Retirer",companyReport:"Rapport mensuel de l’équipe",individualReport:"Rapport individuel",print:"Imprimer / PDF",logout:"Déconnexion",sheetHelp:"Chaque profil dispose d’une feuille mensuelle. Définissez les horaires par défaut ci-dessous.",defaultEntry:"Début par défaut",defaultExit:"Fin par défaut",defaultBreak:"Pause par défaut (minutes)",saveDefaults:"Enregistrer les horaires",newDate:"Date du prochain jour",addDay:"＋ Ajouter un jour",paymentMode:"Mode de paiement",daily:"Par jour",hourly:"Par heure",fixed:"Salaire mensuel fixe",currency:"Devise",dailyRate:"Tarif journalier",hourlyRate:"Tarif horaire",fixedSalary:"Salaire mensuel fixe",advance:"Avance du mois",hintBusiness:"Gérez les employés et le rapport de votre entreprise.",hintIndividual:"Suivez vos propres heures : créez un profil avec votre nom. Vos données existantes restent disponibles."},
-"pt-PT":{accountType:"Tipo de conta",business:"Empresa",individual:"Particular",language:"Idioma",defaultCurrency:"Moeda predefinida",profileName:"Nome da empresa / perfil",taxNumber:"NIF / IVA",address:"Morada",phone:"Telefone",email:"E-mail",logo:"URL do logótipo (https://)",worker:"Trabalhador / perfil",year:"Ano",month:"Mês",newWorker:"Novo trabalhador / perfil",addWorker:"Adicionar",removeWorker:"Remover",companyReport:"Relatório mensal da equipa",individualReport:"Relatório individual",print:"Imprimir / PDF",logout:"Sair",sheetHelp:"Cada perfil tem a sua folha mensal. Configure os horários predefinidos.",defaultEntry:"Entrada predefinida",defaultExit:"Saída predefinida",defaultBreak:"Pausa predefinida (minutos)",saveDefaults:"Guardar horário",newDate:"Data do próximo dia",addDay:"＋ Adicionar dia",paymentMode:"Tipo de pagamento",daily:"Por dia",hourly:"Por hora",fixed:"Salário mensal fixo",currency:"Moeda",dailyRate:"Valor diário",hourlyRate:"Valor por hora",fixedSalary:"Salário mensal fixo",advance:"Adiantamento do mês",hintBusiness:"Gira os trabalhadores e o relatório da empresa.",hintIndividual:"Registe as suas horas: crie um perfil com o seu nome. Os dados existentes continuam disponíveis."},
-"pt-BR":{accountType:"Tipo de conta",business:"Empresa",individual:"Individual",language:"Idioma",defaultCurrency:"Moeda padrão",profileName:"Nome da empresa / perfil",taxNumber:"CNPJ / número fiscal",address:"Endereço",phone:"Telefone",email:"E-mail",logo:"URL do logotipo (https://)",worker:"Funcionário / perfil",year:"Ano",month:"Mês",newWorker:"Novo funcionário / perfil",addWorker:"Adicionar",removeWorker:"Remover",companyReport:"Relatório mensal da equipe",individualReport:"Relatório individual",print:"Imprimir / PDF",logout:"Sair",sheetHelp:"Cada perfil tem sua folha mensal. Configure os horários padrão.",defaultEntry:"Entrada padrão",defaultExit:"Saída padrão",defaultBreak:"Pausa padrão (minutos)",saveDefaults:"Salvar horário",newDate:"Data do próximo dia",addDay:"＋ Adicionar dia",paymentMode:"Forma de pagamento",daily:"Por diária",hourly:"Por hora",fixed:"Salário fixo mensal",currency:"Moeda",dailyRate:"Valor por diária",hourlyRate:"Valor por hora",fixedSalary:"Salário fixo mensal",advance:"Adiantamento do mês",hintBusiness:"Gerencie funcionários e o relatório da empresa.",hintIndividual:"Controle suas próprias horas: crie um perfil com seu nome. Os dados existentes continuam disponíveis."},
+"pt-PT":{accountType:"Tipo de conta",business:"Empresa",individual:"Particular",language:"Idioma",defaultCurrency:"Moeda predefinida",profileName:"Nome da empresa / perfil",taxNumber:"NIF / IVA",address:"Morada",phone:"Telefone",email:"E-mail",logo:"URL do logótipo (https://)",worker:"Trabalhador / perfil",year:"Ano",month:"Mês",newWorker:"Novo trabalhador / perfil",addWorker:"Adicionar",removeWorker:"Remover",companyReport:"Relatório mensal da equipa",individualReport:"Rapport individuel",print:"Imprimir / PDF",logout:"Sair",sheetHelp:"Cada perfil tem a sua folha mensal. Configure os horários predefinidos.",defaultEntry:"Entrada predefinida",defaultExit:"Saída predefinida",defaultBreak:"Pausa predefinida (minutos)",saveDefaults:"Guardar horário",newDate:"Data do próximo dia",addDay:"＋ Adicionar dia",paymentMode:"Tipo de pagamento",daily:"Por dia",hourly:"Por hora",fixed:"Salário mensal fixo",currency:"Moeda",dailyRate:"Valor diário",hourlyRate:"Valor por hora",fixedSalary:"Salário mensal fixo",advance:"Adiantamento do mês",hintBusiness:"Gira os trabalhadores e o relatório da empresa.",hintIndividual:"Registe as suas horas: crie um perfil com o seu nome. Os dados existentes continuam disponíveis."},
+"pt-BR":{accountType:"Tipo de conta",business:"Empresa",individual:"Individual",language:"Idioma",defaultCurrency:"Moeda padrão",profileName:"Nome da empresa / perfil",taxNumber:"CNPJ / número fiscal",address:"Endereço",phone:"Telefone",email:"E-mail",logo:"URL do logotipo (https://)",worker:"Funcionário / perfil",year:"Ano",month:"Mês",newWorker:"Novo funcionário / perfil",addWorker:"Adicionar",removeWorker:"Remover",companyReport:"Relatório mensal da equipe",individualReport:"Rapport individuel",print:"Imprimir / PDF",logout:"Sair",sheetHelp:"Cada perfil tem sua folha mensal. Configure os horários padrão.",defaultEntry:"Entrada padrão",defaultExit:"Saída padrão",defaultBreak:"Pausa padrão (minutos)",saveDefaults:"Salvar horário",newDate:"Data do próximo dia",addDay:"＋ Adicionar dia",paymentMode:"Forma de pagamento",daily:"Por diária",hourly:"Por hora",fixed:"Salário fixo mensal",currency:"Moeda",dailyRate:"Valor por diária",hourlyRate:"Valor por hora",fixedSalary:"Salário fixo mensal",advance:"Adiantamento do mês",hintBusiness:"Gerencie funcionários e o relatório da empresa.",hintIndividual:"Controle suas próprias horas: crie um perfil com seu nome. Os dados existentes continuam disponíveis."},
 en:{accountType:"Account type",business:"Business",individual:"Individual",language:"Language",defaultCurrency:"Default currency",profileName:"Company / profile name",taxNumber:"Tax / VAT number",address:"Address",phone:"Phone",email:"Email",logo:"Logo URL (https://)",worker:"Worker / profile",year:"Year",month:"Month",newWorker:"New worker / profile",addWorker:"Add",removeWorker:"Remove",companyReport:"Team monthly report",individualReport:"Individual report",print:"Print / PDF",logout:"Log out",sheetHelp:"Each profile has a monthly timesheet. Set default working hours below.",defaultEntry:"Default start",defaultExit:"Default end",defaultBreak:"Default break (minutes)",saveDefaults:"Save default hours",newDate:"Next day date",addDay:"＋ Add day",paymentMode:"Payment method",daily:"Daily",hourly:"Hourly",fixed:"Fixed monthly salary",currency:"Currency",dailyRate:"Daily rate",hourlyRate:"Hourly rate",fixedSalary:"Fixed monthly salary",advance:"Monthly advance",hintBusiness:"Manage workers and your business report.",hintIndividual:"Track your own hours: create a profile with your name. Existing records remain available."}
 };
 function updateAccountMode(){const lang=$("languageCode").value;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;const individual=$("accountType").value==="individual";$("accountModeHint").textContent=individual?t.hintIndividual:t.hintBusiness;$("companyReportButton").classList.remove("hidden");}
 function applyLanguage(){const lang=$("languageCode").value;document.documentElement.lang=lang;const labels=UI_LABELS[lang]||UI_LABELS.fr;$("profileHeading").textContent=labels.heading;$("saveProfileButton").textContent=labels.save;$("brandSubtitle").textContent=labels.subtitle;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;document.querySelectorAll("[data-i18n]").forEach(el=>{if(t[el.dataset.i18n])el.textContent=t[el.dataset.i18n]});updateAccountMode();}
 function updateBrand(){const name=$("companyName").value.trim();$("brandName").textContent="Suivi des heures";const logo=$("companyLogo").value.trim();$("brandLogo").src=/^https:\/\//i.test(logo)?logo:"assets/suivi-logo.png";$("brandLogo").alt=name||"Logo";}
-async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus("Erro ao carregar perfil: "+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"business",company_name:"Jefris Renovation",language_code:"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
+async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus("Erro ao carregar perfil: "+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"individual",company_name:"",language_code:"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
 async function saveProfile(){
   const button=document.querySelector('[onclick="saveProfile()"]');
   const previousLabel=button?.textContent;
@@ -269,7 +269,7 @@ async function login(){
   const email=$("email").value.trim();
   if(!email){setLogin("Digite seu e-mail.");return}
   setLogin("Enviando link...",true);
-  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:"https://jefrisrenovation-netizen.github.io/",shouldCreateUser:true}});
+  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:"suiviheurespro://login",shouldCreateUser:true}});
   if(error)setLogin(error.message);else setLogin("Link enviado. Abra o e-mail, entre no site principal e depois volte a /preview/.",true);
 }
 async function logout(){await sb.auth.signOut();location.reload()}
@@ -402,7 +402,7 @@ function render(){
       <td><input type="time" value="${(r.exit_time||"").slice(0,5)}" onchange="upd(${i},'exit_time',this.value)"></td>
       <td><input type="number" min="0" value="${r.break_minutes??30}" onchange="upd(${i},'break_minutes',this.value)"></td>
       <td><b>${fmt(minutes(r.entry_time,r.exit_time,r.break_minutes??30))}</b></td>
-      <td><input value="${esc(r.workplace||"")}" placeholder="Ex.: Bruxelas" onchange="upd(${i},'workplace',this.value)"></td>
+      <td><input value="${esc(r.workplace||"")}" placeholder="Ex. : Bruxelles" onchange="upd(${i},'workplace',this.value)"></td>
       <td><button class="danger no-print" style="width:auto;padding:8px" onclick="del(${i})">×</button></td>
     </tr>`).join("");
   const last=records.reduce((max,r)=>Math.max(max,Number(r.work_date.slice(-2))),0);
@@ -538,9 +538,9 @@ async function showIndividualReport(){
     const row=report.rows[0];
     const totalMinutes=days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
     const currency=paymentRow?.currency_code||profile.preferred_currency||"EUR";
-    $("individualReportTitle").textContent="Relatório individual — "+worker.name;
+    $("individualReportTitle").textContent="Rapport individuel — "+worker.name;
     $("individualReportMonth").textContent=monthName()+" — "+(profile.company_name||"Suivi des heures");
-    $("individualReportRows").innerHTML=days.map(d=>`<tr><td>${esc(d.work_date)}</td><td>${esc(d.entry_time||"")}</td><td>${esc(d.exit_time||"")}</td><td>${Number(d.break_minutes??30)}</td><td>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes??30))}</td><td>${esc(d.work_location||d.location||"")}</td></tr>`).join("");
+    $("individualReportRows").innerHTML=days.map(d=>`<tr><td>${esc(d.work_date)}</td><td>${esc(d.entry_time||"")}</td><td>${esc(d.exit_time||"")}</td><td>${Number(d.break_minutes??30)}</td><td>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes??30))}</td><td>${esc(d.workplace||d.work_location||d.location||"")}</td></tr>`).join("");
     $("individualReportSummary").innerHTML=`<div class="stat"><b>${fmt(totalMinutes)}</b><span>Horas trabalhadas</span></div><div class="stat"><b>${row?.days??0}</b><span>Dias equivalentes</span></div><div class="stat"><b>${formatMoney(row?.gross??0,currency)}</b><span>Valor bruto</span></div><div class="stat"><b>${formatMoney(row?.advance??0,currency)}</b><span>Adiantamentos</span></div><div class="stat"><b>${formatMoney(row?.balance??0,currency)}</b><span>Valor líquido</span></div>`;
     closeCompanyReport();$("individualReport").classList.remove("hidden");$("individualReport").scrollIntoView({behavior:"smooth"});
   }catch(error){closeIndividualReport();setStatus("Erro no relatório individual: "+error.message,false)}
@@ -645,7 +645,5 @@ if(false && "serviceWorker"in navigator)window.addEventListener("load",async()=>
   try{const registration=await navigator.serviceWorker.register("sw.js",{updateViaCache:"none"});await registration.update()}catch(error){console.warn("Atualização do aplicativo indisponível",error)}
 });
 </script>
-<footer style="text-align:center;padding:20px;font-size:14px" class="no-print"><a href="/privacy.html" target="_blank" rel="noopener">Confidentialité / Privacidade</a> · <a href="mailto:jefrisrenovation@gmail.com">Assistance / Suporte</a></footer>
 </body>
 </html>
-

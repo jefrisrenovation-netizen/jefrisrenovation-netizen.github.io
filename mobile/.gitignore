@@ -1,0 +1,13 @@
+node_modules/
+dist/
+ios/
+android/
+.env*
+*.p8
+*.p12
+*.jks
+*.keystore
+/src/main.js
+/index.html
+/public/
+/build/

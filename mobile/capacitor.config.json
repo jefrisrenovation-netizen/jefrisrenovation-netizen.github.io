@@ -1,0 +1,12 @@
+{
+  "appId": "io.github.jefrisrenovation.suividesheures",
+  "appName": "Suivi des heures Pro",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "automatic"
+  },
+  "server": {
+    "hostname": "localhost",
+    "androidScheme": "https"
+  }
+}
