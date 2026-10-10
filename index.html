@@ -336,6 +336,7 @@ async function loadRecords(){
   records=data||[];
   const result=await sb.from("monthly_payments").select("*").eq("owner_id",user.id).eq("employee_id",id).eq("month",monthStart()).maybeSingle();
   if(version!==loadVersion)return;
+  if(result.error){setStatus("Erro ao carregar pagamentos: "+result.error.message,false);return}
   payment=result.data||{};
   const emp=employees.find(e=>e.id===id);
   $("defaultEntry").value=String(emp?.default_entry_time||"08:00").slice(0,5);
@@ -349,7 +350,6 @@ async function loadRecords(){
   updatePaymentFields();
   $("advance").value=payment.advance??0;
   render();
-  if(result.error)setStatus("Os valores precisam da atualização do banco de dados: "+result.error.message,false);
 }
 
 function renderHistory(){
