@@ -263,7 +263,9 @@ function minutes(a,b,p){
   const x=a.split(":").map(Number),y=b.split(":").map(Number);
   let m=y[0]*60+y[1]-x[0]*60-x[1];
   if(m<0)m+=1440;
-  return Math.max(0,m-(Number(p)||0));
+  if(m===0)return 0;
+  const pause=Math.max(0,Number(p)||0);
+  return Math.max(0,m-pause);
 }
 function fmt(m){return Math.floor(m/60)+"h"+String(m%60).padStart(2,"0")}
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
