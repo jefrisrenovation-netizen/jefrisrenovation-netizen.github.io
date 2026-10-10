@@ -233,7 +233,29 @@ function updateAccountMode(){const lang=$("languageCode").value;const t=TRANSLAT
 function applyLanguage(){const lang=$("languageCode").value;document.documentElement.lang=lang;const labels=UI_LABELS[lang]||UI_LABELS.fr;$("profileHeading").textContent=labels.heading;$("saveProfileButton").textContent=labels.save;$("brandSubtitle").textContent=labels.subtitle;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;document.querySelectorAll("[data-i18n]").forEach(el=>{if(t[el.dataset.i18n])el.textContent=t[el.dataset.i18n]});updateAccountMode();}
 function updateBrand(){const name=$("companyName").value.trim();$("brandName").textContent="Contrôle des Heures";const logo=$("companyLogo").value.trim();$("brandLogo").src=/^https:\/\//i.test(logo)?logo:"../jefris-logo.jpeg";$("brandLogo").alt=name||"Logo";}
 async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus("Erro ao carregar perfil: "+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"business",company_name:"Jefris Renovation",language_code:"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
-async function saveProfile(){const payload={owner_id:user.id};for(const [field,id] of Object.entries(PROFILE_FIELDS))payload[field]=$(id).value.trim();if(payload.logo_url&&!/^https:\/\//i.test(payload.logo_url)){setStatus("Use uma URL HTTPS válida para o logotipo.",false);return}const {data,error}=await sb.from("app_profiles").upsert(payload,{onConflict:"owner_id"}).select("*").single();if(error){setStatus("Erro ao salvar perfil: "+error.message,false);return}profile=data;applyLanguage();updateBrand();setStatus("Configurações salvas na nuvem.");}
+async function saveProfile(){
+  const button=document.querySelector('[onclick="saveProfile()"]');
+  const previousLabel=button?.textContent;
+  if(button){button.disabled=true;button.textContent="Salvando...";}
+  try{
+    const {data:sessionData,error:sessionError}=await sb.auth.getUser();
+    if(sessionError||!sessionData?.user){setStatus("Sessão expirada. Entre novamente antes de salvar. "+(sessionError?.message||""),false);return}
+    user=sessionData.user;
+    const payload={owner_id:user.id};
+    for(const [field,id] of Object.entries(PROFILE_FIELDS))payload[field]=$(id).value.trim();
+    if(payload.logo_url&&!/^https:\/\//i.test(payload.logo_url)){setStatus("Use uma URL HTTPS válida para o logotipo.",false);return}
+    const {data,error}=await sb.from("app_profiles").upsert(payload,{onConflict:"owner_id"}).select("*").single();
+    if(error){setStatus("Erro ao salvar perfil: "+error.message+" (código: "+(error.code||"indisponível")+")",false);return}
+    const {data:verified,error:verifyError}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).single();
+    if(verifyError||!verified){setStatus("Não foi possível confirmar o salvamento: "+(verifyError?.message||"perfil não encontrado"),false);return}
+    profile=verified;
+    for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??"";
+    applyLanguage();updateBrand();
+    setStatus("Configurações verificadas e salvas na nuvem.");
+    alert("Configurações verificadas e salvas na nuvem.");
+  }catch(error){setStatus("Falha de conexão ao salvar: "+(error?.message||String(error)),false)}
+  finally{if(button){button.disabled=false;button.textContent=previousLabel;}}
+}
 
 function setStatus(msg,ok=true){$("cloudStatus").textContent=msg;$("cloudStatus").className="status "+(ok?"ok":"err")}
 function setLogin(msg,ok=false){$("loginStatus").textContent=msg;$("loginStatus").className="status "+(ok?"ok":"err")}
