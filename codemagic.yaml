@@ -1,4 +1,47 @@
 workflows:
+  ios-testflight:
+    name: iPhone - TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 40
+    integrations:
+      app_store_connect: Codemagic Suivi Heures
+    environment:
+      node: 22
+      xcode: latest
+      ios_signing:
+        provisioning_profiles:
+          - suivi_heures_appstore
+        certificates:
+          - suivi_heures_distribution
+    scripts:
+      - name: Préparer et vérifier le code
+        script: |
+          set -e
+          cd mobile
+          npm ci
+          npm run prepare:web
+          npm test
+          npm run build
+          npm run prepare:native -- ios
+      - name: Configurer la signature et le numéro de compilation
+        script: |
+          set -e
+          cd mobile/ios/App
+          agvtool new-version -all "$BUILD_NUMBER"
+          xcode-project use-profiles --project App.xcodeproj
+      - name: Compiler la version iPhone signée
+        script: |
+          set -e
+          cd mobile
+          xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App
+    artifacts:
+      - mobile/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false
   ios-simulator:
     name: iPhone - compilation de test (simulateur)
     instance_type: mac_mini_m2
