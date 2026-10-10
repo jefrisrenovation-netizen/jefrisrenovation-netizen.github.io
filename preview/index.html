@@ -43,7 +43,9 @@ th,td{padding:9px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:1
 @media print{
 @page{size:A4 landscape;margin:10mm}
 body.print-company #app>section:not(#companyReport),body.print-individual #app>section:not(#individualReport){display:none!important}
-body:not(.print-company) #companyReport,body:not(.print-individual) #individualReport{display:none!important}
+body.print-company #companyReport,body.print-individual #individualReport{display:block!important}
+body.print-company #individualReport,body.print-individual #companyReport{display:none!important}
+body.print-company #app>section:not(#companyReport),body.print-individual #app>section:not(#individualReport){display:none!important}
 body.print-company #companyReport th,body.print-company #companyReport td{width:auto!important;display:table-cell!important}
 body.print-company #companyReport table{table-layout:auto!important}
 body{background:#fff!important;padding:0!important;margin:0!important}
@@ -516,7 +518,7 @@ async function del(i){
 }
 
 function closeIndividualReport(){ $("individualReport").classList.add("hidden"); }
-function printIndividualReport(){document.body.classList.add("print-individual");window.print();document.body.classList.remove("print-individual")}
+function printIndividualReport(){printSelectedReport("print-individual")}
 async function showIndividualReport(){
   const id=$("employee").value;
   if(!id){setStatus("Selecione um funcionário para gerar o relatório individual.",false);return}
@@ -543,7 +545,18 @@ async function showIndividualReport(){
   }catch(error){closeIndividualReport();setStatus("Erro no relatório individual: "+error.message,false)}
 }
 function closeCompanyReport(){ $("companyReport").classList.add("hidden"); }
-function printCompanyReport(){document.body.classList.add("print-company");window.print();document.body.classList.remove("print-company")}
+function printSelectedReport(mode){
+  document.body.classList.remove("print-company","print-individual");
+  document.body.classList.add(mode);
+  const report=document.getElementById(mode==="print-company"?"companyReport":"individualReport");
+  const wasHidden=report.classList.contains("hidden");
+  report.classList.remove("hidden");
+  const cleanup=()=>{document.body.classList.remove(mode);if(wasHidden)report.classList.add("hidden");window.removeEventListener("afterprint",cleanup)};
+  window.addEventListener("afterprint",cleanup);
+  window.print();
+  // iOS Safari may return from print before its preview closes; afterprint handles cleanup.
+}
+function printCompanyReport(){printSelectedReport("print-company")}
 window.addEventListener("afterprint",()=>document.body.classList.remove("print-company"));
 async function showCompanyReport(){
   if(saving){setStatus("Aguarde o salvamento para abrir o relatório.",false);return}
