@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#151515">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Jefris">
+<meta name="apple-mobile-web-app-title" content="Contrôle des Heures">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>Jefris Renovation</title>
+<title>Contrôle des Heures</title>
 <style>
 :root{--red:#d71920;--dark:#171717;--bg:#f2f3f5;--green:#087f5b}
 *{box-sizing:border-box}
@@ -104,14 +104,14 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 <body>
 <header>
   <div class="brand">
-    <img src="jefris-logo.jpeg" alt="Jefris Renovation">
-    <div><h1>Jefris Renovation</h1><small>Controle de Horas</small></div>
+    <img id="brandLogo" src="jefris-logo.jpeg" alt="Logo da empresa">
+    <div><h1 id="brandName">Contrôle des Heures</h1><small id="brandSubtitle">Gestion des heures de travail</small></div>
   </div>
 </header>
 
 <main>
 <section id="loginCard" class="card login">
-  <h2>Acesso ao Jefris</h2>
+  <h2>Accès à Contrôle des Heures</h2>
   <div class="muted">Entre para sincronizar os dados entre iPhone e computador.</div>
   <input id="email" type="email" placeholder="Seu e-mail" autocomplete="email" style="margin-top:12px">
   <button class="green" onclick="login()" style="margin-top:8px">Enviar link de acesso</button>
@@ -119,6 +119,21 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 </section>
 
 <div id="app" class="hidden">
+<section class="card no-print">
+  <h2 id="profileHeading">Configurações da conta</h2>
+  <div class="grid" style="margin-top:10px">
+    <div><label>Tipo de conta</label><select id="accountType"><option value="business">Empresa</option><option value="individual">Individual</option></select></div>
+    <div><label>Idioma</label><select id="languageCode" onchange="applyLanguage()"><option value="fr">Français</option><option value="pt-PT">Português (Portugal)</option><option value="pt-BR">Português (Brasil)</option><option value="en">English</option></select></div>
+    <div><label>Moeda padrão</label><select id="preferredCurrency"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option><option value="BRL">BRL (R$)</option></select></div>
+    <div><label>Nome da empresa / perfil</label><input id="companyName" maxlength="160" placeholder="Nome da empresa"></div>
+    <div><label>Número TVA / NIF</label><input id="vatNumber" maxlength="80"></div>
+    <div><label>Endereço</label><input id="companyAddress" maxlength="300"></div>
+    <div><label>Telefone</label><input id="companyPhone" maxlength="80"></div>
+    <div><label>E-mail</label><input id="companyEmail" type="email" maxlength="160"></div>
+    <div><label>URL do logotipo (https://)</label><input id="companyLogo" type="url" placeholder="https://..."></div>
+    <div style="align-self:end"><button onclick="saveProfile()" id="saveProfileButton">Salvar configurações</button></div>
+  </div>
+</section>
 
 <section class="card no-print">
   <div class="grid">
@@ -204,7 +219,13 @@ const SUPABASE_URL="https://nnrelfuewfhkirgzbwsi.supabase.co";
 const SUPABASE_KEY="sb_publishable_3GY1ZI3m6ZLejVqHGL7Pnw_ZnnViDwb";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=id=>document.getElementById(id);
-let user=null,employees=[],records=[],payment={},loadVersion=0,starting=false,startedFor=null;
+let user=null,employees=[],records=[],payment={},profile={},loadVersion=0,starting=false,startedFor=null;
+const PROFILE_FIELDS={account_type:"accountType",company_name:"companyName",vat_number:"vatNumber",address:"companyAddress",phone:"companyPhone",email:"companyEmail",logo_url:"companyLogo",language_code:"languageCode",preferred_currency:"preferredCurrency"};
+const UI_LABELS={fr:{heading:"Paramètres du compte",save:"Enregistrer",subtitle:"Gestion des heures de travail"}, "pt-PT":{heading:"Definições da conta",save:"Guardar",subtitle:"Controlo de horas de trabalho"},"pt-BR":{heading:"Configurações da conta",save:"Salvar",subtitle:"Controle de horas de trabalho"},en:{heading:"Account settings",save:"Save settings",subtitle:"Work hours tracking"}};
+function applyLanguage(){const lang=$("languageCode").value;document.documentElement.lang=lang;const labels=UI_LABELS[lang]||UI_LABELS.fr;$("profileHeading").textContent=labels.heading;$("saveProfileButton").textContent=labels.save;$("brandSubtitle").textContent=labels.subtitle;}
+function updateBrand(){const name=$("companyName").value.trim();$("brandName").textContent="Contrôle des Heures";const logo=$("companyLogo").value.trim();$("brandLogo").src=/^https:\/\//i.test(logo)?logo:"jefris-logo.jpeg";$("brandLogo").alt=name||"Logo";}
+async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus("Erro ao carregar perfil: "+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"business",company_name:"Jefris Renovation",language_code:"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
+async function saveProfile(){const payload={owner_id:user.id};for(const [field,id] of Object.entries(PROFILE_FIELDS))payload[field]=$(id).value.trim();if(payload.logo_url&&!/^https:\/\//i.test(payload.logo_url)){setStatus("Use uma URL HTTPS válida para o logotipo.",false);return}const {data,error}=await sb.from("app_profiles").upsert(payload,{onConflict:"owner_id"}).select("*").single();if(error){setStatus("Erro ao salvar perfil: "+error.message,false);return}profile=data;applyLanguage();updateBrand();setStatus("Configurações salvas na nuvem.");}
 
 function setStatus(msg,ok=true){$("cloudStatus").textContent=msg;$("cloudStatus").className="status "+(ok?"ok":"err")}
 function setLogin(msg,ok=false){$("loginStatus").textContent=msg;$("loginStatus").className="status "+(ok?"ok":"err")}
@@ -526,6 +547,7 @@ async function start(){
   $("app").classList.remove("hidden");
   setupSelectors();
   setStatus("Conectado à nuvem.",true);
+  await loadProfile();
   await loadEmployees();startedFor=user.id;
   }finally{starting=false}
 }
