@@ -303,7 +303,7 @@ async function loadEmployees(){
   if(error){setStatus("Erro ao carregar funcionários: "+error.message,false);return}
   employees=data||[];
   $("employee").innerHTML=employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join("");
-  if(!employees.length){records=[];payment={};$("dailyRate").value=0;$("advance").value=0;setStatus("Adicione o primeiro funcionário.",true);render();return}
+  if(!employees.length){records=[];payment={};$("dailyRate").value=0;$("hourlyRate").value=0;$("fixedSalary").value=0;$("advance").value=0;$("paymentMode").value="daily";$("currencyCode").value=profile.preferred_currency||"EUR";updatePaymentFields();setStatus("Adicione o primeiro funcionário.",true);render();return}
   await loadRecords();
 }
 
@@ -323,7 +323,7 @@ async function addEmployee(){
 async function loadRecords(){
   const version=++loadVersion;
   const id=$("employee").value;
-  if(!id){records=[];payment={};$("dailyRate").value=0;$("advance").value=0;render();return}
+  if(!id){records=[];payment={};$("dailyRate").value=0;$("hourlyRate").value=0;$("fixedSalary").value=0;$("advance").value=0;$("paymentMode").value="daily";$("currencyCode").value=profile.preferred_currency||"EUR";updatePaymentFields();render();return}
   updateMonthUI();
   const {data,error}=await sb.from("work_days").select("*")
     .eq("owner_id",user.id).eq("employee_id",id)
@@ -395,7 +395,8 @@ function calculateGross(minutesWorked,equivalent,p){
   return Math.round(raw*100)/100;
 }
 function formatMoney(n,currency="EUR"){
-  return Number(n).toLocaleString("pt-BR",{style:"currency",currency});
+  const locales={fr:"fr-BE","pt-PT":"pt-PT","pt-BR":"pt-BR",en:"en-US"};
+  return Number(n).toLocaleString(locales[$("languageCode").value]||"fr-BE",{style:"currency",currency});
 }
 function refreshCalculated(){
   let total=0,full=0,half=0;
@@ -505,12 +506,15 @@ async function showCompanyReport(){
     const [staff,days,payments]=results.map(result=>result.data||[]);
     const report=buildCompanyReport(staff,days,payments);
     $("reportRows").innerHTML=report.rows.map(r=>`<tr><td>${esc(r.name)}${r.active===false?' (retirado da equipe)':''}</td><td>${r.days.toLocaleString("pt-BR")}</td><td>${esc(r.modeLabel)}: ${formatMoney(r.rate,r.currency)}</td><td>${formatMoney(r.gross,r.currency)}</td><td>${formatMoney(r.advance,r.currency)}</td><td>${formatMoney(r.balance,r.currency)}</td></tr>`).join("");
-    $("reportMonth").textContent=monthName();
+    $("reportMonth").textContent=monthName()+" — "+(profile.company_name||"Contrôle des Heures");
     const currencies=[...new Set(report.rows.map(r=>r.currency))];
     const single=currencies.length<=1;
     const money=n=>single?formatMoney(n,currencies[0]||"EUR"):"—";
     $("reportGross").textContent=money(report.gross);$("reportAdvance").textContent=money(report.advance);$("reportBalance").textContent=money(report.balance);$("reportDue").textContent=money(report.due);
-    $("reportNote").textContent=report.rows.length?(single?"Meio dia conta como 0,5 diária para pagamentos diários. Saldos negativos não reduzem os valores devidos aos demais funcionários.":"Há pagamentos em moedas diferentes. Os totais consolidados estão ocultos para evitar somar moedas sem conversão."):"Nenhum registro de trabalho ou pagamento neste mês.";
+    const lang=$("languageCode").value;
+    const notes={fr:["Une demi-journée compte pour 0,5 jour en tarif journalier. Les soldes négatifs ne réduisent pas les sommes dues aux autres employés.","Plusieurs devises sont utilisées. Les totaux consolidés sont masqués pour éviter une addition incorrecte.","Aucune journée ni paiement enregistré ce mois."],"pt-PT":["Meio dia conta como 0,5 dia no pagamento diário. Saldos negativos não reduzem os pagamentos dos outros trabalhadores.","Existem moedas diferentes. Os totais consolidados foram ocultados.","Sem registos este mês."],"pt-BR":["Meio dia conta como 0,5 diária. Saldos negativos não reduzem o pagamento dos outros funcionários.","Há moedas diferentes. Os totais consolidados foram ocultados.","Nenhum registro neste mês."],en:["A half-day counts as 0.5 day for daily pay. Negative balances do not reduce other employees’ pay.","Multiple currencies are present. Consolidated totals are hidden to prevent invalid addition.","No records for this month."]};
+    const note=notes[lang]||notes.fr;
+    $("reportNote").textContent=report.rows.length?(single?note[0]:note[1]):note[2];
     $("companyReport").classList.remove("hidden");$("companyReport").scrollIntoView({behavior:"smooth"});setStatus("Relatório carregado com os dados salvos na nuvem.");
   }catch(error){closeCompanyReport();setStatus("Erro ao carregar relatório: "+error.message,false)}
 }
@@ -523,7 +527,8 @@ function buildCompanyReport(staff,days,payments){
     const mode=p.payment_mode||"daily",currency=p.currency_code||"EUR";
     const rate=Number(mode==="hourly"?p.hourly_rate:mode==="fixed"?p.fixed_salary:p.daily_rate)||0;
     const advance=Number(p.advance)||0,gross=calculateGross(minutesWorked,equivalent,p);
-    const modeLabel=mode==="hourly"?"Por hora":mode==="fixed"?"Fixo mensal":"Por diária";
+    const t=TRANSLATIONS[$("languageCode").value]||TRANSLATIONS.fr;
+    const modeLabel=mode==="hourly"?t.hourly:mode==="fixed"?t.fixed:t.daily;
     return {...e,days:equivalent,rate,advance,gross,currency,modeLabel,balance:Math.round((gross-advance)*100)/100};
   });
   const sum=key=>Math.round(rows.reduce((total,r)=>total+r[key],0)*100)/100;
