@@ -1,0 +1,44 @@
+name: Controle des Heures - development checks
+on:
+  push:
+    branches: [develop-controle-des-heures]
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate inline JavaScript and calculations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('index.html').read_text()
+          scripts=re.findall(r'<script(?:\s[^>]*)?>([\s\S]*?)</script>',html)
+          assert scripts, 'No inline scripts found'
+          Path('/tmp/controle-app.js').write_text('\n'.join(scripts))
+          assert 'function calculateGross(' in html
+          assert 'function minutes(' in html
+          assert 'async function saveProfile()' in html
+          PY
+          node --check /tmp/controle-app.js
+          node - <<'JS'
+          const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+          const code=fs.readFileSync('/tmp/controle-app.js','utf8');
+          const fn=(name)=>{const start=code.indexOf('function '+name+'(');assert(start>=0,name+' missing');let pos=code.indexOf('{',start),depth=0,end=-1;for(let i=pos;i<code.length;i++){if(code[i]==='{')depth++;if(code[i]==='}'&&!--depth){end=i+1;break}}assert(end>pos);return code.slice(start,end)};
+          const context=vm.createContext({Math,Number});vm.runInContext(fn('minutes')+'\n'+fn('calculateGross'),context);
+          const m=context.minutes,g=context.calculateGross;
+          assert.equal(m('08:00','17:30',30),540);
+          assert.equal(m('08:00','12:00',0),240);
+          assert.equal(m('22:00','06:00',30),450);
+          assert.equal(m('08:00','08:00',0),0);
+          assert.equal(m('08:00','09:00',120),0);
+          assert.equal(g(540,1,{payment_mode:'daily',daily_rate:150}),150);
+          assert.equal(g(1080,2.5,{payment_mode:'daily',daily_rate:150}),375);
+          assert.equal(g(540,1,{payment_mode:'hourly',hourly_rate:20}),180);
+          assert.equal(g(0,0,{payment_mode:'fixed',fixed_salary:2500}),2500);
+          console.log('JavaScript syntax and 9 calculation assertions passed');
+          JS
