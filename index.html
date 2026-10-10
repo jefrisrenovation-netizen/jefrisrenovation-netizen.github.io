@@ -148,7 +148,13 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 
 <section class="card">
   <div class="sheet-title" id="title">Folha mensal</div>
-  <div class="sheet-sub">Cada funcionário tem sua própria folha em cada mês. Pausa padrão: 30 minutos.</div>
+  <div class="sheet-sub">Cada funcionário tem sua própria folha em cada mês. Configure o horário padrão de cada funcionário abaixo.</div>
+  <div class="grid no-print" style="margin-top:12px">
+    <div><label>Entrada padrão</label><input id="defaultEntry" type="time" value="08:00"></div>
+    <div><label>Saída padrão</label><input id="defaultExit" type="time" value="17:30"></div>
+    <div><label>Pausa padrão (minutos)</label><input id="defaultBreak" type="number" min="0" step="1" value="30"></div>
+    <div style="align-self:end"><button class="secondary" onclick="saveEmployeeDefaults()">Salvar horário padrão</button></div>
+  </div>
 
   <div class="table" style="margin-top:12px">
     <table>
@@ -296,6 +302,10 @@ async function loadRecords(){
   const result=await sb.from("monthly_payments").select("*").eq("owner_id",user.id).eq("employee_id",id).eq("month",monthStart()).maybeSingle();
   if(version!==loadVersion)return;
   payment=result.data||{};
+  const emp=employees.find(e=>e.id===id);
+  $("defaultEntry").value=String(emp?.default_entry_time||"08:00").slice(0,5);
+  $("defaultExit").value=String(emp?.default_exit_time||"17:30").slice(0,5);
+  $("defaultBreak").value=emp?.default_break_minutes??30;
   $("dailyRate").value=payment.daily_rate??0;
   $("advance").value=payment.advance??0;
   render();
@@ -355,6 +365,15 @@ function refreshCalculated(){
   $("equivDays").textContent=(full+half/2).toFixed(1).replace(".0","");
 }
 
+async function saveEmployeeDefaults(){
+  const id=$("employee").value;if(!id){setStatus("Selecione um funcionário.",false);return}
+  const entry=$("defaultEntry").value,exit=$("defaultExit").value,breakMinutes=Number($("defaultBreak").value);
+  if(!entry||!exit||!Number.isInteger(breakMinutes)||breakMinutes<0){setStatus("Preencha horários válidos e pausa não negativa.",false);return}
+  const {data,error}=await sb.from("employees").update({default_entry_time:entry,default_exit_time:exit,default_break_minutes:breakMinutes}).eq("id",id).eq("owner_id",user.id).select("*").single();
+  if(error){setStatus("Erro ao salvar horário padrão: "+error.message,false);return}
+  const index=employees.findIndex(e=>e.id===id);if(index>=0)employees[index]=data;
+  setStatus("Horário padrão salvo. Dias anteriores não foram alterados.");
+}
 async function addRow(){
   if(!$("employee").value){setStatus("Primeiro adicione um funcionário.",false);return}
   const d=$("newDate").value;
@@ -362,7 +381,7 @@ async function addRow(){
   if(records.some(r=>r.work_date===d)){setStatus("Esta data já foi adicionada.",false);return}
   const {data,error}=await sb.from("work_days").insert({
     owner_id:user.id,employee_id:$("employee").value,work_date:d,
-    entry_time:"08:00",exit_time:"17:30",break_minutes:30,workplace:null
+    entry_time:$("defaultEntry").value||"08:00",exit_time:$("defaultExit").value||"17:30",break_minutes:Number($("defaultBreak").value)||0,workplace:null
   }).select().single();
   if(error){setStatus(error.message,false);return}
   records.push(data);records.sort((a,b)=>a.work_date.localeCompare(b.work_date));render();
