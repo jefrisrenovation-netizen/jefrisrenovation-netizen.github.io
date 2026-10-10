@@ -6,10 +6,11 @@
 <meta name="theme-color" content="#151515">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Contrôle des Heures">
-<link rel="manifest" href="../manifest.webmanifest">
-<link rel="apple-touch-icon" href="../icon-192.png">
-<title>Contrôle des Heures</title>
+<meta name="apple-mobile-web-app-title" content="Suivi des heures">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" type="image/png" href="assets/icon-192.png">
+<title>Suivi des heures</title>
 <style>
 :root{--red:#d71920;--dark:#171717;--bg:#f2f3f5;--green:#087f5b}
 *{box-sizing:border-box}
@@ -106,14 +107,14 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 <body>
 <header>
   <div class="brand">
-    <img id="brandLogo" src="../jefris-logo.jpeg" alt="Logo da empresa">
-    <div><h1 id="brandName">Contrôle des Heures</h1><small id="brandSubtitle">Gestion des heures de travail</small></div>
+    <img id="brandLogo" src="assets/suivi-logo.png" alt="Logo da empresa">
+    <div><h1 id="brandName">Suivi des heures</h1><small id="brandSubtitle">Gestion des heures de travail</small></div>
   </div>
 </header>
 
 <main>
 <section id="loginCard" class="card login">
-  <h2>Accès à Contrôle des Heures</h2>
+  <h2>Accès à Suivi des heures</h2>
   <div class="muted">Entre para sincronizar os dados entre iPhone e computador.</div>
   <input id="email" type="email" placeholder="Seu e-mail" autocomplete="email" style="margin-top:12px">
   <button class="green" onclick="login()" style="margin-top:8px">Enviar link de acesso</button>
@@ -235,7 +236,7 @@ en:{accountType:"Account type",business:"Business",individual:"Individual",langu
 };
 function updateAccountMode(){const lang=$("languageCode").value;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;const individual=$("accountType").value==="individual";$("accountModeHint").textContent=individual?t.hintIndividual:t.hintBusiness;$("companyReportButton").classList.remove("hidden");}
 function applyLanguage(){const lang=$("languageCode").value;document.documentElement.lang=lang;const labels=UI_LABELS[lang]||UI_LABELS.fr;$("profileHeading").textContent=labels.heading;$("saveProfileButton").textContent=labels.save;$("brandSubtitle").textContent=labels.subtitle;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;document.querySelectorAll("[data-i18n]").forEach(el=>{if(t[el.dataset.i18n])el.textContent=t[el.dataset.i18n]});updateAccountMode();}
-function updateBrand(){const name=$("companyName").value.trim();$("brandName").textContent="Contrôle des Heures";const logo=$("companyLogo").value.trim();$("brandLogo").src=/^https:\/\//i.test(logo)?logo:"../jefris-logo.jpeg";$("brandLogo").alt=name||"Logo";}
+function updateBrand(){const name=$("companyName").value.trim();$("brandName").textContent="Suivi des heures";const logo=$("companyLogo").value.trim();$("brandLogo").src=/^https:\/\//i.test(logo)?logo:"assets/suivi-logo.png";$("brandLogo").alt=name||"Logo";}
 async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus("Erro ao carregar perfil: "+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"business",company_name:"Jefris Renovation",language_code:"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
 async function saveProfile(){
   const button=document.querySelector('[onclick="saveProfile()"]');
@@ -538,7 +539,7 @@ async function showIndividualReport(){
     const totalMinutes=days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
     const currency=paymentRow?.currency_code||profile.preferred_currency||"EUR";
     $("individualReportTitle").textContent="Relatório individual — "+worker.name;
-    $("individualReportMonth").textContent=monthName()+" — "+(profile.company_name||"Contrôle des Heures");
+    $("individualReportMonth").textContent=monthName()+" — "+(profile.company_name||"Suivi des heures");
     $("individualReportRows").innerHTML=days.map(d=>`<tr><td>${esc(d.work_date)}</td><td>${esc(d.entry_time||"")}</td><td>${esc(d.exit_time||"")}</td><td>${Number(d.break_minutes??30)}</td><td>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes??30))}</td><td>${esc(d.work_location||d.location||"")}</td></tr>`).join("");
     $("individualReportSummary").innerHTML=`<div class="stat"><b>${fmt(totalMinutes)}</b><span>Horas trabalhadas</span></div><div class="stat"><b>${row?.days??0}</b><span>Dias equivalentes</span></div><div class="stat"><b>${formatMoney(row?.gross??0,currency)}</b><span>Valor bruto</span></div><div class="stat"><b>${formatMoney(row?.advance??0,currency)}</b><span>Adiantamentos</span></div><div class="stat"><b>${formatMoney(row?.balance??0,currency)}</b><span>Valor líquido</span></div>`;
     closeCompanyReport();$("individualReport").classList.remove("hidden");$("individualReport").scrollIntoView({behavior:"smooth"});
@@ -554,7 +555,7 @@ function printSelectedReport(mode){
   const report=source.cloneNode(true);
   report.querySelectorAll(".no-print").forEach(el=>el.remove());
   report.classList.remove("hidden");
-  const company=profile.company_name||"Contrôle des Heures";
+  const company=profile.company_name||"Suivi des heures";
   const style=`<style>@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#171717;margin:18px}header{display:flex;align-items:center;gap:14px;margin-bottom:18px}header img{width:70px;height:70px;object-fit:contain}h1{font-size:20px;margin:0}h2{font-size:21px;margin:12px 0 4px}p{color:#555}.table{overflow:visible}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #ccc;padding:7px 5px;text-align:left;font-size:11px;overflow-wrap:anywhere}th{background:#f2f2f2}.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:20px}.stat{border:1px solid #ddd;border-radius:12px;padding:16px 8px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;min-width:0}.stat b{font-size:20px;white-space:nowrap}.stat span{font-size:11px;color:#555}#companyReport table th:nth-child(2){width:13%}#companyReport table th:nth-child(3){width:14%}#companyReport table td:nth-child(n+4){white-space:nowrap}#companyReport .summary{break-inside:avoid}.hidden{display:block}tr{break-inside:avoid}@media print{body{margin:0}header{margin-bottom:12px}.summary{grid-template-columns:repeat(4,minmax(0,1fr))}}</style>`;
   const logo=document.getElementById("brandLogo")?.src||"";
   const escapeHTML=s=>String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
@@ -580,7 +581,7 @@ async function showCompanyReport(){
     const [staff,days,payments]=results.map(result=>result.data||[]);
     const report=buildCompanyReport(staff,days,payments);
     $("reportRows").innerHTML=report.rows.map(r=>`<tr><td>${esc(r.name)}${r.active===false?' (retirado da equipe)':''}</td><td>${r.days.toLocaleString("pt-BR")}</td><td>${esc(r.modeLabel)}: ${formatMoney(r.rate,r.currency)}</td><td>${formatMoney(r.gross,r.currency)}</td><td>${formatMoney(r.advance,r.currency)}</td><td>${formatMoney(r.balance,r.currency)}</td></tr>`).join("");
-    $("reportMonth").textContent=monthName()+" — "+(profile.company_name||"Contrôle des Heures");
+    $("reportMonth").textContent=monthName()+" — "+(profile.company_name||"Suivi des heures");
     const currencies=[...new Set(report.rows.map(r=>r.currency))];
     const single=currencies.length<=1;
     const money=n=>single?formatMoney(n,currencies[0]||"EUR"):"—";
@@ -646,3 +647,4 @@ if(false && "serviceWorker"in navigator)window.addEventListener("load",async()=>
 </script>
 </body>
 </html>
+
