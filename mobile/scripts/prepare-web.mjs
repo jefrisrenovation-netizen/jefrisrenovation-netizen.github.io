@@ -17,8 +17,9 @@ code=code.replace('Link enviado. Abra o e-mail, entre no site principal e depois
 code=code.replace('Digite seu e-mail.','Saisissez votre adresse e-mail.').replace('Enviando link...','Envoi du lien…');
 const names=[...code.matchAll(/(?:async\s+)?function\s+(\w+)\(/g)].map(m=>m[1]);
 fs.mkdirSync('src',{recursive:true});
-const imports=`import {createClient} from '@supabase/supabase-js';\nimport {Capacitor} from '@capacitor/core';\nimport {App} from '@capacitor/app';\nimport {Filesystem,Directory} from '@capacitor/filesystem';\nimport {Share} from '@capacitor/share';\nimport {jsPDF} from 'jspdf';\nimport {autoTable} from 'jspdf-autotable';\nimport {authTokens,reportFilename} from './helpers.mjs';\n`;
-const mobile=fs.readFileSync('scripts/mobile-runtime.js','utf8');
+const imports=`import {createClient} from '@supabase/supabase-js';\nimport {Capacitor,registerPlugin} from '@capacitor/core';\nimport {App} from '@capacitor/app';\nimport {Filesystem,Directory} from '@capacitor/filesystem';\nimport {Share} from '@capacitor/share';\nimport {jsPDF} from 'jspdf';\nimport {autoTable} from 'jspdf-autotable';\nimport {authTokens,reportFilename} from './helpers.mjs';\nimport {subscriptionController} from './subscriptions.mjs';\n`;
+code=code.replace('await loadEmployees();startedFor=user.id;', 'await refreshSubscription();await loadEmployees();startedFor=user.id;');
+const mobile=fs.readFileSync('scripts/mobile-runtime.js','utf8')+'\n'+fs.readFileSync('scripts/subscription-runtime.js','utf8');
 fs.writeFileSync('src/main.js',imports+code+'\n'+mobile+'\nObject.assign(window,{'+[...new Set(names.concat(['exportMobileReport','requestAccountDeletion']))].join(',')+'});\n');
 fs.writeFileSync('index.html',html);
 fs.mkdirSync('public/assets',{recursive:true});
