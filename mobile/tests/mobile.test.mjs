@@ -3,6 +3,38 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {authTokens,reportFilename} from '../src/helpers.mjs';
+function passwordLogin(signIn){
+ const runtime=fs.readFileSync('scripts/mobile-runtime.js','utf8');
+ const fn=runtime.slice(runtime.indexOf('async function loginWithPassword'),runtime.indexOf('const passwordAccess='));
+ const elements={email:{value:' reviewer@example.com '},loginPassword:{value:' secret '},passwordLoginButton:{disabled:false}};
+ const messages=[];let starts=0;
+ const context={$:id=>elements[id],sb:{auth:{signInWithPassword:signIn}},setLogin:message=>messages.push(message),start:async()=>{starts++;}};
+ vm.createContext(context);vm.runInContext(fn,context);
+ return {run:context.loginWithPassword,elements,messages,starts:()=>starts};
+}
+test('password login authenticates with Supabase and clears the password after success',async()=>{
+ let credentials;
+ const login=passwordLogin(async value=>{credentials=value;return {error:null};});
+ await login.run();
+ assert.equal(credentials.email,'reviewer@example.com');assert.equal(credentials.password,' secret ');
+ assert.equal(login.starts(),1);assert.equal(login.elements.loginPassword.value,'');
+ assert.equal(login.elements.passwordLoginButton.disabled,false);
+});
+test('failed password login never starts an authenticated session',async()=>{
+ for(const signIn of [async()=>({error:{message:'invalid'}}),async()=>{throw new Error('offline')}]){
+  const login=passwordLogin(signIn);await login.run();
+  assert.equal(login.starts(),0);assert.equal(login.elements.passwordLoginButton.disabled,false);
+  assert.match(login.messages.at(-1),/Connexion impossible/);
+ }
+});
+test('password login rejects empty credentials and ignores repeated submissions',async()=>{
+ let calls=0;let finish;
+ const login=passwordLogin(()=>{calls++;return new Promise(resolve=>{finish=resolve;});});
+ login.elements.loginPassword.value='';await login.run();assert.equal(calls,0);
+ login.elements.loginPassword.value='secret';const pending=login.run();
+ await login.run();assert.equal(calls,1);
+ finish({error:null});await pending;assert.equal(login.starts(),1);
+});
 test('only our application login links are accepted',()=>{
  assert.deepEqual(authTokens('https://jefrisrenovation-netizen.github.io/#access_token=a&refresh_token=b'),{access_token:'a',refresh_token:'b'});
  assert.deepEqual(authTokens('suiviheurespro://login#access_token=a&refresh_token=b'),{access_token:'a',refresh_token:'b'});
