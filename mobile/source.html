@@ -522,8 +522,8 @@ function closeIndividualReport(){ $("individualReport").classList.add("hidden");
 function printIndividualReport(){printSelectedReport("print-individual")}
 async function showIndividualReport(){
   const id=$("employee").value;
-  if(!id){setStatus("Selecione um funcionário para gerar o relatório individual.",false);return}
-  if(saving){setStatus("Aguarde o salvamento para abrir o relatório.",false);return}
+  if(!id){setStatus("Sélectionnez un employé pour générer le rapport individuel.",false);return}
+  if(saving){setStatus("Attendez la fin de l’enregistrement avant d’ouvrir le rapport.",false);return}
   const selectedMonth=ym();
   try{
     const results=await Promise.all([
@@ -543,12 +543,12 @@ async function showIndividualReport(){
     $("individualReportRows").innerHTML=days.map(d=>`<tr><td>${esc(d.work_date)}</td><td>${esc(d.entry_time||"")}</td><td>${esc(d.exit_time||"")}</td><td>${Number(d.break_minutes??30)}</td><td>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes??30))}</td><td>${esc(d.workplace||d.work_location||d.location||"")}</td></tr>`).join("");
     $("individualReportSummary").innerHTML=`<div class="stat"><b>${fmt(totalMinutes)}</b><span>Horas trabalhadas</span></div><div class="stat"><b>${row?.days??0}</b><span>Dias equivalentes</span></div><div class="stat"><b>${formatMoney(row?.gross??0,currency)}</b><span>Valor bruto</span></div><div class="stat"><b>${formatMoney(row?.advance??0,currency)}</b><span>Adiantamentos</span></div><div class="stat"><b>${formatMoney(row?.balance??0,currency)}</b><span>Valor líquido</span></div>`;
     closeCompanyReport();$("individualReport").classList.remove("hidden");$("individualReport").scrollIntoView({behavior:"smooth"});
-  }catch(error){closeIndividualReport();setStatus("Erro no relatório individual: "+error.message,false)}
+  }catch(error){closeIndividualReport();setStatus("Erreur lors de la création du rapport individuel : "+error.message,false)}
 }
 function closeCompanyReport(){ $("companyReport").classList.add("hidden"); }
 function printSelectedReport(mode){
   const source=document.getElementById(mode==="print-company"?"companyReport":"individualReport");
-  if(!source||source.classList.contains("hidden")){setStatus("Abra o relatório antes de imprimir.",false);return}
+  if(!source||source.classList.contains("hidden")){setStatus("Ouvrez le rapport avant de l’imprimer.",false);return}
   // A separate print document prevents Safari from including the employee timesheet.
   const popup=window.open("","_blank");
   if(!popup){setStatus("O Safari bloqueou a janela de impressão. Permita pop-ups e tente novamente.",false);return}
@@ -568,7 +568,7 @@ function printSelectedReport(mode){
 }
 function printCompanyReport(){printSelectedReport("print-company")}
 async function showCompanyReport(){
-  if(saving){setStatus("Aguarde o salvamento para abrir o relatório.",false);return}
+  if(saving){setStatus("Attendez la fin de l’enregistrement avant d’ouvrir le rapport.",false);return}
   const selectedMonth=ym();setStatus("Chargement du rapport mensuel…");
   try{
     const results=await Promise.all([
@@ -591,7 +591,7 @@ async function showCompanyReport(){
     const note=notes[lang]||notes.fr;
     $("reportNote").textContent=report.rows.length?(single?note[0]:note[1]):note[2];
     $("companyReport").classList.remove("hidden");$("companyReport").scrollIntoView({behavior:"smooth"});setStatus("Rapport chargé à partir des données enregistrées dans le cloud.");
-  }catch(error){closeCompanyReport();setStatus("Erro ao carregar relatório: "+error.message,false)}
+  }catch(error){closeCompanyReport();setStatus("Erreur lors du chargement du rapport : "+error.message,false)}
 }
 function buildCompanyReport(staff,days,payments){
   const rows=staff.filter(e=>days.some(d=>d.employee_id===e.id)||payments.some(p=>p.employee_id===e.id)).map(e=>{
