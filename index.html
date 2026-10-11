@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Jefris">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>Jefris Renovation</title>
+<title>Suivi des heures Pro</title>
 <style>
 :root{--red:#d71920;--dark:#171717;--bg:#f2f3f5;--green:#087f5b}
 *{box-sizing:border-box}
@@ -104,8 +104,8 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 <body>
 <header>
   <div class="brand">
-    <img src="jefris-logo.jpeg" alt="Jefris Renovation">
-    <div><h1>Jefris Renovation</h1><small>Controle de Horas</small></div>
+    <div aria-hidden="true" style="width:58px;height:58px;display:grid;place-items:center;background:#d71920;color:white;border-radius:10px;font-weight:800;font-size:22px">SH</div>
+    <div><h1>Suivi des heures Pro</h1><small>Gestão de horas de trabalho</small></div>
   </div>
 </header>
 
@@ -137,7 +137,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
   <div class="actions">
     <button onclick="addEmployee()">Adicionar funcionário</button>
     <button class="danger" onclick="deleteEmployee()">Excluir funcionário</button>
-    <button class="secondary" onclick="showCompanyReport()">Relatório mensal da Jefris</button>
+    <button class="secondary" onclick="showCompanyReport()">Relatório mensal da empresa</button>
     <button class="secondary" onclick="window.print()">Imprimir / PDF</button>
     <button class="secondary" onclick="logout()">Sair</button>
   </div>
@@ -184,7 +184,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 </section>
 
 <section id="companyReport" class="card hidden">
-<h2>Relatório mensal — Jefris Renovation</h2>
+<h2>Relatório mensal — Empresa</h2>
 <div id="reportMonth" class="muted"></div>
 <div class="actions no-print"><button class="secondary" onclick="printCompanyReport()">Imprimir relatório / PDF</button><button class="secondary" onclick="closeCompanyReport()">Fechar relatório</button></div>
 <div class="table"><table><thead><tr><th>Funcionário</th><th>Dias equivalentes</th><th>Diária (€)</th><th>Total (€)</th><th>Adiantamento (€)</th><th>Saldo (€)</th></tr></thead><tbody id="reportRows"></tbody></table></div>
