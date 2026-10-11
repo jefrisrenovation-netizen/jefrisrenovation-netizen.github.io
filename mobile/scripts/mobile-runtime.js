@@ -1,4 +1,38 @@
 // The shipped application bundle stays on-device; only account data goes to Supabase.
+async function loginWithPassword(){
+  const button=$('passwordLoginButton');
+  if(button.disabled)return;
+  const email=$('email').value.trim();
+  const password=$('loginPassword').value;
+  if(!email||!password){setLogin('Saisissez votre e-mail et votre mot de passe.');return;}
+  button.disabled=true;
+  setLogin('Connexion en cours…',true);
+  try{
+    const {error}=await sb.auth.signInWithPassword({email,password});
+    if(error){setLogin('Connexion impossible. Vérifiez vos identifiants.');return;}
+    $('loginPassword').value='';
+    await start();
+  }catch{setLogin('Connexion impossible. Vérifiez votre connexion Internet et réessayez.');}
+  finally{button.disabled=false;}
+}
+const passwordAccess=document.createElement('details');
+passwordAccess.style.marginTop='16px';
+const passwordSummary=document.createElement('summary');
+passwordSummary.textContent='Se connecter avec un mot de passe';
+const passwordForm=document.createElement('form');
+const passwordLabel=document.createElement('label');
+passwordLabel.htmlFor='loginPassword';passwordLabel.textContent='Mot de passe';
+passwordLabel.style.marginTop='12px';
+const passwordInput=document.createElement('input');
+passwordInput.id='loginPassword';passwordInput.type='password';
+passwordInput.autocomplete='current-password';passwordInput.required=true;
+const passwordButton=document.createElement('button');
+passwordButton.id='passwordLoginButton';passwordButton.type='submit';
+passwordButton.textContent='Se connecter';passwordButton.style.marginTop='8px';
+passwordForm.append(passwordLabel,passwordInput,passwordButton);
+passwordForm.onsubmit=event=>{event.preventDefault();loginWithPassword();};
+passwordAccess.append(passwordSummary,passwordForm);
+$('loginCard').append(passwordAccess);
 async function handleAuthLink(url){
   const tokens=authTokens(url);
   if(!tokens)return;
