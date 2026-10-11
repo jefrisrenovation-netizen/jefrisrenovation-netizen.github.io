@@ -150,9 +150,9 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
   <div class="actions">
     <button onclick="addEmployee()" data-i18n="addWorker">Adicionar funcionário</button>
     <button class="danger" onclick="deleteEmployee()" data-i18n="removeWorker">Excluir funcionário</button>
-    <button id="companyReportButton" class="secondary" onclick="showCompanyReport()" data-i18n="companyReport">Relatório mensal da equipe</button>
+    <button id="companyReportButton" class="secondary" onclick="showCompanyReport()" data-i18n="companyReport">Rapport mensuel de l’équipe</button>
     <button id="individualReportButton" class="secondary" onclick="showIndividualReport()" data-i18n="individualReport">Rapport individuel</button>
-    <button class="secondary" onclick="window.print()" data-i18n="print">Imprimir / PDF</button>
+    <button class="secondary" onclick="window.print()" data-i18n="print">Imprimer / PDF</button>
     <button class="secondary" onclick="logout()" data-i18n="logout">Sair</button>
   </div>
 
@@ -235,8 +235,8 @@ fr:{accountType:"Type de compte",business:"Entreprise",individual:"Particulier",
 en:{accountType:"Account type",business:"Business",individual:"Individual",language:"Language",defaultCurrency:"Default currency",profileName:"Company / profile name",taxNumber:"Tax / VAT number",address:"Address",phone:"Phone",email:"Email",logo:"Logo URL (https://)",worker:"Worker / profile",year:"Year",month:"Month",newWorker:"New worker / profile",addWorker:"Add",removeWorker:"Remove",companyReport:"Team monthly report",individualReport:"Individual report",print:"Print / PDF",logout:"Log out",sheetHelp:"Each profile has a monthly timesheet. Set default working hours below.",defaultEntry:"Default start",defaultExit:"Default end",defaultBreak:"Default break (minutes)",saveDefaults:"Save default hours",newDate:"Next day date",addDay:"＋ Add day",paymentMode:"Payment method",daily:"Daily",hourly:"Hourly",fixed:"Fixed monthly salary",currency:"Currency",dailyRate:"Daily rate",hourlyRate:"Hourly rate",fixedSalary:"Fixed monthly salary",advance:"Monthly advance",hintBusiness:"Manage workers and your business report.",hintIndividual:"Track your own hours: create a profile with your name. Existing records remain available."}
 };
 function updateAccountMode(){const lang=$("languageCode").value;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;const individual=$("accountType").value==="individual";$("accountModeHint").textContent=individual?t.hintIndividual:t.hintBusiness;$("companyReportButton").classList.remove("hidden");}
-function applyLanguage(){const lang=$("languageCode").value;document.documentElement.lang=lang;const labels=UI_LABELS[lang]||UI_LABELS.fr;$("profileHeading").textContent=labels.heading;$("saveProfileButton").textContent=labels.save;$("brandSubtitle").textContent=labels.subtitle;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;document.querySelectorAll("[data-i18n]").forEach(el=>{if(t[el.dataset.i18n])el.textContent=t[el.dataset.i18n]});updateAccountMode();}
-function updateBrand(){const name=$("companyName").value.trim();$("brandName").textContent="Suivi des heures";const logo=$("companyLogo").value.trim();$("brandLogo").src=/^https:\/\//i.test(logo)?logo:"assets/suivi-logo.png";$("brandLogo").alt=name||"Logo";}
+function applyLanguage(){const lang=$("languageCode").value;document.documentElement.lang=lang;const labels=UI_LABELS[lang]||UI_LABELS.fr;$("profileHeading").textContent=labels.heading;$("saveProfileButton").textContent=labels.save;$("brandSubtitle").textContent=labels.subtitle;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;document.querySelectorAll("[data-i18n]").forEach(el=>{if(t[el.dataset.i18n])el.textContent=t[el.dataset.i18n]});updateAccountMode();updateBrand();}
+function updateBrand(){const name=$("companyName").value.trim();$("brandName").textContent="Suivi des heures Pro";const lang=$("languageCode").value;const labels=UI_LABELS[lang]||UI_LABELS.fr;$("brandSubtitle").textContent=name||labels.subtitle;const logo=$("companyLogo").value.trim();$("brandLogo").src=/^https:\/\//i.test(logo)?logo:"assets/suivi-logo.png";$("brandLogo").alt=name||"Logo de l’application";}
 async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus("Erro ao carregar perfil: "+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"individual",company_name:"",language_code:"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
 async function saveProfile(){
   const button=document.querySelector('[onclick="saveProfile()"]');
@@ -522,8 +522,8 @@ function closeIndividualReport(){ $("individualReport").classList.add("hidden");
 function printIndividualReport(){printSelectedReport("print-individual")}
 async function showIndividualReport(){
   const id=$("employee").value;
-  if(!id){setStatus("Selecione um funcionário para gerar o relatório individual.",false);return}
-  if(saving){setStatus("Aguarde o salvamento para abrir o relatório.",false);return}
+  if(!id){setStatus("Sélectionnez un employé pour générer le rapport individuel.",false);return}
+  if(saving){setStatus("Attendez la fin de l’enregistrement avant d’ouvrir le rapport.",false);return}
   const selectedMonth=ym();
   try{
     const results=await Promise.all([
@@ -543,12 +543,12 @@ async function showIndividualReport(){
     $("individualReportRows").innerHTML=days.map(d=>`<tr><td>${esc(d.work_date)}</td><td>${esc(d.entry_time||"")}</td><td>${esc(d.exit_time||"")}</td><td>${Number(d.break_minutes??30)}</td><td>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes??30))}</td><td>${esc(d.workplace||d.work_location||d.location||"")}</td></tr>`).join("");
     $("individualReportSummary").innerHTML=`<div class="stat"><b>${fmt(totalMinutes)}</b><span>Horas trabalhadas</span></div><div class="stat"><b>${row?.days??0}</b><span>Dias equivalentes</span></div><div class="stat"><b>${formatMoney(row?.gross??0,currency)}</b><span>Valor bruto</span></div><div class="stat"><b>${formatMoney(row?.advance??0,currency)}</b><span>Adiantamentos</span></div><div class="stat"><b>${formatMoney(row?.balance??0,currency)}</b><span>Valor líquido</span></div>`;
     closeCompanyReport();$("individualReport").classList.remove("hidden");$("individualReport").scrollIntoView({behavior:"smooth"});
-  }catch(error){closeIndividualReport();setStatus("Erro no relatório individual: "+error.message,false)}
+  }catch(error){closeIndividualReport();setStatus("Erreur lors de la création du rapport individuel : "+error.message,false)}
 }
 function closeCompanyReport(){ $("companyReport").classList.add("hidden"); }
 function printSelectedReport(mode){
   const source=document.getElementById(mode==="print-company"?"companyReport":"individualReport");
-  if(!source||source.classList.contains("hidden")){setStatus("Abra o relatório antes de imprimir.",false);return}
+  if(!source||source.classList.contains("hidden")){setStatus("Ouvrez le rapport avant de l’imprimer.",false);return}
   // A separate print document prevents Safari from including the employee timesheet.
   const popup=window.open("","_blank");
   if(!popup){setStatus("O Safari bloqueou a janela de impressão. Permita pop-ups e tente novamente.",false);return}
@@ -560,7 +560,7 @@ function printSelectedReport(mode){
   const logo=document.getElementById("brandLogo")?.src||"";
   const escapeHTML=s=>String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
   popup.document.open();
-  popup.document.write('<!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório - '+escapeHTML(company)+'</title>'+style+'</head><body><header><img src="'+escapeHTML(logo)+'" alt=""><h1>'+escapeHTML(company)+'</h1></header>'+report.outerHTML+'</body></html>');
+  popup.document.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Rapport - '+escapeHTML(company)+'</title>'+style+'</head><body><header><img src="'+escapeHTML(logo)+'" alt=""><h1>'+escapeHTML(company)+'</h1></header>'+report.outerHTML+'</body></html>');
   popup.document.close();
   popup.focus();
   // User can use Safari Share > Print if its print dialog does not open automatically.
@@ -568,8 +568,8 @@ function printSelectedReport(mode){
 }
 function printCompanyReport(){printSelectedReport("print-company")}
 async function showCompanyReport(){
-  if(saving){setStatus("Aguarde o salvamento para abrir o relatório.",false);return}
-  const selectedMonth=ym();setStatus("Carregando relatório mensal...");
+  if(saving){setStatus("Attendez la fin de l’enregistrement avant d’ouvrir le rapport.",false);return}
+  const selectedMonth=ym();setStatus("Chargement du rapport mensuel…");
   try{
     const results=await Promise.all([
       sb.from("employees").select("*").eq("owner_id",user.id).order("name"),
@@ -590,8 +590,8 @@ async function showCompanyReport(){
     const notes={fr:["Une demi-journée compte pour 0,5 jour en tarif journalier. Les soldes négatifs ne réduisent pas les sommes dues aux autres employés.","Plusieurs devises sont utilisées. Les totaux consolidés sont masqués pour éviter une addition incorrecte.","Aucune journée ni paiement enregistré ce mois."],"pt-PT":["Meio dia conta como 0,5 dia no pagamento diário. Saldos negativos não reduzem os pagamentos dos outros trabalhadores.","Existem moedas diferentes. Os totais consolidados foram ocultados.","Sem registos este mês."],"pt-BR":["Meio dia conta como 0,5 diária. Saldos negativos não reduzem o pagamento dos outros funcionários.","Há moedas diferentes. Os totais consolidados foram ocultados.","Nenhum registro neste mês."],en:["A half-day counts as 0.5 day for daily pay. Negative balances do not reduce other employees’ pay.","Multiple currencies are present. Consolidated totals are hidden to prevent invalid addition.","No records for this month."]};
     const note=notes[lang]||notes.fr;
     $("reportNote").textContent=report.rows.length?(single?note[0]:note[1]):note[2];
-    $("companyReport").classList.remove("hidden");$("companyReport").scrollIntoView({behavior:"smooth"});setStatus("Relatório carregado com os dados salvos na nuvem.");
-  }catch(error){closeCompanyReport();setStatus("Erro ao carregar relatório: "+error.message,false)}
+    $("companyReport").classList.remove("hidden");$("companyReport").scrollIntoView({behavior:"smooth"});setStatus("Rapport chargé à partir des données enregistrées dans le cloud.");
+  }catch(error){closeCompanyReport();setStatus("Erreur lors du chargement du rapport : "+error.message,false)}
 }
 function buildCompanyReport(staff,days,payments){
   const rows=staff.filter(e=>days.some(d=>d.employee_id===e.id)||payments.some(p=>p.employee_id===e.id)).map(e=>{

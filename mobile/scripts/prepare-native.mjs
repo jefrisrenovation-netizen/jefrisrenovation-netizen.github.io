@@ -5,6 +5,24 @@ if(!['ios','android'].includes(platform))throw new Error('Expected ios or androi
 const bundle='io.github.jefrisrenovation-netizen.suividesheures';
 if(!fs.existsSync(platform))execFileSync('npx',['cap','add',platform],{stdio:'inherit'});
 execFileSync('npx',['cap','sync',platform],{stdio:'inherit'});
+if(platform==='ios'){
+  const plugin='B00000000000000000000001',ref='B00000000000000000000002';
+  let project=fs.readFileSync('ios/App/App.xcodeproj/project.pbxproj','utf8');
+  if(!project.includes(plugin)){
+    project=project.replace('/* Begin PBXBuildFile section */',`/* Begin PBXBuildFile section */\n\t\t${plugin} /* SubscriptionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = ${ref}; };`);
+    project=project.replace('/* Begin PBXFileReference section */',`/* Begin PBXFileReference section */\n\t\t${ref} /* SubscriptionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionPlugin.swift; sourceTree = "<group>"; };`);
+    project=project.replace('504EC30E1FED79650016851F /* Assets.xcassets */,',`504EC30E1FED79650016851F /* Assets.xcassets */,\n\t\t\t\t${ref} /* SubscriptionPlugin.swift */,`);
+    project=project.replace('504EC3081FED79650016851F /* AppDelegate.swift in Sources */,',`504EC3081FED79650016851F /* AppDelegate.swift in Sources */,\n\t\t\t\t${plugin} /* SubscriptionPlugin.swift in Sources */,`);
+    if(!project.includes(`${plugin} /* SubscriptionPlugin.swift in Sources */,`))throw new Error('Plugin source build phase not found');
+    fs.writeFileSync('ios/App/App.xcodeproj/project.pbxproj',project);
+  }
+  fs.copyFileSync('native/SubscriptionPlugin.swift','ios/App/App/SubscriptionPlugin.swift');
+  const storyboard='ios/App/App/Base.lproj/Main.storyboard';
+  let xml=fs.readFileSync(storyboard,'utf8');
+  xml=xml.replace('customClass="CAPBridgeViewController" customModule="Capacitor"','customClass="SubscriptionViewController" customModule="App" customModuleProvider="target"');
+  if(!xml.includes('customClass="SubscriptionViewController"'))throw new Error('Custom subscription controller not registered');
+  fs.writeFileSync(storyboard,xml);
+}
 if(fs.existsSync(`${platform}/.suivi-prepared`)){console.log('Native project already prepared');process.exit(0)}
 if(platform==='ios'){
   let pbx=fs.readFileSync('ios/App/App.xcodeproj/project.pbxproj','utf8');
