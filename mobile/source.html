@@ -150,9 +150,9 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
   <div class="actions">
     <button onclick="addEmployee()" data-i18n="addWorker">Adicionar funcionário</button>
     <button class="danger" onclick="deleteEmployee()" data-i18n="removeWorker">Excluir funcionário</button>
-    <button id="companyReportButton" class="secondary" onclick="showCompanyReport()" data-i18n="companyReport">Relatório mensal da equipe</button>
+    <button id="companyReportButton" class="secondary" onclick="showCompanyReport()" data-i18n="companyReport">Rapport mensuel de l’équipe</button>
     <button id="individualReportButton" class="secondary" onclick="showIndividualReport()" data-i18n="individualReport">Rapport individuel</button>
-    <button class="secondary" onclick="window.print()" data-i18n="print">Imprimir / PDF</button>
+    <button class="secondary" onclick="window.print()" data-i18n="print">Imprimer / PDF</button>
     <button class="secondary" onclick="logout()" data-i18n="logout">Sair</button>
   </div>
 
@@ -560,7 +560,7 @@ function printSelectedReport(mode){
   const logo=document.getElementById("brandLogo")?.src||"";
   const escapeHTML=s=>String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
   popup.document.open();
-  popup.document.write('<!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório - '+escapeHTML(company)+'</title>'+style+'</head><body><header><img src="'+escapeHTML(logo)+'" alt=""><h1>'+escapeHTML(company)+'</h1></header>'+report.outerHTML+'</body></html>');
+  popup.document.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Rapport - '+escapeHTML(company)+'</title>'+style+'</head><body><header><img src="'+escapeHTML(logo)+'" alt=""><h1>'+escapeHTML(company)+'</h1></header>'+report.outerHTML+'</body></html>');
   popup.document.close();
   popup.focus();
   // User can use Safari Share > Print if its print dialog does not open automatically.
@@ -569,7 +569,7 @@ function printSelectedReport(mode){
 function printCompanyReport(){printSelectedReport("print-company")}
 async function showCompanyReport(){
   if(saving){setStatus("Aguarde o salvamento para abrir o relatório.",false);return}
-  const selectedMonth=ym();setStatus("Carregando relatório mensal...");
+  const selectedMonth=ym();setStatus("Chargement du rapport mensuel…");
   try{
     const results=await Promise.all([
       sb.from("employees").select("*").eq("owner_id",user.id).order("name"),
@@ -590,7 +590,7 @@ async function showCompanyReport(){
     const notes={fr:["Une demi-journée compte pour 0,5 jour en tarif journalier. Les soldes négatifs ne réduisent pas les sommes dues aux autres employés.","Plusieurs devises sont utilisées. Les totaux consolidés sont masqués pour éviter une addition incorrecte.","Aucune journée ni paiement enregistré ce mois."],"pt-PT":["Meio dia conta como 0,5 dia no pagamento diário. Saldos negativos não reduzem os pagamentos dos outros trabalhadores.","Existem moedas diferentes. Os totais consolidados foram ocultados.","Sem registos este mês."],"pt-BR":["Meio dia conta como 0,5 diária. Saldos negativos não reduzem o pagamento dos outros funcionários.","Há moedas diferentes. Os totais consolidados foram ocultados.","Nenhum registro neste mês."],en:["A half-day counts as 0.5 day for daily pay. Negative balances do not reduce other employees’ pay.","Multiple currencies are present. Consolidated totals are hidden to prevent invalid addition.","No records for this month."]};
     const note=notes[lang]||notes.fr;
     $("reportNote").textContent=report.rows.length?(single?note[0]:note[1]):note[2];
-    $("companyReport").classList.remove("hidden");$("companyReport").scrollIntoView({behavior:"smooth"});setStatus("Relatório carregado com os dados salvos na nuvem.");
+    $("companyReport").classList.remove("hidden");$("companyReport").scrollIntoView({behavior:"smooth"});setStatus("Rapport chargé à partir des données enregistrées dans le cloud.");
   }catch(error){closeCompanyReport();setStatus("Erro ao carregar relatório: "+error.message,false)}
 }
 function buildCompanyReport(staff,days,payments){
