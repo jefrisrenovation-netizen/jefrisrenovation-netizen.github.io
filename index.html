@@ -115,6 +115,12 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
   <div class="muted">Entre para sincronizar os dados entre iPhone e computador.</div>
   <input id="email" type="email" placeholder="Seu e-mail" autocomplete="email" style="margin-top:12px">
   <button class="green" onclick="login()" style="margin-top:8px">Enviar link de acesso</button>
+  <details style="margin-top:14px;text-align:left">
+    <summary style="cursor:pointer;font-weight:700;padding:10px">Entrar com e-mail e senha</summary>
+    <label for="password">Senha</label>
+    <input id="password" type="password" placeholder="Sua senha" autocomplete="current-password">
+    <button onclick="loginWithPassword()" style="margin-top:8px">Entrar com senha</button>
+  </details>
   <div id="loginStatus" class="status"></div>
 </section>
 
@@ -205,6 +211,15 @@ async function login(){
   setLogin("Enviando link...",true);
   const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:"https://jefrisrenovation-netizen.github.io/",shouldCreateUser:true}});
   if(error)setLogin(error.message);else setLogin("Link enviado. Abra seu e-mail e toque no link para entrar.",true);
+}
+async function loginWithPassword(){
+  const email=$("email").value.trim();
+  const password=$("password").value;
+  if(!email||!password){setLogin("Digite seu e-mail e sua senha.");return}
+  setLogin("Entrando...",true);
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error){setLogin("Não foi possível entrar. Confira o e-mail e a senha.");return}
+  setLogin("Acesso autorizado.",true);
 }
 async function logout(){await sb.auth.signOut();location.reload()}
 
