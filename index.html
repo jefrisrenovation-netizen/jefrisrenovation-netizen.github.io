@@ -46,6 +46,27 @@ body.print-company #app>section:not(#companyReport){display:none!important}
 body:not(.print-company) #companyReport{display:none!important}
 body.print-company #companyReport th,body.print-company #companyReport td{width:auto!important;display:table-cell!important}
 body.print-company #companyReport table{table-layout:auto!important}
+/* Impressão da empresa: mantém o relatório selecionado durante a prévia do Safari. */
+body:has(#companyReport:not(.hidden)) #app>section:not(#companyReport){display:none!important}
+body:has(#companyReport:not(.hidden)) #companyReport{display:block!important}
+body.print-company #companyReport,body:has(#companyReport:not(.hidden)) #companyReport{
+  width:100%!important;max-width:none!important;break-inside:avoid-page;page-break-inside:avoid;
+}
+body.print-company #companyReport table,body:has(#companyReport:not(.hidden)) #companyReport table{
+  width:100%!important;min-width:0!important;table-layout:auto!important;
+}
+body.print-company #companyReport th,body.print-company #companyReport td,
+body:has(#companyReport:not(.hidden)) #companyReport th,body:has(#companyReport:not(.hidden)) #companyReport td{
+  display:table-cell!important;width:auto!important;white-space:normal!important;
+  font-size:9px!important;padding:4px!important;overflow-wrap:anywhere;
+}
+body.print-company #companyReport .summary,body:has(#companyReport:not(.hidden)) #companyReport .summary{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:5px!important;margin-top:7px!important;
+}
+body.print-company #companyReport h2,body:has(#companyReport:not(.hidden)) #companyReport h2{font-size:15px!important}
+body.print-company #companyReport .stat,body:has(#companyReport:not(.hidden)) #companyReport .stat{break-inside:avoid;padding:4px!important}
+body.print-company #companyReport p,body:has(#companyReport:not(.hidden)) #companyReport p{font-size:9px!important;margin:7px 0!important}
+
 body{background:#fff!important;padding:0!important;margin:0!important}
 .no-print,#loginCard{display:none!important}
   header{
@@ -432,7 +453,7 @@ async function del(i){
 }
 
 function closeCompanyReport(){ $("companyReport").classList.add("hidden"); }
-function printCompanyReport(){document.body.classList.add("print-company");window.print();document.body.classList.remove("print-company")}
+function printCompanyReport(){document.body.classList.add("print-company");window.print()}
 window.addEventListener("afterprint",()=>document.body.classList.remove("print-company"));
 async function showCompanyReport(){
   if(saving){setStatus("Aguarde o salvamento para abrir o relatório.",false);return}
