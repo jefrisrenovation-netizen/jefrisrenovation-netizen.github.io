@@ -54,22 +54,28 @@ async function exportMobileReport(mode){
   if(saving){setStatus('Attendez la fin de l’enregistrement.',false);return;}
   let source=document.getElementById(mode==='print-company'?'companyReport':'individualReport');
   if(!source||source.classList.contains('hidden')){
-    await showIndividualReport();source=$('individualReport');
+    if(mode==='print-company'){
+      await showCompanyReport();
+      source=$('companyReport');
+    }else{
+      await showIndividualReport();
+      source=$('individualReport');
+    }
   }
-  if(source.classList.contains('hidden'))return;
+  if(!source||source.classList.contains('hidden'))return;
   try{
-    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
     doc.setFontSize(17);doc.text(String(profile.company_name||'Suivi des heures Pro'),14,18);
     doc.setFontSize(11);doc.text(source.querySelector('h2')?.textContent||'Rapport',14,26);
     doc.text(source.querySelector('p')?.textContent||monthName(),14,33);
     const logo=$('brandLogo');
-    if(logo?.complete&&logo.naturalWidth){try{doc.addImage(logo, 'PNG',258,10,23,23)}catch{}}
+    if(logo?.complete&&logo.naturalWidth){try{doc.addImage(logo, 'PNG',173,10,23,23)}catch{}}
     const table=source.querySelector('table');
-    autoTable(doc,{head:[[...table.querySelectorAll('thead th')].map(e=>e.textContent)],body:[...table.querySelectorAll('tbody tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.textContent)),startY:40,styles:{fontSize:9,cellPadding:3},headStyles:{fillColor:[183,25,32]},margin:{left:14,right:14}});
+    autoTable(doc,{head:[[...table.querySelectorAll('thead th')].map(e=>e.textContent)],body:[...table.querySelectorAll('tbody tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.textContent)),startY:40,styles:{fontSize:8,cellPadding:2,overflow:'linebreak'},headStyles:{fillColor:[183,25,32]},margin:{left:14,right:14},pageBreak:'auto',rowPageBreak:'avoid'});
     const summary=[...source.querySelectorAll('.stat')].map(e=>[e.querySelector('span')?.textContent||'',e.querySelector('b')?.textContent||'']);
-    autoTable(doc,{body:summary,startY:(doc.lastAutoTable?.finalY||40)+8,styles:{fontSize:10},margin:{left:14,right:14}});
+    autoTable(doc,{body:summary,startY:(doc.lastAutoTable?.finalY||40)+8,styles:{fontSize:9,cellPadding:2},margin:{left:14,right:14},pageBreak:'auto'});
     const note=source.querySelector('#reportNote')?.textContent;
-    if(note){let y=(doc.lastAutoTable?.finalY||40)+10;if(y>185){doc.addPage();y=15}doc.setFontSize(9);doc.text(doc.splitTextToSize(note,268),14,y)}
+    if(note){let y=(doc.lastAutoTable?.finalY||40)+10;const lines=doc.splitTextToSize(note,180);if(y+lines.length*4>282){doc.addPage();y=15}doc.setFontSize(9);doc.text(lines,14,y)}
     const name=reportFilename(mode,ym());
     if(Capacitor.isNativePlatform()){
       const base64=doc.output('datauristring').split(',')[1];
