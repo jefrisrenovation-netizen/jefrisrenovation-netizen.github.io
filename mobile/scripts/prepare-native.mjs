@@ -11,6 +11,8 @@ if(platform==='ios'){
   pbx=pbx.replaceAll('PRODUCT_BUNDLE_IDENTIFIER = io.github.jefrisrenovation.suividesheures;',`PRODUCT_BUNDLE_IDENTIFIER = "${bundle}";`);
   pbx=pbx.replaceAll('CODE_SIGN_STYLE = Automatic;','CODE_SIGN_STYLE = Automatic;\n\t\t\t\tDEVELOPMENT_TEAM = ZFF7B3HXTT;\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = App/App.entitlements;');
   pbx=pbx.replaceAll('DEVELOPMENT_TEAM = "";','DEVELOPMENT_TEAM = ZFF7B3HXTT;');
+  // Restrict the App Store device family to iPhone only (1 = iPhone, 2 = iPad).
+  pbx=pbx.replace(/TARGETED_DEVICE_FAMILY = [^;]+;/g,'TARGETED_DEVICE_FAMILY = "1";');
   // Add the app privacy manifest to the generated Xcode project.
   pbx=pbx.replace('/* Begin PBXBuildFile section */','/* Begin PBXBuildFile section */\n\t\tA00000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000002 /* PrivacyInfo.xcprivacy */; };');
   pbx=pbx.replace('/* Begin PBXFileReference section */','/* Begin PBXFileReference section */\n\t\tA00000000000000000000002 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };');
