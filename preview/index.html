@@ -102,7 +102,8 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 .stat{padding:6px!important;border:1px solid #ddd!important}
 .stat b{font-size:14px!important}
 .stat span{font-size:9px!important}
-}</style>
+}@media(max-width:600px){.grid>*{min-width:0}input,select{max-width:100%;min-width:0}.brand{min-width:0}.brand h1{overflow-wrap:anywhere}.actions button{max-width:100%}}
+</style>
 </head>
 <body>
 <header>
@@ -114,10 +115,10 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 
 <main>
 <section id="loginCard" class="card login">
-  <h2>Accès à Suivi des heures</h2>
-  <div class="muted">Entre para sincronizar os dados entre iPhone e computador.</div>
-  <input id="email" type="email" placeholder="Seu e-mail" autocomplete="email" style="margin-top:12px">
-  <button class="green" onclick="login()" style="margin-top:8px">Enviar link de acesso</button>
+  <h2 data-text="Accès à Suivi des heures">Accès à Suivi des heures</h2>
+  <div class="muted" data-text="Entre para sincronizar os dados entre iPhone e computador.">Entre para sincronizar os dados entre iPhone e computador.</div>
+  <input id="email" type="email" data-placeholder="Seu e-mail" placeholder="Seu e-mail" autocomplete="email" style="margin-top:12px">
+  <button class="green" onclick="login()" style="margin-top:8px" data-text="Enviar link de acesso">Enviar link de acesso</button>
   <div id="loginStatus" class="status"></div>
 </section>
 
@@ -129,7 +130,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
     <div><label data-i18n="accountType">Tipo de conta</label><select id="accountType" onchange="updateAccountMode()"><option value="business" data-i18n="business">Empresa</option><option value="individual" data-i18n="individual">Individual</option></select></div>
     <div><label data-i18n="language">Idioma</label><select id="languageCode" onchange="applyLanguage()"><option value="fr">Français</option><option value="pt-PT">Português (Portugal)</option><option value="pt-BR">Português (Brasil)</option><option value="en">English</option></select></div>
     <div><label data-i18n="defaultCurrency">Moeda padrão</label><select id="preferredCurrency"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option><option value="BRL">BRL (R$)</option></select></div>
-    <div><label data-i18n="profileName">Nome da empresa / perfil</label><input id="companyName" maxlength="160" placeholder="Nome da empresa"></div>
+    <div><label data-i18n="profileName">Nome da empresa / perfil</label><input id="companyName" maxlength="160" data-placeholder="Nome da empresa" placeholder="Nome da empresa"></div>
     <div><label data-i18n="taxNumber">Número TVA / NIF</label><input id="vatNumber" maxlength="80"></div>
     <div><label data-i18n="address">Endereço</label><input id="companyAddress" maxlength="300"></div>
     <div><label data-i18n="phone">Telefone</label><input id="companyPhone" maxlength="80"></div>
@@ -144,16 +145,13 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
     <div><label data-i18n="worker">Funcionário</label><select id="employee"></select></div>
     <div><label data-i18n="year">Ano</label><select id="year"></select></div>
     <div><label data-i18n="month">Mês</label><select id="month"></select></div>
-    <div><label data-i18n="newWorker">Novo funcionário</label><input id="newEmployee" placeholder="Nome completo"></div>
+    <div><label data-i18n="newWorker">Novo funcionário</label><input id="newEmployee" data-placeholder="Nom complet" placeholder="Nom complet"></div>
   </div>
 
   <div class="actions">
     <button onclick="addEmployee()" data-i18n="addWorker">Adicionar funcionário</button>
     <button class="danger" onclick="deleteEmployee()" data-i18n="removeWorker">Excluir funcionário</button>
-    <button id="companyReportButton" class="secondary" onclick="showCompanyReport()" data-i18n="companyReport">Relatório mensal da equipe</button>
-    <button id="individualReportButton" class="secondary" onclick="showIndividualReport()" data-i18n="individualReport">Relatório individual</button>
-    <button class="secondary" onclick="window.print()" data-i18n="print">Imprimir / PDF</button>
-    <button class="secondary" onclick="logout()" data-i18n="logout">Sair</button>
+
   </div>
 
   <div class="month-nav">
@@ -167,7 +165,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 </section>
 
 <section class="card">
-  <div class="sheet-title" id="title">Folha mensal</div>
+  <div class="sheet-title" id="title">Feuille mensuelle</div>
   <div class="sheet-sub" data-i18n="sheetHelp">Cada funcionário tem sua própria folha em cada mês. Configure o horário padrão de cada funcionário abaixo.</div>
   <div class="grid no-print" style="margin-top:12px">
     <div><label data-i18n="defaultEntry">Entrada padrão</label><input id="defaultEntry" type="time" value="08:00"></div>
@@ -179,7 +177,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
   <div class="table" style="margin-top:12px">
     <table>
       <thead>
-        <tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Pausa (min)</th><th>Horas</th><th>Local de trabalho</th><th></th></tr>
+        <tr><th data-text="Data">Data</th><th data-text="Entrada">Entrada</th><th data-text="Saída">Saída</th><th data-text="Pausa (min)">Pausa (min)</th><th data-text="Horas">Horas</th><th data-text="Local de trabalho">Local de trabalho</th><th></th></tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
@@ -198,22 +196,28 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 <div id="fixedSalaryField" class="hidden"><label data-i18n="fixedSalary">Salário fixo mensal</label><input id="fixedSalary" type="number" min="0" step="0.01" onchange="savePayment()"></div>
 <div><label data-i18n="advance">Adiantamento do mês</label><input id="advance" type="number" min="0" step="0.01" onchange="savePayment()"></div>
 </div>
-<div class="summary"><div class="stat"><b id="gross">€ 0,00</b><span>Total bruto do mês</span></div><div class="stat"><b id="balance">€ 0,00</b><span>Saldo a receber após adiantamento</span></div></div>
+<div class="summary"><div class="stat"><b id="gross">€ 0,00</b><span data-text="Total bruto do mês">Total bruto do mês</span></div><div class="stat"><b id="balance">€ 0,00</b><span data-text="Saldo a receber após adiantamento">Saldo a receber após adiantamento</span></div></div>
 <div class="summary">
-    <div class="stat"><b id="total">0h00</b><span>Horas do mês</span></div>
-    <div class="stat"><b id="fullDays">0</b><span>Dias completos</span></div>
-    <div class="stat"><b id="halfDays">0</b><span>Meios dias</span></div>
-    <div class="stat"><b id="equivDays">0</b><span>Dias equivalentes</span></div>
+    <div class="stat"><b id="total">0h00</b><span data-text="Horas do mês">Horas do mês</span></div>
+    <div class="stat"><b id="fullDays">0</b><span data-text="Dias completos">Dias completos</span></div>
+    <div class="stat"><b id="halfDays">0</b><span data-text="Meios dias">Meios dias</span></div>
+    <div class="stat"><b id="equivDays">0</b><span data-text="Dias equivalentes">Dias equivalentes</span></div>
   </div>
 </section>
 
-<section id="individualReport" class="card hidden"><h2 id="individualReportTitle">Relatório individual</h2><p id="individualReportMonth" class="muted"></p><div class="actions no-print"><button class="secondary" onclick="printIndividualReport()">Imprimir relatório / PDF</button><button class="secondary" onclick="closeIndividualReport()">Fechar relatório</button></div><div class="table"><table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Pausa (min)</th><th>Horas</th><th>Local</th></tr></thead><tbody id="individualReportRows"></tbody></table></div><div id="individualReportSummary" class="summary"></div></section>
+<section id="reportActions" class="card no-print"><div class="actions">
+    <button id="companyReportButton" class="secondary" onclick="showCompanyReport()" data-i18n="companyReport">Relatório mensal da equipe</button>
+    <button id="individualReportButton" class="secondary" onclick="showIndividualReport()" data-i18n="individualReport">Rapport individuel</button>
+    <button class="green" onclick="exportCurrentReport()"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" style="vertical-align:middle;margin-right:8px;fill:currentColor"><path d="M20.5 3.5A12 12 0 0 0 1.6 18L0 24l6.2-1.6A12 12 0 0 0 20.5 3.5ZM12 22a10 10 0 0 1-5.1-1.4l-.4-.2-3.7 1 1-3.6-.3-.4A10 10 0 1 1 12 22Zm5.5-7.5c-.3-.2-1.8-.9-2.1-1s-.5-.2-.7.2-.8 1-1 1.1-.4.2-.7 0a8 8 0 0 1-3.8-3.3c-.3-.5.3-.5.9-1.6.1-.2 0-.4 0-.6L9 7.1c-.3-.6-.6-.5-.8-.5h-.6c-.2 0-.6.1-.9.4-2.1 2.1-.9 4.5-.7 4.8.2.3 2.1 3.3 5.1 4.6 1.9.8 2.7.9 3.7.7.6-.1 1.8-.7 2.1-1.4.3-.7.3-1.3.2-1.4s-.3-.2-.6-.3Z"/></svg> <span data-i18n="print">Imprimir / PDF</span></button>
+    <button class="secondary" onclick="logout()" data-i18n="logout">Sair</button>
+</div></section>
+<section id="individualReport" class="card hidden"><h2 id="individualReportTitle" data-text="Rapport individuel">Rapport individuel</h2><p id="individualReportMonth" class="muted"></p><div class="actions no-print"><button class="green" onclick="printIndividualReport()"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" style="vertical-align:middle;margin-right:8px;fill:currentColor"><path d="M20.5 3.5A12 12 0 0 0 1.6 18L0 24l6.2-1.6A12 12 0 0 0 20.5 3.5ZM12 22a10 10 0 0 1-5.1-1.4l-.4-.2-3.7 1 1-3.6-.3-.4A10 10 0 1 1 12 22Zm5.5-7.5c-.3-.2-1.8-.9-2.1-1s-.5-.2-.7.2-.8 1-1 1.1-.4.2-.7 0a8 8 0 0 1-3.8-3.3c-.3-.5.3-.5.9-1.6.1-.2 0-.4 0-.6L9 7.1c-.3-.6-.6-.5-.8-.5h-.6c-.2 0-.6.1-.9.4-2.1 2.1-.9 4.5-.7 4.8.2.3 2.1 3.3 5.1 4.6 1.9.8 2.7.9 3.7.7.6-.1 1.8-.7 2.1-1.4.3-.7.3-1.3.2-1.4s-.3-.2-.6-.3Z"/></svg><span data-text="Partager le rapport PDF">Partager le rapport PDF</span></button><button class="secondary" onclick="closeIndividualReport()" data-text="Fermer le rapport">Fermer le rapport</button></div><div class="table"><table><thead><tr><th data-text="Data">Data</th><th data-text="Entrada">Entrada</th><th data-text="Saída">Saída</th><th data-text="Pausa (min)">Pausa (min)</th><th data-text="Horas">Horas</th><th data-text="Local">Local</th></tr></thead><tbody id="individualReportRows"></tbody></table></div><div id="individualReportSummary" class="summary"></div></section>
 <section id="companyReport" class="card hidden">
-<h2>Relatório mensal — Jefris Renovation</h2>
+<h2 data-text="Rapport mensuel de l’équipe">Rapport mensuel de l’équipe</h2>
 <div id="reportMonth" class="muted"></div>
-<div class="actions no-print"><button class="secondary" onclick="printCompanyReport()">Imprimir relatório / PDF</button><button class="secondary" onclick="closeCompanyReport()">Fechar relatório</button></div>
-<div class="table"><table><thead><tr><th>Funcionário</th><th>Dias equivalentes</th><th>Pagamento</th><th>Total</th><th>Adiantamento</th><th>Saldo</th></tr></thead><tbody id="reportRows"></tbody></table></div>
-<div class="summary"><div class="stat"><b id="reportGross"></b><span>Total das diárias</span></div><div class="stat"><b id="reportAdvance"></b><span>Adiantamentos</span></div><div class="stat"><b id="reportBalance"></b><span>Saldo total da equipe</span></div><div class="stat"><b id="reportDue"></b><span>Total a pagar (saldos positivos)</span></div></div>
+<div class="actions no-print"><button class="green" onclick="printCompanyReport()"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" style="vertical-align:middle;margin-right:8px;fill:currentColor"><path d="M20.5 3.5A12 12 0 0 0 1.6 18L0 24l6.2-1.6A12 12 0 0 0 20.5 3.5ZM12 22a10 10 0 0 1-5.1-1.4l-.4-.2-3.7 1 1-3.6-.3-.4A10 10 0 1 1 12 22Zm5.5-7.5c-.3-.2-1.8-.9-2.1-1s-.5-.2-.7.2-.8 1-1 1.1-.4.2-.7 0a8 8 0 0 1-3.8-3.3c-.3-.5.3-.5.9-1.6.1-.2 0-.4 0-.6L9 7.1c-.3-.6-.6-.5-.8-.5h-.6c-.2 0-.6.1-.9.4-2.1 2.1-.9 4.5-.7 4.8.2.3 2.1 3.3 5.1 4.6 1.9.8 2.7.9 3.7.7.6-.1 1.8-.7 2.1-1.4.3-.7.3-1.3.2-1.4s-.3-.2-.6-.3Z"/></svg><span data-text="Partager le rapport PDF">Partager le rapport PDF</span></button><button class="secondary" onclick="closeCompanyReport()" data-text="Fermer le rapport">Fermer le rapport</button></div>
+<div class="table"><table><thead><tr><th data-text="Funcionário">Funcionário</th><th data-text="Dias equivalentes">Dias equivalentes</th><th data-text="Pagamento">Pagamento</th><th data-text="Total">Total</th><th data-text="Adiantamento">Adiantamento</th><th data-text="Saldo">Saldo</th></tr></thead><tbody id="reportRows"></tbody></table></div>
+<div class="summary"><div class="stat"><b id="reportGross"></b><span data-text="Total das diárias">Total das diárias</span></div><div class="stat"><b id="reportAdvance"></b><span data-text="Adiantamentos">Adiantamentos</span></div><div class="stat"><b id="reportBalance"></b><span data-text="Saldo total da equipe">Saldo total da equipe</span></div><div class="stat"><b id="reportDue"></b><span data-text="Total a pagar (saldos positivos)">Total a pagar (saldos positivos)</span></div></div>
 <p id="reportNote" class="muted"></p>
 </section>
 </div>
@@ -229,36 +233,41 @@ let user=null,employees=[],records=[],payment={},profile={},loadVersion=0,starti
 const PROFILE_FIELDS={account_type:"accountType",company_name:"companyName",vat_number:"vatNumber",address:"companyAddress",phone:"companyPhone",email:"companyEmail",logo_url:"companyLogo",language_code:"languageCode",preferred_currency:"preferredCurrency"};
 const UI_LABELS={fr:{heading:"Paramètres du compte",save:"Enregistrer",subtitle:"Gestion des heures de travail"}, "pt-PT":{heading:"Definições da conta",save:"Guardar",subtitle:"Controlo de horas de trabalho"},"pt-BR":{heading:"Configurações da conta",save:"Salvar",subtitle:"Controle de horas de trabalho"},en:{heading:"Account settings",save:"Save settings",subtitle:"Work hours tracking"}};
 const TRANSLATIONS={
-fr:{accountType:"Type de compte",business:"Entreprise",individual:"Particulier",language:"Langue",defaultCurrency:"Devise par défaut",profileName:"Nom de l’entreprise / profil",taxNumber:"Numéro TVA / fiscal",address:"Adresse",phone:"Téléphone",email:"E-mail",logo:"URL du logo (https://)",worker:"Employé / profil",year:"Année",month:"Mois",newWorker:"Nouvel employé / profil",addWorker:"Ajouter",removeWorker:"Retirer",companyReport:"Rapport mensuel de l’équipe",individualReport:"Rapport individuel",print:"Imprimer / PDF",logout:"Déconnexion",sheetHelp:"Chaque profil dispose d’une feuille mensuelle. Définissez les horaires par défaut ci-dessous.",defaultEntry:"Début par défaut",defaultExit:"Fin par défaut",defaultBreak:"Pause par défaut (minutes)",saveDefaults:"Enregistrer les horaires",newDate:"Date du prochain jour",addDay:"＋ Ajouter un jour",paymentMode:"Mode de paiement",daily:"Par jour",hourly:"Par heure",fixed:"Salaire mensuel fixe",currency:"Devise",dailyRate:"Tarif journalier",hourlyRate:"Tarif horaire",fixedSalary:"Salaire mensuel fixe",advance:"Avance du mois",hintBusiness:"Gérez les employés et le rapport de votre entreprise.",hintIndividual:"Suivez vos propres heures : créez un profil avec votre nom. Vos données existantes restent disponibles."},
-"pt-PT":{accountType:"Tipo de conta",business:"Empresa",individual:"Particular",language:"Idioma",defaultCurrency:"Moeda predefinida",profileName:"Nome da empresa / perfil",taxNumber:"NIF / IVA",address:"Morada",phone:"Telefone",email:"E-mail",logo:"URL do logótipo (https://)",worker:"Trabalhador / perfil",year:"Ano",month:"Mês",newWorker:"Novo trabalhador / perfil",addWorker:"Adicionar",removeWorker:"Remover",companyReport:"Relatório mensal da equipa",individualReport:"Relatório individual",print:"Imprimir / PDF",logout:"Sair",sheetHelp:"Cada perfil tem a sua folha mensal. Configure os horários predefinidos.",defaultEntry:"Entrada predefinida",defaultExit:"Saída predefinida",defaultBreak:"Pausa predefinida (minutos)",saveDefaults:"Guardar horário",newDate:"Data do próximo dia",addDay:"＋ Adicionar dia",paymentMode:"Tipo de pagamento",daily:"Por dia",hourly:"Por hora",fixed:"Salário mensal fixo",currency:"Moeda",dailyRate:"Valor diário",hourlyRate:"Valor por hora",fixedSalary:"Salário mensal fixo",advance:"Adiantamento do mês",hintBusiness:"Gira os trabalhadores e o relatório da empresa.",hintIndividual:"Registe as suas horas: crie um perfil com o seu nome. Os dados existentes continuam disponíveis."},
-"pt-BR":{accountType:"Tipo de conta",business:"Empresa",individual:"Individual",language:"Idioma",defaultCurrency:"Moeda padrão",profileName:"Nome da empresa / perfil",taxNumber:"CNPJ / número fiscal",address:"Endereço",phone:"Telefone",email:"E-mail",logo:"URL do logotipo (https://)",worker:"Funcionário / perfil",year:"Ano",month:"Mês",newWorker:"Novo funcionário / perfil",addWorker:"Adicionar",removeWorker:"Remover",companyReport:"Relatório mensal da equipe",individualReport:"Relatório individual",print:"Imprimir / PDF",logout:"Sair",sheetHelp:"Cada perfil tem sua folha mensal. Configure os horários padrão.",defaultEntry:"Entrada padrão",defaultExit:"Saída padrão",defaultBreak:"Pausa padrão (minutos)",saveDefaults:"Salvar horário",newDate:"Data do próximo dia",addDay:"＋ Adicionar dia",paymentMode:"Forma de pagamento",daily:"Por diária",hourly:"Por hora",fixed:"Salário fixo mensal",currency:"Moeda",dailyRate:"Valor por diária",hourlyRate:"Valor por hora",fixedSalary:"Salário fixo mensal",advance:"Adiantamento do mês",hintBusiness:"Gerencie funcionários e o relatório da empresa.",hintIndividual:"Controle suas próprias horas: crie um perfil com seu nome. Os dados existentes continuam disponíveis."},
-en:{accountType:"Account type",business:"Business",individual:"Individual",language:"Language",defaultCurrency:"Default currency",profileName:"Company / profile name",taxNumber:"Tax / VAT number",address:"Address",phone:"Phone",email:"Email",logo:"Logo URL (https://)",worker:"Worker / profile",year:"Year",month:"Month",newWorker:"New worker / profile",addWorker:"Add",removeWorker:"Remove",companyReport:"Team monthly report",individualReport:"Individual report",print:"Print / PDF",logout:"Log out",sheetHelp:"Each profile has a monthly timesheet. Set default working hours below.",defaultEntry:"Default start",defaultExit:"Default end",defaultBreak:"Default break (minutes)",saveDefaults:"Save default hours",newDate:"Next day date",addDay:"＋ Add day",paymentMode:"Payment method",daily:"Daily",hourly:"Hourly",fixed:"Fixed monthly salary",currency:"Currency",dailyRate:"Daily rate",hourlyRate:"Hourly rate",fixedSalary:"Fixed monthly salary",advance:"Monthly advance",hintBusiness:"Manage workers and your business report.",hintIndividual:"Track your own hours: create a profile with your name. Existing records remain available."}
+fr:{accountType:"Type de compte",business:"Entreprise",individual:"Particulier",language:"Langue",defaultCurrency:"Devise par défaut",profileName:"Nom de l’entreprise / profil",taxNumber:"Numéro TVA / fiscal",address:"Adresse",phone:"Téléphone",email:"E-mail",logo:"URL du logo (https://)",worker:"Employé / profil",year:"Année",month:"Mois",newWorker:"Nouvel employé / profil",addWorker:"Ajouter",removeWorker:"Retirer",companyReport:"Rapport mensuel de l’équipe",individualReport:"Rapport individuel",print:"Imprimer / Envoyer PDF",logout:"Déconnexion",sheetHelp:"Chaque profil dispose d’une feuille mensuelle. Définissez les horaires par défaut ci-dessous.",defaultEntry:"Début par défaut",defaultExit:"Fin par défaut",defaultBreak:"Pause par défaut (minutes)",saveDefaults:"Enregistrer les horaires",newDate:"Date du prochain jour",addDay:"＋ Ajouter un jour",paymentMode:"Mode de paiement",daily:"Par jour",hourly:"Par heure",fixed:"Salaire mensuel fixe",currency:"Devise",dailyRate:"Tarif journalier",hourlyRate:"Tarif horaire",fixedSalary:"Salaire mensuel fixe",advance:"Avance du mois",hintBusiness:"Gérez les employés et le rapport de votre entreprise.",hintIndividual:"Suivez vos propres heures : créez un profil avec votre nom. Vos données existantes restent disponibles."},
+"pt-PT":{accountType:"Tipo de conta",business:"Empresa",individual:"Particular",language:"Idioma",defaultCurrency:"Moeda predefinida",profileName:"Nome da empresa / perfil",taxNumber:"NIF / IVA",address:"Morada",phone:"Telefone",email:"E-mail",logo:"URL do logótipo (https://)",worker:"Trabalhador / perfil",year:"Ano",month:"Mês",newWorker:"Novo trabalhador / perfil",addWorker:"Adicionar",removeWorker:"Remover",companyReport:"Relatório mensal da equipa",individualReport:"Relatório individual",print:"Imprimir / Enviar PDF",logout:"Sair",sheetHelp:"Cada perfil tem a sua folha mensal. Configure os horários predefinidos.",defaultEntry:"Entrada predefinida",defaultExit:"Saída predefinida",defaultBreak:"Pausa predefinida (minutos)",saveDefaults:"Guardar horário",newDate:"Data do próximo dia",addDay:"＋ Adicionar dia",paymentMode:"Tipo de pagamento",daily:"Por dia",hourly:"Por hora",fixed:"Salário mensal fixo",currency:"Moeda",dailyRate:"Valor diário",hourlyRate:"Valor por hora",fixedSalary:"Salário mensal fixo",advance:"Adiantamento do mês",hintBusiness:"Gira os trabalhadores e o relatório da empresa.",hintIndividual:"Registe as suas horas: crie um perfil com o seu nome. Os dados existentes continuam disponíveis."},
+"pt-BR":{accountType:"Tipo de conta",business:"Empresa",individual:"Individual",language:"Idioma",defaultCurrency:"Moeda padrão",profileName:"Nome da empresa / perfil",taxNumber:"CNPJ / número fiscal",address:"Endereço",phone:"Telefone",email:"E-mail",logo:"URL do logotipo (https://)",worker:"Funcionário / perfil",year:"Ano",month:"Mês",newWorker:"Novo funcionário / perfil",addWorker:"Adicionar",removeWorker:"Remover",companyReport:"Relatório mensal da equipe",individualReport:"Relatório individual",print:"Imprimir / Enviar PDF",logout:"Sair",sheetHelp:"Cada perfil tem sua folha mensal. Configure os horários padrão.",defaultEntry:"Entrada padrão",defaultExit:"Saída padrão",defaultBreak:"Pausa padrão (minutos)",saveDefaults:"Salvar horário",newDate:"Data do próximo dia",addDay:"＋ Adicionar dia",paymentMode:"Forma de pagamento",daily:"Por diária",hourly:"Por hora",fixed:"Salário fixo mensal",currency:"Moeda",dailyRate:"Valor por diária",hourlyRate:"Valor por hora",fixedSalary:"Salário fixo mensal",advance:"Adiantamento do mês",hintBusiness:"Gerencie funcionários e o relatório da empresa.",hintIndividual:"Controle suas próprias horas: crie um perfil com seu nome. Os dados existentes continuam disponíveis."},
+en:{accountType:"Account type",business:"Business",individual:"Individual",language:"Language",defaultCurrency:"Default currency",profileName:"Company / profile name",taxNumber:"Tax / VAT number",address:"Address",phone:"Phone",email:"Email",logo:"Logo URL (https://)",worker:"Worker / profile",year:"Year",month:"Month",newWorker:"New worker / profile",addWorker:"Add",removeWorker:"Remove",companyReport:"Team monthly report",individualReport:"Individual report",print:"Print / Send PDF",logout:"Log out",sheetHelp:"Each profile has a monthly timesheet. Set default working hours below.",defaultEntry:"Default start",defaultExit:"Default end",defaultBreak:"Default break (minutes)",saveDefaults:"Save default hours",newDate:"Next day date",addDay:"＋ Add day",paymentMode:"Payment method",daily:"Daily",hourly:"Hourly",fixed:"Fixed monthly salary",currency:"Currency",dailyRate:"Daily rate",hourlyRate:"Hourly rate",fixedSalary:"Fixed monthly salary",advance:"Monthly advance",hintBusiness:"Manage workers and your business report.",hintIndividual:"Track your own hours: create a profile with your name. Existing records remain available."}
 };
+const TEXTS={"Data": {"fr": "Date", "pt-PT": "Data", "pt-BR": "Data", "en": "Date"}, "Entrada": {"fr": "Début", "pt-PT": "Entrada", "pt-BR": "Entrada", "en": "Start"}, "Saída": {"fr": "Fin", "pt-PT": "Saída", "pt-BR": "Saída", "en": "End"}, "Pausa (min)": {"fr": "Pause (min)", "pt-PT": "Pausa (min)", "pt-BR": "Pausa (min)", "en": "Break (min)"}, "Horas": {"fr": "Heures", "pt-PT": "Horas", "pt-BR": "Horas", "en": "Hours"}, "Local": {"fr": "Lieu", "pt-PT": "Local", "pt-BR": "Local", "en": "Location"}, "Local de trabalho": {"fr": "Lieu de travail", "pt-PT": "Local de trabalho", "pt-BR": "Local de trabalho", "en": "Workplace"}, "Funcionário": {"fr": "Employé", "pt-PT": "Trabalhador", "pt-BR": "Funcionário", "en": "Worker"}, "Pagamento": {"fr": "Paiement", "pt-PT": "Pagamento", "pt-BR": "Pagamento", "en": "Payment"}, "Total": {"fr": "Total", "pt-PT": "Total", "pt-BR": "Total", "en": "Total"}, "Adiantamento": {"fr": "Avance", "pt-PT": "Adiantamento", "pt-BR": "Adiantamento", "en": "Advance"}, "Saldo": {"fr": "Solde", "pt-PT": "Saldo", "pt-BR": "Saldo", "en": "Balance"}, "Dias equivalentes": {"fr": "Jours équivalents", "pt-PT": "Dias equivalentes", "pt-BR": "Dias equivalentes", "en": "Equivalent days"}, "Horas trabalhadas": {"fr": "Heures travaillées", "pt-PT": "Horas trabalhadas", "pt-BR": "Horas trabalhadas", "en": "Hours worked"}, "Valor bruto": {"fr": "Montant brut", "pt-PT": "Valor bruto", "pt-BR": "Valor bruto", "en": "Gross amount"}, "Adiantamentos": {"fr": "Avances", "pt-PT": "Adiantamentos", "pt-BR": "Adiantamentos", "en": "Advances"}, "Valor líquido": {"fr": "Montant net", "pt-PT": "Valor líquido", "pt-BR": "Valor líquido", "en": "Net amount"}, "Total bruto do mês": {"fr": "Total brut du mois", "pt-PT": "Total bruto do mês", "pt-BR": "Total bruto do mês", "en": "Monthly gross total"}, "Saldo a receber após adiantamento": {"fr": "Solde après avance", "pt-PT": "Saldo após adiantamento", "pt-BR": "Saldo a receber após adiantamento", "en": "Balance after advance"}, "Horas do mês": {"fr": "Heures du mois", "pt-PT": "Horas do mês", "pt-BR": "Horas do mês", "en": "Monthly hours"}, "Dias completos": {"fr": "Journées complètes", "pt-PT": "Dias completos", "pt-BR": "Dias completos", "en": "Full days"}, "Meios dias": {"fr": "Demi-journées", "pt-PT": "Meios dias", "pt-BR": "Meios dias", "en": "Half days"}, "Total das diárias": {"fr": "Total brut", "pt-PT": "Total bruto", "pt-BR": "Total das diárias", "en": "Gross total"}, "Saldo total da equipe": {"fr": "Solde total de l’équipe", "pt-PT": "Saldo total da equipa", "pt-BR": "Saldo total da equipe", "en": "Team balance"}, "Total a pagar (saldos positivos)": {"fr": "Total à payer (soldes positifs)", "pt-PT": "Total a pagar (saldos positivos)", "pt-BR": "Total a pagar (saldos positivos)", "en": "Total due (positive balances)"}, "Partager le rapport PDF": {"fr": "Partager le PDF", "pt-PT": "Partilhar PDF", "pt-BR": "Compartilhar PDF", "en": "Share PDF"}, "Fermer le rapport": {"fr": "Fermer le rapport", "pt-PT": "Fechar relatório", "pt-BR": "Fechar relatório", "en": "Close report"}, "Rapport individuel": {"fr": "Rapport individuel", "pt-PT": "Relatório individual", "pt-BR": "Relatório individual", "en": "Individual report"}, "Rapport mensuel de l’équipe": {"fr": "Rapport mensuel de l’équipe", "pt-PT": "Relatório mensal da equipa", "pt-BR": "Relatório mensal da equipe", "en": "Team monthly report"}, "Folha atual: ": {"fr": "Feuille actuelle : ", "pt-PT": "Folha atual: ", "pt-BR": "Folha atual: ", "en": "Current timesheet: "}, "Escolha uma data livre dentro deste mês.": {"fr": "Choisissez une date disponible dans le mois sélectionné.", "pt-PT": "Escolha uma data livre dentro deste mês.", "pt-BR": "Escolha uma data livre dentro deste mês.", "en": "Choose an unused date within the selected month."}, "Escolha uma data deste mês para adicionar.": {"fr": "Choisissez une date dans le mois sélectionné.", "pt-PT": "Escolha uma data deste mês para adicionar.", "pt-BR": "Escolha uma data deste mês para adicionar.", "en": "Choose a date within the selected month."}, "Esta data já foi adicionada.": {"fr": "Cette date existe déjà.", "pt-PT": "Esta data já foi adicionada.", "pt-BR": "Esta data já foi adicionada.", "en": "This date already exists."}, "Excluir este dia?": {"fr": "Supprimer cette journée ?", "pt-PT": "Apagar este dia?", "pt-BR": "Excluir este dia?", "en": "Delete this day?"}, "Conectado à nuvem.": {"fr": "Connecté au cloud.", "pt-PT": "Ligado à nuvem.", "pt-BR": "Conectado à nuvem.", "en": "Connected to the cloud."}, "Valores salvos na nuvem.": {"fr": "Montants enregistrés dans le cloud.", "pt-PT": "Valores guardados na nuvem.", "pt-BR": "Valores salvos na nuvem.", "en": "Amounts saved to the cloud."}, "Dia excluído e alteração salva.": {"fr": "Journée supprimée et modification enregistrée.", "pt-PT": "Dia apagado e alteração guardada.", "pt-BR": "Dia excluído e alteração salva.", "en": "Day deleted and change saved."}, "Selecione um funcionário.": {"fr": "Sélectionnez un employé.", "pt-PT": "Selecione um trabalhador.", "pt-BR": "Selecione um funcionário.", "en": "Select a worker."}, "Primeiro adicione um funcionário.": {"fr": "Ajoutez d’abord un employé.", "pt-PT": "Adicione primeiro um trabalhador.", "pt-BR": "Primeiro adicione um funcionário.", "en": "Add a worker first."}, "Adicione o primeiro funcionário.": {"fr": "Ajoutez votre premier employé.", "pt-PT": "Adicione o primeiro trabalhador.", "pt-BR": "Adicione o primeiro funcionário.", "en": "Add your first worker."}, "Digite o nome do funcionário.": {"fr": "Saisissez le nom de l’employé.", "pt-PT": "Introduza o nome do trabalhador.", "pt-BR": "Digite o nome do funcionário.", "en": "Enter the worker’s name."}, "Aguarde o salvamento para abrir o relatório.": {"fr": "Attendez la fin de l’enregistrement pour ouvrir le rapport.", "pt-PT": "Aguarde a gravação para abrir o relatório.", "pt-BR": "Aguarde o salvamento para abrir o relatório.", "en": "Wait for saving to finish before opening the report."}, "Selecione um funcionário para gerar o relatório individual.": {"fr": "Sélectionnez un employé pour le rapport individuel.", "pt-PT": "Selecione um trabalhador para gerar o relatório individual.", "pt-BR": "Selecione um funcionário para gerar o relatório individual.", "en": "Select a worker for the individual report."}, "Carregando relatório mensal...": {"fr": "Chargement du rapport mensuel…", "pt-PT": "A carregar relatório mensal…", "pt-BR": "Carregando relatório mensal...", "en": "Loading monthly report…"}, "Relatório carregado com os dados salvos na nuvem.": {"fr": "Rapport chargé avec les données du cloud.", "pt-PT": "Relatório carregado com os dados da nuvem.", "pt-BR": "Relatório carregado com os dados salvos na nuvem.", "en": "Report loaded from saved cloud data."}, "Use valores iguais ou maiores que zero.": {"fr": "Saisissez des montants positifs ou nuls.", "pt-PT": "Use valores iguais ou superiores a zero.", "pt-BR": "Use valores iguais ou maiores que zero.", "en": "Use amounts greater than or equal to zero."}, "Preencha horários válidos e pausa não negativa.": {"fr": "Saisissez des horaires valides et une pause positive ou nulle.", "pt-PT": "Introduza horários válidos e uma pausa não negativa.", "pt-BR": "Preencha horários válidos e pausa não negativa.", "en": "Enter valid times and a non-negative break."}, "Horário padrão salvo. Dias anteriores não foram alterados.": {"fr": "Horaires enregistrés. Les journées précédentes sont conservées.", "pt-PT": "Horário guardado. Dias anteriores mantidos.", "pt-BR": "Horário padrão salvo. Dias anteriores não foram alterados.", "en": "Default hours saved. Previous days are preserved."}, "Salvando...": {"fr": "Enregistrement…", "pt-PT": "A guardar…", "pt-BR": "Salvando...", "en": "Saving…"}, "Configurações verificadas e salvas na nuvem.": {"fr": "Paramètres vérifiés et enregistrés dans le cloud.", "pt-PT": "Definições verificadas e guardadas na nuvem.", "pt-BR": "Configurações verificadas e salvas na nuvem.", "en": "Settings verified and saved to the cloud."}, "Use uma URL HTTPS válida para o logotipo.": {"fr": "Utilisez une URL HTTPS valide pour le logo.", "pt-PT": "Use um URL HTTPS válido para o logótipo.", "pt-BR": "Use uma URL HTTPS válida para o logotipo.", "en": "Use a valid HTTPS logo URL."}, "Digite seu e-mail.": {"fr": "Saisissez votre e-mail.", "pt-PT": "Introduza o seu e-mail.", "pt-BR": "Digite seu e-mail.", "en": "Enter your email."}, "Enviando link...": {"fr": "Envoi du lien…", "pt-PT": "A enviar ligação…", "pt-BR": "Enviando link...", "en": "Sending link…"}, "Enviar link de acesso": {"fr": "Recevoir un lien de connexion", "pt-PT": "Receber ligação de acesso", "pt-BR": "Enviar link de acesso", "en": "Email a sign-in link"}, "Entre para sincronizar os dados entre iPhone e computador.": {"fr": "Connectez-vous pour synchroniser vos données.", "pt-PT": "Entre para sincronizar os dados.", "pt-BR": "Entre para sincronizar os dados entre iPhone e computador.", "en": "Sign in to sync your data."}, "Seu e-mail": {"fr": "Votre e-mail", "pt-PT": "O seu e-mail", "pt-BR": "Seu e-mail", "en": "Your email"}, "Nom complet": {"fr": "Nom complet", "pt-PT": "Nome completo", "pt-BR": "Nome completo", "en": "Full name"}, "Nome da empresa": {"fr": "Nom de l’entreprise", "pt-PT": "Nome da empresa", "pt-BR": "Nome da empresa", "en": "Company name"}, "Se connecter avec un mot de passe": {"fr": "Se connecter avec un mot de passe", "pt-PT": "Entrar com palavra-passe", "pt-BR": "Entrar com senha", "en": "Sign in with password"}, "Mot de passe": {"fr": "Mot de passe", "pt-PT": "Palavra-passe", "pt-BR": "Senha", "en": "Password"}, "Se connecter": {"fr": "Se connecter", "pt-PT": "Entrar", "pt-BR": "Entrar", "en": "Sign in"}, "Créer un compte": {"fr": "Créer un compte", "pt-PT": "Criar conta", "pt-BR": "Criar conta", "en": "Create account"}, "Confirmer le mot de passe": {"fr": "Confirmer le mot de passe", "pt-PT": "Confirmar palavra-passe", "pt-BR": "Confirmar senha", "en": "Confirm password"}, "Saisissez votre e-mail et votre mot de passe.": {"fr": "Saisissez votre e-mail et votre mot de passe.", "pt-PT": "Introduza o e-mail e a palavra-passe.", "pt-BR": "Digite seu e-mail e sua senha.", "en": "Enter your email and password."}, "Connexion en cours…": {"fr": "Connexion en cours…", "pt-PT": "A entrar…", "pt-BR": "Entrando…", "en": "Signing in…"}, "Connexion impossible. Vérifiez vos identifiants.": {"fr": "Connexion impossible. Vérifiez vos identifiants.", "pt-PT": "Não foi possível entrar. Verifique os dados.", "pt-BR": "Não foi possível entrar. Verifique seus dados.", "en": "Unable to sign in. Check your credentials."}, "Connexion impossible. Vérifiez votre connexion Internet et réessayez.": {"fr": "Connexion impossible. Vérifiez votre connexion Internet et réessayez.", "pt-PT": "Verifique a ligação à Internet e tente novamente.", "pt-BR": "Verifique sua conexão com a Internet e tente novamente.", "en": "Check your Internet connection and try again."}, "Création du compte…": {"fr": "Création du compte…", "pt-PT": "A criar conta…", "pt-BR": "Criando conta…", "en": "Creating account…"}, "Confirmez votre e-mail pour activer votre compte, puis connectez-vous avec votre mot de passe.": {"fr": "Confirmez votre e-mail pour activer votre compte, puis connectez-vous avec votre mot de passe.", "pt-PT": "Confirme o e-mail para ativar a conta e entre com a palavra-passe.", "pt-BR": "Confirme seu e-mail para ativar a conta e entre com sua senha.", "en": "Confirm your email to activate your account, then sign in with your password."}, "Les mots de passe doivent être identiques et contenir au moins 8 caractères.": {"fr": "Les mots de passe doivent être identiques et contenir au moins 8 caractères.", "pt-PT": "As palavras-passe devem ser iguais e ter pelo menos 8 caracteres.", "pt-BR": "As senhas devem ser iguais e ter pelo menos 8 caracteres.", "en": "Passwords must match and contain at least 8 characters."}, "Gestion du compte": {"fr": "Gestion du compte", "pt-PT": "Gestão da conta", "pt-BR": "Gerenciar conta", "en": "Account management"}, "Supprimer mon compte et mes données": {"fr": "Supprimer mon compte et mes données", "pt-PT": "Apagar a minha conta e os dados", "pt-BR": "Apagar minha conta e meus dados", "en": "Delete my account and data"}, "Supprimer définitivement votre compte, ses employés, ses heures et ses paiements ? Cette action est irréversible. Saisissez votre e-mail pour confirmer.": {"fr": "Supprimer définitivement votre compte, ses employés, ses heures et ses paiements ? Cette action est irréversible. Saisissez votre e-mail pour confirmer.", "pt-PT": "Apagar definitivamente a conta, trabalhadores, horas e pagamentos? Esta ação é irreversível. Introduza o seu e-mail para confirmar.", "pt-BR": "Apagar definitivamente sua conta, funcionários, horas e pagamentos? Esta ação é irreversível. Digite seu e-mail para confirmar.", "en": "Permanently delete your account, workers, hours and payments? This cannot be undone. Enter your email to confirm."}, "L’adresse ne correspond pas à votre compte.": {"fr": "L’adresse ne correspond pas à votre compte.", "pt-PT": "O e-mail não corresponde à conta.", "pt-BR": "O e-mail não corresponde à sua conta.", "en": "The email does not match your account."}, "Erro ao carregar perfil: ": {"fr": "Erreur de chargement du profil : ", "pt-PT": "Erro ao carregar perfil: ", "pt-BR": "Erro ao carregar perfil: ", "en": "Unable to load profile: "}, "Erro ao salvar perfil: ": {"fr": "Erreur d’enregistrement du profil : ", "pt-PT": "Erro ao guardar perfil: ", "pt-BR": "Erro ao salvar perfil: ", "en": "Unable to save profile: "}, "Erro ao carregar funcionários: ": {"fr": "Erreur de chargement des employés : ", "pt-PT": "Erro ao carregar trabalhadores: ", "pt-BR": "Erro ao carregar funcionários: ", "en": "Unable to load workers: "}, "Erro ao carregar dias: ": {"fr": "Erreur de chargement des journées : ", "pt-PT": "Erro ao carregar dias: ", "pt-BR": "Erro ao carregar dias: ", "en": "Unable to load days: "}, "Erro ao carregar pagamentos: ": {"fr": "Erreur de chargement des paiements : ", "pt-PT": "Erro ao carregar pagamentos: ", "pt-BR": "Erro ao carregar pagamentos: ", "en": "Unable to load payments: "}, "Erro ao salvar horário padrão: ": {"fr": "Erreur d’enregistrement des horaires : ", "pt-PT": "Erro ao guardar horário: ", "pt-BR": "Erro ao salvar horário padrão: ", "en": "Unable to save default hours: "}, "Erro ao salvar: ": {"fr": "Erreur d’enregistrement : ", "pt-PT": "Erro ao guardar: ", "pt-BR": "Erro ao salvar: ", "en": "Unable to save: "}, "Erro ao salvar valores: ": {"fr": "Erreur d’enregistrement des montants : ", "pt-PT": "Erro ao guardar valores: ", "pt-BR": "Erro ao salvar valores: ", "en": "Unable to save amounts: "}, "Erro no relatório individual: ": {"fr": "Erreur du rapport individuel : ", "pt-PT": "Erro no relatório individual: ", "pt-BR": "Erro no relatório individual: ", "en": "Individual report error: "}, "Erro ao carregar relatório: ": {"fr": "Erreur de chargement du rapport : ", "pt-PT": "Erro ao carregar relatório: ", "pt-BR": "Erro ao carregar relatório: ", "en": "Unable to load report: "}, "Falha de conexão: ": {"fr": "Erreur de connexion : ", "pt-PT": "Falha de ligação: ", "pt-BR": "Falha de conexão: ", "en": "Connection error: "}, "Não foi possível excluir o dia: ": {"fr": "Impossible de supprimer la journée : ", "pt-PT": "Não foi possível apagar o dia: ", "pt-BR": "Não foi possível excluir o dia: ", "en": "Unable to delete day: "}, "Funcionário excluído da equipe. Histórico preservado.": {"fr": "Employé retiré de l’équipe. Historique conservé.", "pt-PT": "Trabalhador removido da equipa. Histórico preservado.", "pt-BR": "Funcionário excluído da equipe. Histórico preservado.", "en": "Worker removed from team. History preserved."}, "Excluir ": {"fr": "Retirer ", "pt-PT": "Remover ", "pt-BR": "Excluir ", "en": "Remove "}, " da equipe? O histórico será preservado.": {"fr": " de l’équipe ? L’historique sera conservé.", "pt-PT": " da equipa? O histórico será preservado.", "pt-BR": " da equipe? O histórico será preservado.", "en": " from the team? History will be preserved."}, " (retirado da equipe)": {"fr": " (retiré de l’équipe)", "pt-PT": " (removido da equipa)", "pt-BR": " (retirado da equipe)", "en": " (removed from team)"}, "Link enviado. Abra o e-mail, entre no site principal e depois volte a /preview/.": {"fr": "Lien envoyé. Consultez votre e-mail.", "pt-PT": "Ligação enviada. Consulte o seu e-mail.", "pt-BR": "Link enviado. Abra o e-mail, entre no site principal e depois volte a /preview/.", "en": "Link sent. Check your email."}, "Sessão expirada. Entre novamente antes de salvar. ": {"fr": "Session expirée. Reconnectez-vous avant d’enregistrer. ", "pt-PT": "Sessão expirada. Entre novamente antes de guardar. ", "pt-BR": "Sessão expirada. Entre novamente antes de salvar. ", "en": "Session expired. Sign in again before saving. "}, "Não foi possível confirmar o salvamento: ": {"fr": "Impossible de vérifier l’enregistrement : ", "pt-PT": "Não foi possível confirmar a gravação: ", "pt-BR": "Não foi possível confirmar o salvamento: ", "en": "Unable to verify saving: "}, "Falha de conexão ao salvar: ": {"fr": "Erreur de connexion lors de l’enregistrement : ", "pt-PT": "Falha de ligação ao guardar: ", "pt-BR": "Falha de conexão ao salvar: ", "en": "Connection error while saving: "}, "Erro: ": {"fr": "Erreur : ", "pt-PT": "Erro: ", "pt-BR": "Erro: ", "en": "Error: "}, "Não foi possível excluir: ": {"fr": "Impossible de retirer : ", "pt-PT": "Não foi possível remover: ", "pt-BR": "Não foi possível excluir: ", "en": "Unable to remove: "}, "verifique a permissão de atualização no banco": {"fr": "vérifiez les autorisations de modification", "pt-PT": "verifique a permissão de atualização", "pt-BR": "verifique a permissão de atualização no banco", "en": "check update permissions"}, "verifique a permissão de exclusão no banco": {"fr": "vérifiez les autorisations de suppression", "pt-PT": "verifique a permissão de eliminação", "pt-BR": "verifique a permissão de exclusão no banco", "en": "check delete permissions"}, "perfil não encontrado": {"fr": "profil introuvable", "pt-PT": "perfil não encontrado", "pt-BR": "perfil não encontrado", "en": "profile not found"}, "indisponível": {"fr": "indisponible", "pt-PT": "indisponível", "pt-BR": "indisponível", "en": "unavailable"}, " (código: ": {"fr": " (code : ", "pt-PT": " (código: ", "pt-BR": " (código: ", "en": " (code: "}, "Abra o relatório antes de imprimir.": {"fr": "Ouvrez le rapport avant de l’imprimer.", "pt-PT": "Abra o relatório antes de imprimir.", "pt-BR": "Abra o relatório antes de imprimir.", "en": "Open the report before printing."}, "O Safari bloqueou a janela de impressão. Permita pop-ups e tente novamente.": {"fr": "Safari a bloqué la fenêtre d’impression. Autorisez les fenêtres et réessayez.", "pt-PT": "O Safari bloqueou a janela de impressão. Permita pop-ups e tente novamente.", "pt-BR": "O Safari bloqueou a janela de impressão. Permita pop-ups e tente novamente.", "en": "Safari blocked the print window. Allow pop-ups and try again."}, "Attendez la fin de l’enregistrement.": {"fr": "Attendez la fin de l’enregistrement.", "pt-PT": "Aguarde o fim da gravação.", "pt-BR": "Aguarde o fim do salvamento.", "en": "Wait for saving to finish."}, "Ce lien a expiré. Demandez un nouveau lien.": {"fr": "Ce lien a expiré. Demandez un nouveau lien.", "pt-PT": "Esta ligação expirou. Peça outra.", "pt-BR": "Este link expirou. Peça outro.", "en": "This link expired. Request another link."}, "Hors ligne. Reconnectez-vous avant de modifier vos données.": {"fr": "Hors ligne. Reconnectez-vous avant de modifier vos données.", "pt-PT": "Sem ligação. Ligue-se antes de alterar os dados.", "pt-BR": "Sem conexão. Conecte-se antes de alterar os dados.", "en": "Offline. Reconnect before changing your data."}, "Export PDF impossible : ": {"fr": "Export PDF impossible : ", "pt-PT": "Não foi possível exportar PDF: ", "pt-BR": "Não foi possível exportar PDF: ", "en": "Unable to export PDF: "}, "Suppression non effectuée. Contactez jefrisrenovation@gmail.com : ": {"fr": "Suppression non effectuée. Contactez jefrisrenovation@gmail.com : ", "pt-PT": "Conta não apagada. Contacte jefrisrenovation@gmail.com: ", "pt-BR": "Conta não apagada. Contate jefrisrenovation@gmail.com: ", "en": "Account not deleted. Contact jefrisrenovation@gmail.com: "}, "Confidentialité": {"fr": "Confidentialité", "pt-PT": "Privacidade", "pt-BR": "Privacidade", "en": "Privacy"}, "Assistance": {"fr": "Assistance", "pt-PT": "Suporte", "pt-BR": "Suporte", "en": "Support"}, "Accès à Suivi des heures": {"fr": "Accès à Suivi des heures", "pt-PT": "Acesso ao Suivi des heures", "pt-BR": "Acesso ao Suivi des heures", "en": "Sign in to Suivi des heures"}};
+function tr(text){return TEXTS[text]?.[$("languageCode").value]||text}
 function updateAccountMode(){const lang=$("languageCode").value;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;const individual=$("accountType").value==="individual";$("accountModeHint").textContent=individual?t.hintIndividual:t.hintBusiness;$("companyReportButton").classList.remove("hidden");}
-function applyLanguage(){const lang=$("languageCode").value;document.documentElement.lang=lang;const labels=UI_LABELS[lang]||UI_LABELS.fr;$("profileHeading").textContent=labels.heading;$("saveProfileButton").textContent=labels.save;$("brandSubtitle").textContent=labels.subtitle;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;document.querySelectorAll("[data-i18n]").forEach(el=>{if(t[el.dataset.i18n])el.textContent=t[el.dataset.i18n]});updateAccountMode();}
+function applyLanguage(){const lang=$("languageCode").value;document.documentElement.lang=lang;const labels=UI_LABELS[lang]||UI_LABELS.fr;$("profileHeading").textContent=labels.heading;$("saveProfileButton").textContent=labels.save;$("brandSubtitle").textContent=labels.subtitle;const t=TRANSLATIONS[lang]||TRANSLATIONS.fr;document.querySelectorAll("[data-i18n]").forEach(el=>{if(t[el.getAttribute("data-i18n")])el.textContent=t[el.getAttribute("data-i18n")]});document.querySelectorAll('[data-text]').forEach(el=>el.textContent=tr(el.dataset.text));document.querySelectorAll('[data-placeholder]').forEach(el=>el.placeholder=tr(el.dataset.placeholder));
+const selected=$("month").value;[...$("month").options].forEach((o,i)=>o.textContent=new Date(2026,i,1).toLocaleDateString(lang,{month:"long"}));$("month").value=selected;
+if($("month").value&&$("year").value){$("monthLabel").textContent=monthName();renderHistory();const emp=employees.find(e=>e.id===$("employee").value);$("title").textContent=(emp?.name||tr("Funcionário"))+" — "+monthName();}
+closeIndividualReport();closeCompanyReport();$("cloudStatus").textContent="";updateAccountMode();}
 function updateBrand(){const name=$("companyName").value.trim();$("brandName").textContent="Suivi des heures";const logo=$("companyLogo").value.trim();$("brandLogo").src=/^https:\/\//i.test(logo)?logo:"assets/suivi-logo.png";$("brandLogo").alt=name||"Logo";}
-async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus("Erro ao carregar perfil: "+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"business",company_name:"Jefris Renovation",language_code:"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
+async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus(tr("Erro ao carregar perfil: ")+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"individual",company_name:"",language_code:"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
 async function saveProfile(){
   const button=document.querySelector('[onclick="saveProfile()"]');
   const previousLabel=button?.textContent;
-  if(button){button.disabled=true;button.textContent="Salvando...";}
+  if(button){button.disabled=true;button.textContent=tr("Salvando...");}
   try{
     const {data:sessionData,error:sessionError}=await sb.auth.getUser();
-    if(sessionError||!sessionData?.user){setStatus("Sessão expirada. Entre novamente antes de salvar. "+(sessionError?.message||""),false);return}
+    if(sessionError||!sessionData?.user){setStatus(tr("Sessão expirada. Entre novamente antes de salvar. ")+(sessionError?.message||""),false);return}
     user=sessionData.user;
     const payload={owner_id:user.id};
     for(const [field,id] of Object.entries(PROFILE_FIELDS))payload[field]=$(id).value.trim();
-    if(payload.logo_url&&!/^https:\/\//i.test(payload.logo_url)){setStatus("Use uma URL HTTPS válida para o logotipo.",false);return}
+    if(payload.logo_url&&!/^https:\/\//i.test(payload.logo_url)){setStatus(tr("Use uma URL HTTPS válida para o logotipo."),false);return}
     const {data,error}=await sb.from("app_profiles").upsert(payload,{onConflict:"owner_id"}).select("*").single();
-    if(error){setStatus("Erro ao salvar perfil: "+error.message+" (código: "+(error.code||"indisponível")+")",false);return}
+    if(error){setStatus(tr("Erro ao salvar perfil: ")+error.message+tr(" (código: ")+(error.code||tr("indisponível"))+")",false);return}
     const {data:verified,error:verifyError}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).single();
-    if(verifyError||!verified){setStatus("Não foi possível confirmar o salvamento: "+(verifyError?.message||"perfil não encontrado"),false);return}
+    if(verifyError||!verified){setStatus(tr("Não foi possível confirmar o salvamento: ")+(verifyError?.message||tr("perfil não encontrado")),false);return}
     profile=verified;
     for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??"";
     applyLanguage();updateBrand();
-    setStatus("Configurações verificadas e salvas na nuvem.");
-    alert("Configurações verificadas e salvas na nuvem.");
-  }catch(error){setStatus("Falha de conexão ao salvar: "+(error?.message||String(error)),false)}
+    setStatus(tr("Configurações verificadas e salvas na nuvem."));
+    alert(tr("Configurações verificadas e salvas na nuvem."));
+  }catch(error){setStatus(tr("Falha de conexão ao salvar: ")+(error?.message||String(error)),false)}
   finally{if(button){button.disabled=false;button.textContent=previousLabel;}}
 }
 
@@ -267,10 +276,10 @@ function setLogin(msg,ok=false){$("loginStatus").textContent=msg;$("loginStatus"
 
 async function login(){
   const email=$("email").value.trim();
-  if(!email){setLogin("Digite seu e-mail.");return}
-  setLogin("Enviando link...",true);
-  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:"https://jefrisrenovation-netizen.github.io/",shouldCreateUser:true}});
-  if(error)setLogin(error.message);else setLogin("Link enviado. Abra o e-mail, entre no site principal e depois volte a /preview/.",true);
+  if(!email){setLogin(tr("Digite seu e-mail."));return}
+  setLogin(tr("Enviando link..."),true);
+  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:"https://jefrisrenovation-netizen.github.io/preview/",shouldCreateUser:true}});
+  if(error)setLogin(error.message);else setLogin(tr("Link enviado. Abra o e-mail, entre no site principal e depois volte a /preview/."),true);
 }
 async function logout(){await sb.auth.signOut();location.reload()}
 
@@ -283,7 +292,7 @@ function monthEnd(){
 }
 function monthName(){
   return new Date(Number($("year").value),Number($("month").value)-1,1)
-    .toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
+    .toLocaleDateString($("languageCode").value||"fr",{month:"long",year:"numeric"});
 }
 function minutes(a,b,p){
   if(!a||!b)return 0;
@@ -329,18 +338,18 @@ function changeMonth(delta){
 
 async function loadEmployees(){
   const {data,error}=await sb.from("employees").select("*").eq("owner_id",user.id).eq("active",true).order("name");
-  if(error){setStatus("Erro ao carregar funcionários: "+error.message,false);return}
+  if(error){setStatus(tr("Erro ao carregar funcionários: ")+error.message,false);return}
   employees=data||[];
   $("employee").innerHTML=employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join("");
-  if(!employees.length){records=[];payment={};$("dailyRate").value=0;$("hourlyRate").value=0;$("fixedSalary").value=0;$("advance").value=0;$("paymentMode").value="daily";$("currencyCode").value=profile.preferred_currency||"EUR";updatePaymentFields();setStatus("Adicione o primeiro funcionário.",true);render();return}
+  if(!employees.length){records=[];payment={};$("dailyRate").value=0;$("hourlyRate").value=0;$("fixedSalary").value=0;$("advance").value=0;$("paymentMode").value="daily";$("currencyCode").value=profile.preferred_currency||"EUR";updatePaymentFields();setStatus(tr("Adicione o primeiro funcionário."),true);render();return}
   await loadRecords();
 }
 
 async function addEmployee(){
   const name=$("newEmployee").value.trim();
-  if(!name){setStatus("Digite o nome do funcionário.",false);return}
+  if(!name){setStatus(tr("Digite o nome do funcionário."),false);return}
   const {data,error}=await sb.from("employees").insert({owner_id:user.id,name,active:true}).select().single();
-  if(error){setStatus("Erro: "+error.message,false);return}
+  if(error){setStatus(tr("Erro: ")+error.message,false);return}
   employees.push(data);
   employees.sort((a,b)=>a.name.localeCompare(b.name));
   $("newEmployee").value="";
@@ -358,12 +367,12 @@ async function loadRecords(){
     .eq("owner_id",user.id).eq("employee_id",id)
     .gte("work_date",monthStart()).lte("work_date",monthEnd())
     .order("work_date");
-  if(error){setStatus("Erro ao carregar dias: "+error.message,false);return}
+  if(error){setStatus(tr("Erro ao carregar dias: ")+error.message,false);return}
   if(version!==loadVersion)return;
   records=data||[];
   const result=await sb.from("monthly_payments").select("*").eq("owner_id",user.id).eq("employee_id",id).eq("month",monthStart()).maybeSingle();
   if(version!==loadVersion)return;
-  if(result.error){setStatus("Erro ao carregar pagamentos: "+result.error.message,false);return}
+  if(result.error){setStatus(tr("Erro ao carregar pagamentos: ")+result.error.message,false);return}
   payment=result.data||{};
   const emp=employees.find(e=>e.id===id);
   $("defaultEntry").value=String(emp?.default_entry_time||"08:00").slice(0,5);
@@ -387,28 +396,29 @@ function renderHistory(){
   const info=document.createElement("div");
   info.className="muted";
   info.style.gridColumn="1/-1";
-  info.textContent="Folha atual: "+label;
+  info.textContent=tr("Folha atual: ")+label;
   box.appendChild(info);
 }
 
 function render(){
   const emp=employees.find(e=>e.id===$("employee").value);
-  $("title").textContent=(emp?emp.name:"Funcionário")+" — "+monthName();
+  $("title").textContent=(emp?emp.name:tr("Funcionário"))+" — "+monthName();
 
   $("rows").innerHTML=records.map((r,i)=>`
     <tr>
-      <td><input type="date" value="${r.work_date||""}" onchange="upd(${i},'work_date',this.value)"></td>
+      <td><input type="date" min="${monthStart()}" max="${monthEnd()}" value="${r.work_date||""}" onchange="upd(${i},'work_date',this.value)"></td>
       <td><input type="time" value="${(r.entry_time||"").slice(0,5)}" onchange="upd(${i},'entry_time',this.value)"></td>
       <td><input type="time" value="${(r.exit_time||"").slice(0,5)}" onchange="upd(${i},'exit_time',this.value)"></td>
       <td><input type="number" min="0" value="${r.break_minutes??30}" onchange="upd(${i},'break_minutes',this.value)"></td>
       <td><b>${fmt(minutes(r.entry_time,r.exit_time,r.break_minutes??30))}</b></td>
-      <td><input value="${esc(r.workplace||"")}" placeholder="Ex.: Bruxelas" onchange="upd(${i},'workplace',this.value)"></td>
+      <td><input value="${esc(r.workplace||"")}" placeholder="Ex. : Bruxelles" onchange="upd(${i},'workplace',this.value)"></td>
       <td><button class="danger no-print" style="width:auto;padding:8px" onclick="del(${i})">×</button></td>
     </tr>`).join("");
   const last=records.reduce((max,r)=>Math.max(max,Number(r.work_date.slice(-2))),0);
   const days=Number(monthEnd().slice(-2));
   $("newDate").min=monthStart();$("newDate").max=monthEnd();
-  $("newDate").value=last<days?ym()+"-"+pad(last+1):"";
+  const available=Array.from({length:days},(_,i)=>ym()+"-"+pad(i+1)).find(date=>!records.some(r=>r.work_date===date));
+  $("newDate").value=available||"";
   refreshCalculated();
 }
 
@@ -449,19 +459,19 @@ function refreshCalculated(){
 }
 
 async function saveEmployeeDefaults(){
-  const id=$("employee").value;if(!id){setStatus("Selecione um funcionário.",false);return}
+  const id=$("employee").value;if(!id){setStatus(tr("Selecione um funcionário."),false);return}
   const entry=$("defaultEntry").value,exit=$("defaultExit").value,breakMinutes=Number($("defaultBreak").value);
-  if(!entry||!exit||!Number.isInteger(breakMinutes)||breakMinutes<0){setStatus("Preencha horários válidos e pausa não negativa.",false);return}
+  if(!entry||!exit||!Number.isInteger(breakMinutes)||breakMinutes<0){setStatus(tr("Preencha horários válidos e pausa não negativa."),false);return}
   const {data,error}=await sb.from("employees").update({default_entry_time:entry,default_exit_time:exit,default_break_minutes:breakMinutes}).eq("id",id).eq("owner_id",user.id).select("*").single();
-  if(error){setStatus("Erro ao salvar horário padrão: "+error.message,false);return}
+  if(error){setStatus(tr("Erro ao salvar horário padrão: ")+error.message,false);return}
   const index=employees.findIndex(e=>e.id===id);if(index>=0)employees[index]=data;
-  setStatus("Horário padrão salvo. Dias anteriores não foram alterados.");
+  setStatus(tr("Horário padrão salvo. Dias anteriores não foram alterados."));
 }
 async function addRow(){
-  if(!$("employee").value){setStatus("Primeiro adicione um funcionário.",false);return}
+  if(!$("employee").value){setStatus(tr("Primeiro adicione um funcionário."),false);return}
   const d=$("newDate").value;
-  if(!d||d<monthStart()||d>monthEnd()){setStatus("Escolha uma data deste mês para adicionar.",false);return}
-  if(records.some(r=>r.work_date===d)){setStatus("Esta data já foi adicionada.",false);return}
+  if(!d||d<monthStart()||d>monthEnd()){setStatus(tr("Escolha uma data deste mês para adicionar."),false);return}
+  if(records.some(r=>r.work_date===d)){setStatus(tr("Esta data já foi adicionada."),false);return}
   const {data,error}=await sb.from("work_days").insert({
     owner_id:user.id,employee_id:$("employee").value,work_date:d,
     entry_time:$("defaultEntry").value||"08:00",exit_time:$("defaultExit").value||"17:30",break_minutes:Number($("defaultBreak").value)||0,workplace:null
@@ -473,7 +483,7 @@ async function addRow(){
 async function upd(i,p,v){
   const record=records[i];if(!record)return;
   const payload={};
-  if(p==="work_date"&&(!v||v<monthStart()||v>monthEnd()||records.some(r=>r.id!==record.id&&r.work_date===v))){render();setStatus("Escolha uma data livre dentro deste mês.",false);return}
+  if(p==="work_date"&&(!v||v<monthStart()||v>monthEnd()||records.some(r=>r.id!==record.id&&r.work_date===v))){render();setStatus(tr("Escolha uma data livre dentro deste mês."),false);return}
   if(p==="work_date")payload.work_date=v;
   else if(p==="entry_time")payload.entry_time=v||null;
   else if(p==="exit_time")payload.exit_time=v||null;
@@ -482,7 +492,7 @@ async function upd(i,p,v){
 
   const {data,error}=await sb.from("work_days").update(payload)
     .eq("id",record.id).eq("owner_id",user.id).select().single();
-  if(error){render();setStatus("Erro ao salvar: "+error.message,false);return}
+  if(error){render();setStatus(tr("Erro ao salvar: ")+error.message,false);return}
   const index=records.findIndex(r=>r.id===record.id);if(index<0)return;records[index]=data;
   if(p==="work_date"){
     records.sort((a,b)=>a.work_date.localeCompare(b.work_date));
@@ -495,35 +505,40 @@ async function upd(i,p,v){
 async function deleteEmployee(){
   const id=$("employee").value,emp=employees.find(e=>e.id===id);
   if(!emp)return;
-  if(!confirm("Excluir "+emp.name+" da equipe? O histórico será preservado."))return;
+  if(!confirm(tr("Excluir ")+emp.name+tr(" da equipe? O histórico será preservado.")))return;
   const {data,error}=await sb.from("employees").update({active:false}).eq("id",id).eq("owner_id",user.id).select("id");
-  if(error||!data?.length){setStatus("Não foi possível excluir: "+(error?.message||"verifique a permissão de atualização no banco"),false);return}
-  records=[];await loadEmployees();setStatus("Funcionário excluído da equipe. Histórico preservado.");
+  if(error||!data?.length){setStatus(tr("Não foi possível excluir: ")+(error?.message||tr("verifique a permissão de atualização no banco")),false);return}
+  records=[];await loadEmployees();setStatus(tr("Funcionário excluído da equipe. Histórico preservado."));
 }
 async function savePayment(){
   closeCompanyReport();
   const id=$("employee").value;if(!id)return;
   const payload={owner_id:user.id,employee_id:id,month:monthStart(),payment_mode:$("paymentMode").value,currency_code:$("currencyCode").value,daily_rate:Number($("dailyRate").value)||0,hourly_rate:Number($("hourlyRate").value)||0,fixed_salary:Number($("fixedSalary").value)||0,advance:Number($("advance").value)||0};
-  if([payload.daily_rate,payload.hourly_rate,payload.fixed_salary,payload.advance].some(v=>!Number.isFinite(v)||v<0)){setStatus("Use valores iguais ou maiores que zero.",false);return}
+  if([payload.daily_rate,payload.hourly_rate,payload.fixed_salary,payload.advance].some(v=>!Number.isFinite(v)||v<0)){setStatus(tr("Use valores iguais ou maiores que zero."),false);return}
   const {error}=await sb.from("monthly_payments").upsert(payload,{onConflict:"owner_id,employee_id,month"});
-  if(error){setStatus("Erro ao salvar valores: "+error.message,false);return}
-  payment=payload;updatePaymentFields();refreshCalculated();setStatus("Valores salvos na nuvem.");
+  if(error){setStatus(tr("Erro ao salvar valores: ")+error.message,false);return}
+  payment=payload;updatePaymentFields();refreshCalculated();setStatus(tr("Valores salvos na nuvem."));
 }
 async function del(i){
-  if(!confirm("Excluir este dia?"))return;
+  if(!confirm(tr("Excluir este dia?")))return;
   const id=records[i].id;
   const {data,error}=await sb.from("work_days").delete()
     .eq("id",id).eq("owner_id",user.id).select("id");
-  if(error||!data?.length){setStatus("Não foi possível excluir o dia: "+(error?.message||"verifique a permissão de exclusão no banco"),false);return}
-  records=records.filter(r=>r.id!==id);render();setStatus("Dia excluído e alteração salva.");
+  if(error||!data?.length){setStatus(tr("Não foi possível excluir o dia: ")+(error?.message||tr("verifique a permissão de exclusão no banco")),false);return}
+  records=records.filter(r=>r.id!==id);render();setStatus(tr("Dia excluído e alteração salva."));
 }
 
+async function exportCurrentReport(){
+  if(!$("companyReport").classList.contains("hidden")){printCompanyReport();return;}
+  if($("individualReport").classList.contains("hidden"))await showIndividualReport();
+  if(!$("individualReport").classList.contains("hidden"))printIndividualReport();
+}
 function closeIndividualReport(){ $("individualReport").classList.add("hidden"); }
 function printIndividualReport(){printSelectedReport("print-individual")}
 async function showIndividualReport(){
   const id=$("employee").value;
-  if(!id){setStatus("Selecione um funcionário para gerar o relatório individual.",false);return}
-  if(saving){setStatus("Aguarde o salvamento para abrir o relatório.",false);return}
+  if(!id){setStatus(tr("Selecione um funcionário para gerar o relatório individual."),false);return}
+  if(saving){setStatus(tr("Aguarde o salvamento para abrir o relatório."),false);return}
   const selectedMonth=ym();
   try{
     const results=await Promise.all([
@@ -538,25 +553,25 @@ async function showIndividualReport(){
     const row=report.rows[0];
     const totalMinutes=days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
     const currency=paymentRow?.currency_code||profile.preferred_currency||"EUR";
-    $("individualReportTitle").textContent="Relatório individual — "+worker.name;
+    $("individualReportTitle").textContent=tr("Rapport individuel")+" — "+worker.name;
     $("individualReportMonth").textContent=monthName()+" — "+(profile.company_name||"Suivi des heures");
-    $("individualReportRows").innerHTML=days.map(d=>`<tr><td>${esc(d.work_date)}</td><td>${esc(d.entry_time||"")}</td><td>${esc(d.exit_time||"")}</td><td>${Number(d.break_minutes??30)}</td><td>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes??30))}</td><td>${esc(d.work_location||d.location||"")}</td></tr>`).join("");
-    $("individualReportSummary").innerHTML=`<div class="stat"><b>${fmt(totalMinutes)}</b><span>Horas trabalhadas</span></div><div class="stat"><b>${row?.days??0}</b><span>Dias equivalentes</span></div><div class="stat"><b>${formatMoney(row?.gross??0,currency)}</b><span>Valor bruto</span></div><div class="stat"><b>${formatMoney(row?.advance??0,currency)}</b><span>Adiantamentos</span></div><div class="stat"><b>${formatMoney(row?.balance??0,currency)}</b><span>Valor líquido</span></div>`;
+    $("individualReportRows").innerHTML=days.map(d=>`<tr><td>${esc(d.work_date)}</td><td>${esc(d.entry_time||"")}</td><td>${esc(d.exit_time||"")}</td><td>${Number(d.break_minutes??30)}</td><td>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes??30))}</td><td>${esc(d.workplace||d.work_location||d.location||"")}</td></tr>`).join("");
+    $("individualReportSummary").innerHTML=`<div class="stat"><b>${formatMoney(row?.rate??0,currency)}</b><span>${esc(row?.modeLabel||"")}</span></div><div class="stat"><b>${fmt(totalMinutes)}</b><span>${esc(tr("Horas trabalhadas"))}</span></div><div class="stat"><b>${row?.days??0}</b><span>${esc(tr("Dias equivalentes"))}</span></div><div class="stat"><b>${formatMoney(row?.gross??0,currency)}</b><span>${esc(tr("Valor bruto"))}</span></div><div class="stat"><b>${formatMoney(row?.advance??0,currency)}</b><span>${esc(tr("Adiantamentos"))}</span></div><div class="stat"><b>${formatMoney(row?.balance??0,currency)}</b><span>${esc(tr("Valor líquido"))}</span></div>`;
     closeCompanyReport();$("individualReport").classList.remove("hidden");$("individualReport").scrollIntoView({behavior:"smooth"});
-  }catch(error){closeIndividualReport();setStatus("Erro no relatório individual: "+error.message,false)}
+  }catch(error){closeIndividualReport();setStatus(tr("Erro no relatório individual: ")+error.message,false)}
 }
 function closeCompanyReport(){ $("companyReport").classList.add("hidden"); }
 function printSelectedReport(mode){
   const source=document.getElementById(mode==="print-company"?"companyReport":"individualReport");
-  if(!source||source.classList.contains("hidden")){setStatus("Abra o relatório antes de imprimir.",false);return}
+  if(!source||source.classList.contains("hidden")){setStatus(tr("Abra o relatório antes de imprimir."),false);return}
   // A separate print document prevents Safari from including the employee timesheet.
   const popup=window.open("","_blank");
-  if(!popup){setStatus("O Safari bloqueou a janela de impressão. Permita pop-ups e tente novamente.",false);return}
+  if(!popup){setStatus(tr("O Safari bloqueou a janela de impressão. Permita pop-ups e tente novamente."),false);return}
   const report=source.cloneNode(true);
   report.querySelectorAll(".no-print").forEach(el=>el.remove());
   report.classList.remove("hidden");
   const company=profile.company_name||"Suivi des heures";
-  const style=`<style>@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#171717;margin:18px}header{display:flex;align-items:center;gap:14px;margin-bottom:18px}header img{width:70px;height:70px;object-fit:contain}h1{font-size:20px;margin:0}h2{font-size:21px;margin:12px 0 4px}p{color:#555}.table{overflow:visible}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #ccc;padding:7px 5px;text-align:left;font-size:11px;overflow-wrap:anywhere}th{background:#f2f2f2}.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:20px}.stat{border:1px solid #ddd;border-radius:12px;padding:16px 8px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;min-width:0}.stat b{font-size:20px;white-space:nowrap}.stat span{font-size:11px;color:#555}#companyReport table th:nth-child(2){width:13%}#companyReport table th:nth-child(3){width:14%}#companyReport table td:nth-child(n+4){white-space:nowrap}#companyReport .summary{break-inside:avoid}.hidden{display:block}tr{break-inside:avoid}@media print{body{margin:0}header{margin-bottom:12px}.summary{grid-template-columns:repeat(4,minmax(0,1fr))}}</style>`;
+  const style=`<style>@page{size:A4 portrait;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#171717;margin:18px}header{display:flex;align-items:center;gap:14px;margin-bottom:18px}header img{width:70px;height:70px;object-fit:contain}h1{font-size:20px;margin:0}h2{font-size:21px;margin:12px 0 4px}p{color:#555}.table{overflow:visible}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #ccc;padding:3px 4px;text-align:left;font-size:11px;overflow-wrap:anywhere}th{background:#f2f2f2}.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:8px}.stat{border:1px solid #ddd;border-radius:12px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;min-width:0}.stat b{font-size:20px;white-space:nowrap}.stat span{font-size:11px;color:#555}#companyReport table th:nth-child(2){width:13%}#companyReport table th:nth-child(3){width:14%}#companyReport table td:nth-child(n+4){white-space:nowrap}#companyReport .summary{break-inside:avoid}.hidden{display:block}tr{break-inside:avoid}@media print{body{margin:0}header{margin-bottom:12px}.summary{grid-template-columns:repeat(4,minmax(0,1fr))}}</style>`;
   const logo=document.getElementById("brandLogo")?.src||"";
   const escapeHTML=s=>String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
   popup.document.open();
@@ -568,8 +583,8 @@ function printSelectedReport(mode){
 }
 function printCompanyReport(){printSelectedReport("print-company")}
 async function showCompanyReport(){
-  if(saving){setStatus("Aguarde o salvamento para abrir o relatório.",false);return}
-  const selectedMonth=ym();setStatus("Carregando relatório mensal...");
+  if(saving){setStatus(tr("Aguarde o salvamento para abrir o relatório."),false);return}
+  const selectedMonth=ym();setStatus(tr("Carregando relatório mensal..."));
   try{
     const results=await Promise.all([
       sb.from("employees").select("*").eq("owner_id",user.id).order("name"),
@@ -580,7 +595,7 @@ async function showCompanyReport(){
     for(const result of results)if(result.error)throw result.error;
     const [staff,days,payments]=results.map(result=>result.data||[]);
     const report=buildCompanyReport(staff,days,payments);
-    $("reportRows").innerHTML=report.rows.map(r=>`<tr><td>${esc(r.name)}${r.active===false?' (retirado da equipe)':''}</td><td>${r.days.toLocaleString("pt-BR")}</td><td>${esc(r.modeLabel)}: ${formatMoney(r.rate,r.currency)}</td><td>${formatMoney(r.gross,r.currency)}</td><td>${formatMoney(r.advance,r.currency)}</td><td>${formatMoney(r.balance,r.currency)}</td></tr>`).join("");
+    $("reportRows").innerHTML=report.rows.map(r=>`<tr><td>${esc(r.name)}${r.active===false?esc(tr(' (retirado da equipe)')):''}</td><td>${r.days.toLocaleString($("languageCode").value||"fr")}</td><td>${esc(r.modeLabel)}: ${formatMoney(r.rate,r.currency)}</td><td>${formatMoney(r.gross,r.currency)}</td><td>${formatMoney(r.advance,r.currency)}</td><td>${formatMoney(r.balance,r.currency)}</td></tr>`).join("");
     $("reportMonth").textContent=monthName()+" — "+(profile.company_name||"Suivi des heures");
     const currencies=[...new Set(report.rows.map(r=>r.currency))];
     const single=currencies.length<=1;
@@ -590,8 +605,8 @@ async function showCompanyReport(){
     const notes={fr:["Une demi-journée compte pour 0,5 jour en tarif journalier. Les soldes négatifs ne réduisent pas les sommes dues aux autres employés.","Plusieurs devises sont utilisées. Les totaux consolidés sont masqués pour éviter une addition incorrecte.","Aucune journée ni paiement enregistré ce mois."],"pt-PT":["Meio dia conta como 0,5 dia no pagamento diário. Saldos negativos não reduzem os pagamentos dos outros trabalhadores.","Existem moedas diferentes. Os totais consolidados foram ocultados.","Sem registos este mês."],"pt-BR":["Meio dia conta como 0,5 diária. Saldos negativos não reduzem o pagamento dos outros funcionários.","Há moedas diferentes. Os totais consolidados foram ocultados.","Nenhum registro neste mês."],en:["A half-day counts as 0.5 day for daily pay. Negative balances do not reduce other employees’ pay.","Multiple currencies are present. Consolidated totals are hidden to prevent invalid addition.","No records for this month."]};
     const note=notes[lang]||notes.fr;
     $("reportNote").textContent=report.rows.length?(single?note[0]:note[1]):note[2];
-    $("companyReport").classList.remove("hidden");$("companyReport").scrollIntoView({behavior:"smooth"});setStatus("Relatório carregado com os dados salvos na nuvem.");
-  }catch(error){closeCompanyReport();setStatus("Erro ao carregar relatório: "+error.message,false)}
+    $("companyReport").classList.remove("hidden");$("companyReport").scrollIntoView({behavior:"smooth"});setStatus(tr("Relatório carregado com os dados salvos na nuvem."));
+  }catch(error){closeCompanyReport();setStatus(tr("Erro ao carregar relatório: ")+error.message,false)}
 }
 function buildCompanyReport(staff,days,payments){
   const rows=staff.filter(e=>days.some(d=>d.employee_id===e.id)||payments.some(p=>p.employee_id===e.id)).map(e=>{
@@ -613,7 +628,7 @@ function lockForm(locked){document.querySelectorAll("#app input,#app select,#app
 let saving=false;
 for(const name of ["addEmployee","addRow","upd","del","deleteEmployee","savePayment"]){
   const original={addEmployee,addRow,upd,del,deleteEmployee,savePayment}[name];
-  const guarded=async(...args)=>{if(saving)return;saving=true;lockForm(true);try{return await original(...args)}catch(error){setStatus("Falha de conexão: "+error.message,false)}finally{saving=false;lockForm(false)}};
+  const guarded=async(...args)=>{if(saving)return;saving=true;lockForm(true);try{return await original(...args)}catch(error){setStatus(tr("Falha de conexão: ")+error.message,false)}finally{saving=false;lockForm(false)}};
   if(name==="addEmployee")addEmployee=guarded;
   if(name==="addRow")addRow=guarded;
   if(name==="upd")upd=guarded;
@@ -634,7 +649,7 @@ async function start(){
   $("loginCard").classList.add("hidden");
   $("app").classList.remove("hidden");
   setupSelectors();
-  setStatus("Conectado à nuvem.",true);
+  setStatus(tr("Conectado à nuvem."),true);
   await loadProfile();
   await loadEmployees();startedFor=user.id;
   }finally{starting=false}
@@ -644,8 +659,76 @@ start();
 if(false && "serviceWorker"in navigator)window.addEventListener("load",async()=>{
   try{const registration=await navigator.serviceWorker.register("sw.js",{updateViaCache:"none"});await registration.update()}catch(error){console.warn("Atualização do aplicativo indisponível",error)}
 });
+// The shipped application bundle stays on-device; only account data goes to Supabase.
+async function loginWithPassword(){
+  const button=$('passwordLoginButton');
+  if(button.disabled)return;
+  const email=$('email').value.trim();
+  const password=$('loginPassword').value;
+  if(!email||!password){setLogin(tr('Saisissez votre e-mail et votre mot de passe.'));return;}
+  button.disabled=true;
+  setLogin(tr('Connexion en cours…'),true);
+  try{
+    const {error}=await sb.auth.signInWithPassword({email,password});
+    if(error){setLogin(tr('Connexion impossible. Vérifiez vos identifiants.'));return;}
+    $('loginPassword').value='';
+    await start();
+  }catch{setLogin(tr('Connexion impossible. Vérifiez votre connexion Internet et réessayez.'));}
+  finally{button.disabled=false;}
+}
+const passwordAccess=document.createElement('details');
+passwordAccess.style.marginTop='16px';
+const passwordSummary=document.createElement('summary');
+passwordSummary.dataset.text='Se connecter avec un mot de passe';passwordSummary.textContent=tr(passwordSummary.dataset.text);
+const passwordForm=document.createElement('form');
+const passwordLabel=document.createElement('label');
+passwordLabel.htmlFor='loginPassword';passwordLabel.dataset.text='Mot de passe';passwordLabel.textContent=tr(passwordLabel.dataset.text);
+passwordLabel.style.marginTop='12px';
+const passwordInput=document.createElement('input');
+passwordInput.id='loginPassword';passwordInput.type='password';
+passwordInput.autocomplete='current-password';passwordInput.required=true;
+const passwordButton=document.createElement('button');
+passwordButton.id='passwordLoginButton';passwordButton.type='submit';
+passwordButton.dataset.text='Se connecter';passwordButton.textContent=tr(passwordButton.dataset.text);passwordButton.style.marginTop='8px';
+passwordForm.append(passwordLabel,passwordInput,passwordButton);
+passwordForm.onsubmit=event=>{event.preventDefault();loginWithPassword();};
+passwordAccess.append(passwordSummary,passwordForm);
+$('loginCard').append(passwordAccess);
+async function registerWithPassword(){
+  const button=$('passwordSignupButton');
+  if(button.disabled)return;
+  const email=$('email').value.trim(),password=$('signupPassword').value;
+  if(!email||!$('email').checkValidity()){setLogin(tr('Digite seu e-mail.'));return;}
+  if(password.length<8||password!==$('signupConfirmation').value){setLogin(tr('Les mots de passe doivent être identiques et contenir au moins 8 caractères.'));return;}
+  button.disabled=true;
+  setLogin(tr('Création du compte…'),true);
+  try{
+    const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:'https://jefrisrenovation-netizen.github.io/'}});
+    if(error){setLogin(error.message);return;}
+    $('signupPassword').value='';$('signupConfirmation').value='';
+    if(data?.session)await start();
+    else setLogin(tr('Confirmez votre e-mail pour activer votre compte, puis connectez-vous avec votre mot de passe.'),true);
+  }catch{setLogin(tr('Connexion impossible. Vérifiez votre connexion Internet et réessayez.'));}
+  finally{button.disabled=false;}
+}
+const signup=document.createElement('details');signup.style.marginTop='16px';
+signup.innerHTML='<summary data-text="Créer un compte">Créer un compte</summary><form id="signupForm"><label for="signupPassword" data-text="Mot de passe">Mot de passe</label><input id="signupPassword" type="password" autocomplete="new-password" minlength="8" required><label for="signupConfirmation" data-text="Confirmer le mot de passe">Confirmer le mot de passe</label><input id="signupConfirmation" type="password" autocomplete="new-password" minlength="8" required><button id="passwordSignupButton" type="submit" data-text="Créer un compte">Créer un compte</button></form>';
+$('loginCard').append(signup);$('signupForm').onsubmit=e=>{e.preventDefault();registerWithPassword();};
+
+async function requestAccountDeletion(){
+  if(!user)return;
+  const message='Supprimer définitivement votre compte, ses employés, ses heures et ses paiements ? Cette action est irréversible. Saisissez votre e-mail pour confirmer.';
+  const email=prompt(tr(message));
+  if(email===null)return;
+  if(email.trim().toLowerCase()!==user.email.toLowerCase()){setStatus(tr('L’adresse ne correspond pas à votre compte.'),false);return;}
+  const {error}=await sb.functions.invoke('delete-own-account',{body:{confirm_email:email.trim()}});
+  if(error){setStatus(tr('Suppression non effectuée. Contactez jefrisrenovation@gmail.com : ')+error.message,false);return;}
+  await sb.auth.signOut();location.reload();
+}
+const deletion=document.createElement('button');deletion.className='secondary';deletion.style.cssText='width:auto;margin-top:16px;color:#a52b24;background:transparent;border:1px solid #ddd';deletion.dataset.text='Supprimer mon compte et mes données';deletion.textContent=tr(deletion.dataset.text);deletion.onclick=requestAccountDeletion;
+const deletionCard=document.createElement('section');deletionCard.className='card no-print';const deletionDetails=document.createElement('details');const deletionSummary=document.createElement('summary');deletionSummary.dataset.text='Gestion du compte';deletionSummary.textContent=tr(deletionSummary.dataset.text);deletionDetails.append(deletionSummary,deletion);deletionCard.append(deletionDetails);$('app').append(deletionCard);
+applyLanguage();
+
 </script>
-<footer style="text-align:center;padding:20px;font-size:14px" class="no-print"><a href="/privacy.html" target="_blank" rel="noopener">Confidentialité / Privacidade</a> · <a href="mailto:jefrisrenovation@gmail.com">Assistance / Suporte</a></footer>
 </body>
 </html>
-

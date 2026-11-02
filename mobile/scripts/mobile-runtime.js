@@ -4,46 +4,66 @@ async function loginWithPassword(){
   if(button.disabled)return;
   const email=$('email').value.trim();
   const password=$('loginPassword').value;
-  if(!email||!password){setLogin('Saisissez votre e-mail et votre mot de passe.');return;}
+  if(!email||!password){setLogin(tr('Saisissez votre e-mail et votre mot de passe.'));return;}
   button.disabled=true;
-  setLogin('Connexion en cours…',true);
+  setLogin(tr('Connexion en cours…'),true);
   try{
     const {error}=await sb.auth.signInWithPassword({email,password});
-    if(error){setLogin('Connexion impossible. Vérifiez vos identifiants.');return;}
+    if(error){setLogin(tr('Connexion impossible. Vérifiez vos identifiants.'));return;}
     $('loginPassword').value='';
     await start();
-  }catch{setLogin('Connexion impossible. Vérifiez votre connexion Internet et réessayez.');}
+  }catch{setLogin(tr('Connexion impossible. Vérifiez votre connexion Internet et réessayez.'));}
   finally{button.disabled=false;}
 }
 const passwordAccess=document.createElement('details');
 passwordAccess.style.marginTop='16px';
 const passwordSummary=document.createElement('summary');
-passwordSummary.textContent='Se connecter avec un mot de passe';
+passwordSummary.dataset.text='Se connecter avec un mot de passe';passwordSummary.textContent=tr(passwordSummary.dataset.text);
 const passwordForm=document.createElement('form');
 const passwordLabel=document.createElement('label');
-passwordLabel.htmlFor='loginPassword';passwordLabel.textContent='Mot de passe';
+passwordLabel.htmlFor='loginPassword';passwordLabel.dataset.text='Mot de passe';passwordLabel.textContent=tr(passwordLabel.dataset.text);
 passwordLabel.style.marginTop='12px';
 const passwordInput=document.createElement('input');
 passwordInput.id='loginPassword';passwordInput.type='password';
 passwordInput.autocomplete='current-password';passwordInput.required=true;
 const passwordButton=document.createElement('button');
 passwordButton.id='passwordLoginButton';passwordButton.type='submit';
-passwordButton.textContent='Se connecter';passwordButton.style.marginTop='8px';
+passwordButton.dataset.text='Se connecter';passwordButton.textContent=tr(passwordButton.dataset.text);passwordButton.style.marginTop='8px';
 passwordForm.append(passwordLabel,passwordInput,passwordButton);
 passwordForm.onsubmit=event=>{event.preventDefault();loginWithPassword();};
 passwordAccess.append(passwordSummary,passwordForm);
 $('loginCard').append(passwordAccess);
+async function registerWithPassword(){
+  const button=$('passwordSignupButton');
+  if(button.disabled)return;
+  const email=$('email').value.trim(),password=$('signupPassword').value;
+  if(!email||!$('email').checkValidity()){setLogin(tr('Digite seu e-mail.'));return;}
+  if(password.length<8||password!==$('signupConfirmation').value){setLogin(tr('Les mots de passe doivent être identiques et contenir au moins 8 caractères.'));return;}
+  button.disabled=true;
+  setLogin(tr('Création du compte…'),true);
+  try{
+    const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:'https://jefrisrenovation-netizen.github.io/'}});
+    if(error){setLogin(error.message);return;}
+    $('signupPassword').value='';$('signupConfirmation').value='';
+    if(data?.session)await start();
+    else setLogin(tr('Confirmez votre e-mail pour activer votre compte, puis connectez-vous avec votre mot de passe.'),true);
+  }catch{setLogin(tr('Connexion impossible. Vérifiez votre connexion Internet et réessayez.'));}
+  finally{button.disabled=false;}
+}
+const signup=document.createElement('details');signup.style.marginTop='16px';
+signup.innerHTML='<summary data-text="Créer un compte">Créer un compte</summary><form id="signupForm"><label for="signupPassword" data-text="Mot de passe">Mot de passe</label><input id="signupPassword" type="password" autocomplete="new-password" minlength="8" required><label for="signupConfirmation" data-text="Confirmer le mot de passe">Confirmer le mot de passe</label><input id="signupConfirmation" type="password" autocomplete="new-password" minlength="8" required><button id="passwordSignupButton" type="submit" data-text="Créer un compte">Créer un compte</button></form>';
+$('loginCard').append(signup);$('signupForm').onsubmit=e=>{e.preventDefault();registerWithPassword();};
 async function handleAuthLink(url){
   const tokens=authTokens(url);
   if(!tokens)return;
   const {error}=await sb.auth.setSession(tokens);
-  if(error){setLogin('Ce lien a expiré. Demandez un nouveau lien.');return;}
+  if(error){setLogin(tr('Ce lien a expiré. Demandez un nouveau lien.'));return;}
   await start();
 }
 if(Capacitor.isNativePlatform()){
   App.addListener('appUrlOpen',({url})=>handleAuthLink(url));
   App.getLaunchUrl().then(result=>{if(result?.url)handleAuthLink(result.url)});
-  window.addEventListener('offline',()=>setStatus('Hors ligne. Reconnectez-vous avant de modifier vos données.',false));
+  window.addEventListener('offline',()=>setStatus(tr('Hors ligne. Reconnectez-vous avant de modifier vos données.'),false));
   App.addListener('backButton',()=>{
     if(!$('companyReport').classList.contains('hidden'))closeCompanyReport();
     else if(!$('individualReport').classList.contains('hidden'))closeIndividualReport();
@@ -51,7 +71,7 @@ if(Capacitor.isNativePlatform()){
   });
 }
 async function exportMobileReport(mode){
-  if(saving){setStatus('Attendez la fin de l’enregistrement.',false);return;}
+  if(saving){setStatus(tr('Attendez la fin de l’enregistrement.'),false);return;}
   let source=document.getElementById(mode==='print-company'?'companyReport':'individualReport');
   if(!source||source.classList.contains('hidden')){
     if(mode==='print-company'){
@@ -67,13 +87,13 @@ async function exportMobileReport(mode){
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
     doc.setFontSize(17);doc.text(String(profile.company_name||'Suivi des heures Pro'),14,18);
     doc.setFontSize(11);doc.text(source.querySelector('h2')?.textContent||'Rapport',14,26);
-    doc.text(source.querySelector('p')?.textContent||monthName(),14,33);
+    doc.text((source.querySelector('p')||source.querySelector('#reportMonth'))?.textContent||monthName(),14,33);
     const logo=$('brandLogo');
     if(logo?.complete&&logo.naturalWidth){try{doc.addImage(logo, 'PNG',173,10,23,23)}catch{}}
     const table=source.querySelector('table');
-    autoTable(doc,{head:[[...table.querySelectorAll('thead th')].map(e=>e.textContent)],body:[...table.querySelectorAll('tbody tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.textContent)),startY:40,styles:{fontSize:8,cellPadding:2,overflow:'linebreak'},headStyles:{fillColor:[183,25,32]},margin:{left:14,right:14},pageBreak:'auto',rowPageBreak:'avoid'});
+    autoTable(doc,{head:[[...table.querySelectorAll('thead th')].map(e=>e.textContent)],body:[...table.querySelectorAll('tbody tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.textContent)),startY:40,styles:{fontSize:7,cellPadding:1.1,overflow:'linebreak'},headStyles:{fillColor:[183,25,32]},margin:{left:14,right:14},pageBreak:'auto',rowPageBreak:'avoid'});
     const summary=[...source.querySelectorAll('.stat')].map(e=>[e.querySelector('span')?.textContent||'',e.querySelector('b')?.textContent||'']);
-    autoTable(doc,{body:summary,startY:(doc.lastAutoTable?.finalY||40)+8,styles:{fontSize:9,cellPadding:2},margin:{left:14,right:14},pageBreak:'auto'});
+    autoTable(doc,{body:summary,startY:(doc.lastAutoTable?.finalY||40)+4,styles:{fontSize:8,cellPadding:1.2},margin:{left:14,right:14},pageBreak:'auto'});
     const note=source.querySelector('#reportNote')?.textContent;
     if(note){let y=(doc.lastAutoTable?.finalY||40)+10;const lines=doc.splitTextToSize(note,180);if(y+lines.length*4>282){doc.addPage();y=15}doc.setFontSize(9);doc.text(lines,14,y)}
     const name=reportFilename(mode,ym());
@@ -81,23 +101,24 @@ async function exportMobileReport(mode){
       const base64=doc.output('datauristring').split(',')[1];
       await Filesystem.writeFile({path:name,data:base64,directory:Directory.Cache});
       const {uri}=await Filesystem.getUri({path:name,directory:Directory.Cache});
-      await Share.share({title:'Rapport mensuel',files:[uri],dialogTitle:'Partager le rapport PDF'});
+      await Share.share({title:tr('Rapport mensuel de l’équipe'),files:[uri],dialogTitle:tr('Partager le rapport PDF')});
       // Do not leave previous salary reports in the app cache after sharing.
       await Filesystem.deleteFile({path:name,directory:Directory.Cache});
     }else doc.save(name);
-  }catch(error){setStatus('Export PDF impossible : '+error.message,false)}
+  }catch(error){setStatus(tr('Export PDF impossible : ')+error.message,false)}
 }
 printSelectedReport=exportMobileReport;
 window.print=()=>exportMobileReport('print-individual');
 async function requestAccountDeletion(){
   if(!user)return;
   const message='Supprimer définitivement votre compte, ses employés, ses heures et ses paiements ? Cette action est irréversible. Saisissez votre e-mail pour confirmer.';
-  const email=prompt(message);
+  const email=prompt(tr(message));
   if(email===null)return;
-  if(email.trim().toLowerCase()!==user.email.toLowerCase()){setStatus('L’adresse ne correspond pas à votre compte.',false);return;}
+  if(email.trim().toLowerCase()!==user.email.toLowerCase()){setStatus(tr('L’adresse ne correspond pas à votre compte.'),false);return;}
   const {error}=await sb.functions.invoke('delete-own-account',{body:{confirm_email:email.trim()}});
-  if(error){setStatus('Suppression non effectuée. Contactez jefrisrenovation@gmail.com : '+error.message,false);return;}
+  if(error){setStatus(tr('Suppression non effectuée. Contactez jefrisrenovation@gmail.com : ')+error.message,false);return;}
   await sb.auth.signOut();location.reload();
 }
-const deletion=document.createElement('button');deletion.className='danger';deletion.textContent='Supprimer mon compte et mes données';deletion.onclick=requestAccountDeletion;
-const deletionCard=document.createElement('section');deletionCard.className='card no-print';deletionCard.append(deletion);$('app').append(deletionCard);
+const deletion=document.createElement('button');deletion.className='secondary';deletion.style.cssText='width:auto;margin-top:16px;color:#a52b24;background:transparent;border:1px solid #ddd';deletion.dataset.text='Supprimer mon compte et mes données';deletion.textContent=tr(deletion.dataset.text);deletion.onclick=requestAccountDeletion;
+const deletionCard=document.createElement('section');deletionCard.className='card no-print';const deletionDetails=document.createElement('details');const deletionSummary=document.createElement('summary');deletionSummary.dataset.text='Gestion du compte';deletionSummary.textContent=tr(deletionSummary.dataset.text);deletionDetails.append(deletionSummary,deletion);deletionCard.append(deletionDetails);$('app').append(deletionCard);
+applyLanguage();

@@ -8,7 +8,7 @@ function passwordLogin(signIn){
  const fn=runtime.slice(runtime.indexOf('async function loginWithPassword'),runtime.indexOf('const passwordAccess='));
  const elements={email:{value:' reviewer@example.com '},loginPassword:{value:' secret '},passwordLoginButton:{disabled:false}};
  const messages=[];let starts=0;
- const context={$:id=>elements[id],sb:{auth:{signInWithPassword:signIn}},setLogin:message=>messages.push(message),start:async()=>{starts++;}};
+ const context={tr:s=>s,$:id=>elements[id],sb:{auth:{signInWithPassword:signIn}},setLogin:message=>messages.push(message),start:async()=>{starts++;}};
  vm.createContext(context);vm.runInContext(fn,context);
  return {run:context.loginWithPassword,elements,messages,starts:()=>starts};
 }
@@ -66,4 +66,41 @@ test('all days of long and leap-year months remain available',()=>{
 });
 test('new profiles do not inherit the owner’s company name',()=>{
  const source=fs.readFileSync('source.html','utf8');assert.ok(source.includes('account_type:"individual",company_name:""'));
+});
+
+function signupTest(signUp){
+ const runtime=fs.readFileSync('scripts/mobile-runtime.js','utf8');
+ const fn=runtime.slice(runtime.indexOf('async function registerWithPassword'),runtime.indexOf("const signup=document.createElement"));
+ const elements={email:{value:' new@example.com ',checkValidity:()=>true},signupPassword:{value:'password123'},signupConfirmation:{value:'password123'},passwordSignupButton:{disabled:false}};
+ const messages=[];let starts=0;
+ const context={tr:s=>s,$:id=>elements[id],sb:{auth:{signUp}},setLogin:(m)=>messages.push(m),start:async()=>{starts++;}};
+ vm.createContext(context);vm.runInContext(fn,context);
+ return {run:context.registerWithPassword,elements,messages,starts:()=>starts};
+}
+test('signup handles email confirmation without starting an unauthenticated session',async()=>{
+ let request;
+ const signup=signupTest(async value=>{request=value;return {data:{session:null},error:null};});
+ await signup.run();assert.equal(request.email,'new@example.com');assert.equal(request.password,'password123');
+ assert.equal(signup.starts(),0);assert.equal(signup.elements.signupPassword.value,'');assert.match(signup.messages.at(-1),/Confirmez/);
+ assert.equal(signup.elements.passwordSignupButton.disabled,false);
+});
+test('signup starts only with a session and retains form after API failures',async()=>{
+ const success=signupTest(async()=>({data:{session:{user:{id:'new'}}},error:null}));await success.run();assert.equal(success.starts(),1);
+ for(const signUp of [async()=>({error:{message:'Registration unavailable'}}),async()=>{throw Error('offline')}]){
+  const signup=signupTest(signUp);await signup.run();assert.equal(signup.starts(),0);assert.equal(signup.elements.signupPassword.value,'password123');assert.equal(signup.elements.passwordSignupButton.disabled,false);
+ }
+});
+test('signup rejects missing email and mismatched or short passwords before contacting Auth',async()=>{
+ let calls=0;const signup=signupTest(async()=>{calls++;return {data:{},error:null};});
+ signup.elements.email.value='';await signup.run();signup.elements.email.value='new@example.com';
+ signup.elements.signupConfirmation.value='different';await signup.run();signup.elements.signupPassword.value='short';signup.elements.signupConfirmation.value='short';await signup.run();assert.equal(calls,0);
+});
+test('months and screenshot validation message use the selected language',()=>{
+ const {context,api}=calculations();
+ context.document.getElementById=id=>({value:id==='languageCode'?'fr':id==='year'?'2026':'11'});
+ assert.equal(vm.runInContext('monthName()',context),'novembre 2026');
+ assert.match(vm.runInContext('tr("Escolha uma data livre dentro deste mês.")',context),/^Choisissez/);
+ context.document.getElementById=id=>({value:id==='languageCode'?'en':id==='year'?'2026':'11'});
+ assert.equal(vm.runInContext('monthName()',context),'November 2026');
+ assert.match(vm.runInContext('tr("Escolha uma data livre dentro deste mês.")',context),/^Choose/);
 });
