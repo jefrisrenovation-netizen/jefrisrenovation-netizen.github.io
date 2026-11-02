@@ -11,6 +11,8 @@ if(platform==='ios'){
   pbx=pbx.replaceAll('PRODUCT_BUNDLE_IDENTIFIER = io.github.jefrisrenovation.suividesheures;',`PRODUCT_BUNDLE_IDENTIFIER = "${bundle}";`);
   pbx=pbx.replaceAll('CODE_SIGN_STYLE = Automatic;','CODE_SIGN_STYLE = Automatic;\n\t\t\t\tDEVELOPMENT_TEAM = ZFF7B3HXTT;\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = App/App.entitlements;');
   pbx=pbx.replaceAll('DEVELOPMENT_TEAM = "";','DEVELOPMENT_TEAM = ZFF7B3HXTT;');
+  // A released 1.0 app needs a new marketing version for the update.
+  pbx=pbx.replace(/MARKETING_VERSION = [^;]+;/g,'MARKETING_VERSION = 1.0.1;');
   // Restrict the App Store device family to iPhone only (1 = iPhone, 2 = iPad).
   pbx=pbx.replace(/TARGETED_DEVICE_FAMILY = [^;]+;/g,'TARGETED_DEVICE_FAMILY = "1";');
   // Add the app privacy manifest to the generated Xcode project.

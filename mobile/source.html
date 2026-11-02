@@ -41,6 +41,20 @@ th,td{padding:9px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:1
 .sheet-title{font-size:20px;font-weight:800;margin-top:4px}
 .sheet-sub{font-size:13px;color:#6b7280}
 @media(max-width:600px){.summary{grid-template-columns:repeat(2,1fr)}.actions{flex-direction:column}.grid{grid-template-columns:1fr}}
+.day-field-label{display:none}
+@media screen and (max-width:600px){
+  .day-table-wrap{overflow:visible}
+  #dayTable{display:block;width:100%;min-width:0;border:0}
+  #dayTable thead{display:none}
+  #dayTable tbody{display:grid;gap:14px;width:100%}
+  #dayTable tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px;border:1px solid #d1d5db;border-radius:12px;background:#fafafa}
+  #dayTable td{display:block;width:auto;min-width:0;padding:0;border:0}
+  #dayTable .day-date,#dayTable .day-workplace,#dayTable .day-delete{grid-column:1/-1}
+  #dayTable .day-field-label{display:block;font-size:13px;font-weight:700;margin:0 0 5px}
+  #dayTable input{display:block;width:100%;min-width:0;max-width:100%;min-height:46px;font-size:16px;padding:10px}
+  #dayTable .day-hours{display:flex;align-items:center;min-height:46px;font-size:17px}
+  #dayTable .day-delete{text-align:right}
+}
 @media print{
 @page{size:A4 landscape;margin:10mm}
 body.print-company #app>section:not(#companyReport),body.print-individual #app>section:not(#individualReport){display:none!important}
@@ -174,8 +188,8 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
     <div style="align-self:end"><button class="secondary" onclick="saveEmployeeDefaults()" data-i18n="saveDefaults">Salvar horário padrão</button></div>
   </div>
 
-  <div class="table" style="margin-top:12px">
-    <table>
+  <div class="table day-table-wrap" style="margin-top:12px">
+    <table id="dayTable">
       <thead>
         <tr><th data-text="Data">Data</th><th data-text="Entrada">Entrada</th><th data-text="Saída">Saída</th><th data-text="Pausa (min)">Pausa (min)</th><th data-text="Horas">Horas</th><th data-text="Local de trabalho">Local de trabalho</th><th></th></tr>
       </thead>
@@ -406,13 +420,13 @@ function render(){
 
   $("rows").innerHTML=records.map((r,i)=>`
     <tr>
-      <td><input type="date" min="${monthStart()}" max="${monthEnd()}" value="${r.work_date||""}" onchange="upd(${i},'work_date',this.value)"></td>
-      <td><input type="time" value="${(r.entry_time||"").slice(0,5)}" onchange="upd(${i},'entry_time',this.value)"></td>
-      <td><input type="time" value="${(r.exit_time||"").slice(0,5)}" onchange="upd(${i},'exit_time',this.value)"></td>
-      <td><input type="number" min="0" value="${r.break_minutes??30}" onchange="upd(${i},'break_minutes',this.value)"></td>
-      <td><b>${fmt(minutes(r.entry_time,r.exit_time,r.break_minutes??30))}</b></td>
-      <td><input value="${esc(r.workplace||"")}" placeholder="Ex. : Bruxelles" onchange="upd(${i},'workplace',this.value)"></td>
-      <td><button class="danger no-print" style="width:auto;padding:8px" onclick="del(${i})">×</button></td>
+      <td class="day-date"><label class="day-field-label" data-text="Data" for="day-date-${i}">${esc(tr("Data"))}</label><input id="day-date-${i}" aria-label="${esc(tr("Data"))}" type="date" min="${monthStart()}" max="${monthEnd()}" value="${esc(r.work_date||"")}" onchange="upd(${i},'work_date',this.value)"></td>
+      <td><label class="day-field-label" data-text="Entrada" for="day-entry-${i}">${esc(tr("Entrada"))}</label><input id="day-entry-${i}" aria-label="${esc(tr("Entrada"))}" type="time" value="${esc((r.entry_time||"").slice(0,5))}" onchange="upd(${i},'entry_time',this.value)"></td>
+      <td><label class="day-field-label" data-text="Saída" for="day-exit-${i}">${esc(tr("Saída"))}</label><input id="day-exit-${i}" aria-label="${esc(tr("Saída"))}" type="time" value="${esc((r.exit_time||"").slice(0,5))}" onchange="upd(${i},'exit_time',this.value)"></td>
+      <td><label class="day-field-label" data-text="Pausa (min)" for="day-break-${i}">${esc(tr("Pausa (min)"))}</label><input id="day-break-${i}" aria-label="${esc(tr("Pausa (min)"))}" type="number" inputmode="numeric" min="0" step="1" value="${Number(r.break_minutes??30)}" onchange="upd(${i},'break_minutes',this.value)"></td>
+      <td><span class="day-field-label" data-text="Horas">${esc(tr("Horas"))}</span><b class="day-hours">${fmt(minutes(r.entry_time,r.exit_time,r.break_minutes??30))}</b></td>
+      <td class="day-workplace"><label class="day-field-label" data-text="Local de trabalho" for="day-workplace-${i}">${esc(tr("Local de trabalho"))}</label><input id="day-workplace-${i}" aria-label="${esc(tr("Local de trabalho"))}" value="${esc(r.workplace||"")}" placeholder="Ex. : Bruxelles" onchange="upd(${i},'workplace',this.value)"></td>
+      <td class="day-delete"><button class="danger no-print" style="width:auto;padding:8px" aria-label="${esc(tr("Excluir este dia?"))}" onclick="del(${i})">×</button></td>
     </tr>`).join("");
   const last=records.reduce((max,r)=>Math.max(max,Number(r.work_date.slice(-2))),0);
   const days=Number(monthEnd().slice(-2));
@@ -445,7 +459,7 @@ function refreshCalculated(){
     if(m>0){if(m>240)full++;else half++}
   });
   document.querySelectorAll("#rows tr").forEach((row,i)=>{
-    row.children[4].innerHTML="<b>"+fmt(minutes(records[i].entry_time,records[i].exit_time,records[i].break_minutes??30))+"</b>";
+    row.querySelector(".day-hours").textContent=fmt(minutes(records[i].entry_time,records[i].exit_time,records[i].break_minutes??30));
   });
   $("total").textContent=fmt(total);
   $("fullDays").textContent=full;
