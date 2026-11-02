@@ -117,6 +117,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 .stat b{font-size:14px!important}
 .stat span{font-size:9px!important}
 }@media(max-width:600px){.grid>*{min-width:0}input,select{max-width:100%;min-width:0}.brand{min-width:0}.brand h1{overflow-wrap:anywhere}.actions button{max-width:100%}}
+:root{--red:#c92928;--green:#087f5b}header{position:relative}.brand img{width:48px;height:48px}.brand h1{font-size:21px}.app-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;padding:8px;background:#fff;border-radius:14px;box-shadow:0 2px 12px #0001;margin-bottom:16px;scroll-margin-top:12px}.app-nav button{display:flex;flex-direction:column;gap:4px;align-items:center;font-size:12px;padding:10px 3px;background:transparent;color:#666}.app-nav button.selected{color:var(--red);background:#fff1f2}.app-nav button>span:first-child{font-size:21px}.dashboard-head{display:flex;gap:14px;justify-content:space-between;align-items:center;margin-bottom:18px}.dashboard-head input{width:175px}.register-button{margin:18px 0;padding:16px;font-size:18px}.worker-tile{display:flex;align-items:center;justify-content:space-between;text-align:left;background:#fafafa;border:1px solid #ddd;margin:8px 0;padding:15px}.project-tile{border:1px solid #e5e7eb;background:#fafafa;padding:14px;border-radius:12px;margin-top:12px;overflow-wrap:anywhere}.project-tile p{font-size:14px;color:#666;margin:8px 0}.project-tile button{width:auto}.button{display:inline-block;text-align:center;text-decoration:none;padding:12px;border-radius:10px;font-weight:700}.button.green{color:white}.access-list{margin-top:20px}#inviteForm>button,#siteForm>button{margin:12px 0}dialog{max-width:520px;width:calc(100% - 24px);max-height:92dvh;overflow:auto;border:0;border-radius:16px;padding:20px;box-shadow:0 12px 50px #0003}dialog::backdrop{background:#0008}dialog h2{margin-bottom:16px}dialog input,dialog select{margin-bottom:10px}dialog input[type=time]{min-width:0}#workerPortal{max-width:800px;margin:14px auto}#workerMonth{margin:8px 0}.approval{display:inline-block;padding:4px 8px;border-radius:6px;font-size:12px;margin-left:8px;background:#fff3cd}.approval.approved{background:#dcfce7;color:#166534}.approval.rejected{background:#fee2e2;color:#991b1b}.dashboard-head small{color:#666}#dashboard .stat{background:white;border:1px solid #eee}#dashboard .stat b{font-size:22px}#dashboardTeam{margin-top:10px}#inviteResult .actions{flex-wrap:wrap}#inviteResult a{flex:1}#upgradeNotice:empty{display:none}@media(max-width:600px){main{padding:10px}.card{padding:14px}header{padding:14px 12px;padding-top:calc(14px + env(safe-area-inset-top))}.brand h1{font-size:19px}.brand small{font-size:11px}.dashboard-head{align-items:flex-start;flex-direction:column}.dashboard-head input{width:100%}.app-nav{position:sticky;top:0;z-index:4}.app-nav button{font-size:10px}dialog .grid{grid-template-columns:repeat(2,minmax(0,1fr))}dialog .grid>div:first-child{grid-column:1/-1}input,select{font-size:16px}.worker-tile span{white-space:nowrap}}@media print{#upgradeShell,#mainNav,#accessPanel,#reviewPanel,#sitesPanel,#workerPortal{display:none!important}}
 </style>
 </head>
 <body>
@@ -237,7 +238,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 </div>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3"></script>
 <script>
 const SUPABASE_URL="https://nnrelfuewfhkirgzbwsi.supabase.co";
 const SUPABASE_KEY="sb_publishable_3GY1ZI3m6ZLejVqHGL7Pnw_ZnnViDwb";
@@ -452,10 +453,10 @@ function formatMoney(n,currency="EUR"){
   return Number(n).toLocaleString(locales[$("languageCode").value]||"fr-BE",{style:"currency",currency});
 }
 function refreshCalculated(){
-  let total=0,full=0,half=0;
+  let total=0,full=0,half=0,payableMinutes=0,payableDays=0;
   records.forEach(r=>{
     const m=minutes(r.entry_time,r.exit_time,r.break_minutes??30);
-    total+=m;
+    total+=m;if(!r.approval_status||r.approval_status==="approved"){payableMinutes+=m;payableDays+=m>240?1:m>0?0.5:0;}
     if(m>0){if(m>240)full++;else half++}
   });
   document.querySelectorAll("#rows tr").forEach((row,i)=>{
@@ -466,7 +467,7 @@ function refreshCalculated(){
   $("halfDays").textContent=half;
   const advance=Number($("advance").value)||0;
   const currency=$("currencyCode").value;
-  const gross=calculateGross(total,full+half/2,{payment_mode:$("paymentMode").value,daily_rate:$("dailyRate").value,hourly_rate:$("hourlyRate").value,fixed_salary:$("fixedSalary").value});
+  const gross=calculateGross(payableMinutes,payableDays,{payment_mode:$("paymentMode").value,daily_rate:$("dailyRate").value,hourly_rate:$("hourlyRate").value,fixed_salary:$("fixedSalary").value});
   $("gross").textContent=formatMoney(gross,currency);
   $("balance").textContent=formatMoney(gross-advance,currency);
   $("equivDays").textContent=(full+half/2).toFixed(1).replace(".0","");
@@ -562,7 +563,8 @@ async function showIndividualReport(){
     ]);
     if(selectedMonth!==ym()||id!==$("employee").value)return;
     for(const result of results)if(result.error)throw result.error;
-    const [worker,days,paymentRow]=results.map(result=>result.data);
+    const [worker,rawDays,paymentRow]=results.map(result=>result.data);
+    const days=rawDays.filter(d=>!d.approval_status||d.approval_status==="approved");
     const report=buildCompanyReport([worker],days,paymentRow?[paymentRow]:[]);
     const row=report.rows[0];
     const totalMinutes=days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
@@ -624,7 +626,7 @@ async function showCompanyReport(){
 }
 function buildCompanyReport(staff,days,payments){
   const rows=staff.filter(e=>days.some(d=>d.employee_id===e.id)||payments.some(p=>p.employee_id===e.id)).map(e=>{
-    const employeeDays=days.filter(d=>d.employee_id===e.id);
+    const employeeDays=days.filter(d=>d.employee_id===e.id&&(!d.approval_status||d.approval_status==="approved"));
     const minutesWorked=employeeDays.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
     const equivalent=employeeDays.reduce((sum,d)=>{const m=minutes(d.entry_time,d.exit_time,d.break_minutes??30);return sum+(m>240?1:m>0?0.5:0)},0);
     const p=payments.find(p=>p.employee_id===e.id)||{};
@@ -654,7 +656,7 @@ $("employee").addEventListener("change",loadRecords);
 $("year").addEventListener("change",()=>{updateMonthUI();loadRecords()});
 $("month").addEventListener("change",()=>{updateMonthUI();loadRecords()});
 
-async function start(){
+async function startLegacy(){
   if(starting)return;starting=true;
   try{
   const {data}=await sb.auth.getSession();
@@ -667,6 +669,10 @@ async function start(){
   await loadProfile();
   await loadEmployees();startedFor=user.id;
   }finally{starting=false}
+}
+async function start(){
+ if(typeof teamBoot==="function")return teamBoot();
+ return startLegacy();
 }
 sb.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;if(user)setTimeout(start,0)});
 start();
@@ -683,7 +689,9 @@ async function loginWithPassword(){
   button.disabled=true;
   setLogin(tr('Connexion en cours…'),true);
   try{
-    const {error}=await sb.auth.signInWithPassword({email,password});
+    let error;
+    if(email.includes('@'))({error}=await sb.auth.signInWithPassword({email,password}));
+    else {try{const result=await teamCall('login',{username:email,password});({error}=await sb.auth.setSession(result.session));}catch{error={message:'invalid_credentials'};}}
     if(error){setLogin(tr('Connexion impossible. Vérifiez vos identifiants.'));return;}
     $('loginPassword').value='';
     await start();
@@ -712,7 +720,7 @@ async function registerWithPassword(){
   const button=$('passwordSignupButton');
   if(button.disabled)return;
   const email=$('email').value.trim(),password=$('signupPassword').value;
-  if(!email||!$('email').checkValidity()){setLogin(tr('Digite seu e-mail.'));return;}
+  if(!email||!email.includes('@')||!$('email').checkValidity()){setLogin(tr('Digite seu e-mail.'));return;}
   if(password.length<8||password!==$('signupConfirmation').value){setLogin(tr('Les mots de passe doivent être identiques et contenir au moins 8 caractères.'));return;}
   button.disabled=true;
   setLogin(tr('Création du compte…'),true);
@@ -742,6 +750,170 @@ async function requestAccountDeletion(){
 const deletion=document.createElement('button');deletion.className='secondary';deletion.style.cssText='width:auto;margin-top:16px;color:#a52b24;background:transparent;border:1px solid #ddd';deletion.dataset.text='Supprimer mon compte et mes données';deletion.textContent=tr(deletion.dataset.text);deletion.onclick=requestAccountDeletion;
 const deletionCard=document.createElement('section');deletionCard.className='card no-print';const deletionDetails=document.createElement('details');const deletionSummary=document.createElement('summary');deletionSummary.dataset.text='Gestion du compte';deletionSummary.textContent=tr(deletionSummary.dataset.text);deletionDetails.append(deletionSummary,deletion);deletionCard.append(deletionDetails);$('app').append(deletionCard);
 applyLanguage();
+
+// Employee identities are resolved server-side. Company records keep their existing owner_id.
+const teamState={role:null,booting:false,access:null,sites:[],members:[],days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
+const teamWords={
+ home:['Accueil','Início','Home'],team:['Équipe','Equipe','Team'],sites:['Chantiers','Obras','Projects'],reports:['Rapports','Relatórios','Reports'],settings:['Paramètres','Configurações','Settings'],
+ register:['Enregistrer une journée','Registrar dia','Record day'],month:['Résumé du mois','Resumo do mês','Monthly overview'],hours:['Heures','Horas','Hours'],days:['Jours','Dias','Days'],advances:['Avances','Adiantamentos','Advances'],due:['Total à payer','Total a pagar','Total due'],
+ invite:['Inviter un employé','Convidar funcionário','Invite employee'],username:['Identifiant','Usuário','Username'],email:['E-mail','E-mail','Email'],phone:['Téléphone','Telefone','Phone'],createInvite:['Créer le lien d’invitation','Criar link de convite','Create invite link'],share:['Partager','Compartilhar','Share'],copy:['Copier le lien','Copiar link','Copy link'],copied:['Lien copié','Link copiado','Link copied'],
+ pending:['À approuver','Aguardando aprovação','Pending approval'],approved:['Approuvé','Aprovado','Approved'],rejected:['À corriger','Precisa de correção','Needs correction'],approve:['Approuver','Aprovar','Approve'],reject:['Demander une correction','Pedir correção','Request correction'],
+ block:['Bloquer','Bloquear','Block'],unblock:['Débloquer','Desbloquear','Unblock'],active:['Actif','Ativo','Active'],blocked:['Accès bloqué. Contactez votre responsable.','Acesso bloqueado. Fale com seu administrador.','Access blocked. Contact your administrator.'],
+ siteName:['Nom du chantier','Nome da obra','Project name'],address:['Adresse','Endereço','Address'],addSite:['Ajouter un chantier','Cadastrar obra','Add project'],noSites:['Aucun chantier enregistré','Nenhuma obra cadastrada','No projects yet'],noDays:['Aucune journée enregistrée ce mois','Nenhum dia registrado neste mês','No days recorded this month'],noTeam:['Ajoutez votre premier employé dans Équipe','Cadastre seu primeiro funcionário em Equipe','Add your first employee in Team'],
+ worker:['Employé','Funcionário','Employee'],date:['Date','Data','Date'],entry:['Début','Início','Start'],exit:['Fin','Fim','End'],pause:['Pause (minutes)','Pausa (minutos)','Break (minutes)'],workplace:['Chantier / lieu de travail','Obra / local de trabalho','Project / workplace'],save:['Enregistrer','Salvar','Save'],cancel:['Annuler','Cancelar','Cancel'],edit:['Modifier','Editar','Edit'],ownDays:['Mes journées','Meus dias','My days'],company:['Entreprise','Empresa','Company'],
+ password:['Mot de passe','Senha','Password'],confirm:['Confirmer le mot de passe','Confirmar senha','Confirm password'],setPassword:['Définir mon mot de passe','Definir minha senha','Set my password'],reset:['Mot de passe oublié','Esqueci minha senha','Forgot password'],recover:['Recevoir le lien par e-mail','Receber link por e-mail','Email reset link'],recoverySent:['Si ce compte existe, un lien sera envoyé à l’e-mail associé.','Se a conta existir, um link será enviado ao e-mail cadastrado.','If this account exists, a link will be sent to its email address.'],
+ saveOK:['Enregistré et synchronisé','Salvo e sincronizado','Saved and synced'],check:['Vérifiez les champs et réessayez.','Confira os campos e tente novamente.','Check the fields and try again.'],failed:['Impossible de terminer. Réessayez.','Não foi possível concluir. Tente novamente.','Unable to complete. Try again.'],loading:['Chargement…','Carregando…','Loading…'],sendHours:['Envoyer pour approbation','Enviar para aprovação','Submit for approval'],signout:['Déconnexion','Sair','Sign out'],
+ invalid_credentials:['Identifiant ou mot de passe incorrect.','Usuário ou senha incorretos.','Incorrect username or password.'],username_taken:['Cet identifiant est déjà utilisé.','Este usuário já está em uso.','This username is already taken.'],invalid_username:['Utilisez 3 à 40 caractères : lettres sans accent, chiffres, point, tiret ou soulignement.','Use 3 a 40 caracteres: letras sem acento, números, ponto, hífen ou sublinhado.','Use 3–40 characters: unaccented letters, numbers, dots, hyphens or underscores.'],
+ invalid_email:['Indiquez un e-mail valide différent du vôtre.','Informe um e-mail válido diferente do seu.','Enter a valid email different from yours.'],expired_invite:['Invitation expirée. Demandez un nouveau lien.','Convite expirado. Peça um novo link.','Invite expired. Request a new link.'],invite_email_mismatch:['Connectez-vous avec l’e-mail qui a reçu l’invitation.','Entre com o e-mail cadastrado no convite.','Sign in with the email registered on the invitation.'],try_later:['Trop de tentatives. Réessayez dans 15 minutes.','Muitas tentativas. Tente novamente em 15 minutos.','Too many attempts. Try again in 15 minutes.'],date_exists:['Cette date existe déjà. Modifiez la journée enregistrée.','Esta data já existe. Edite o dia registrado.','This date already exists. Edit the recorded day.'],approved_day_locked:['Journée approuvée. Demandez la modification au responsable.','Dia aprovado. Peça a alteração ao administrador.','Approved day. Ask your manager to make changes.'],linked_email_locked:['L’e-mail d’un accès activé ne peut pas être modifié ici.','O e-mail de um acesso ativado não pode ser alterado aqui.','An activated account’s email cannot be changed here.'],access_blocked:['Débloquez cet accès avant de créer une invitation.','Desbloqueie o acesso antes de criar um convite.','Unblock this account before creating an invite.'],
+ inviteHelp:['L’employé choisit son mot de passe. Son e-mail permet de récupérer l’accès.','O funcionário escolhe a senha. O e-mail permite recuperar o acesso.','The employee chooses their password. Email is used for account recovery.'],reviewHelp:['Les journées approuvées ne peuvent être modifiées que par le responsable.','Somente o administrador pode alterar dias aprovados.','Only the manager can edit approved days.'],reviewTitle:['Journées à approuver','Dias para aprovar','Days to approve'],noPending:['Aucune journée en attente','Nenhum dia aguardando aprovação','No days awaiting approval'],openApp:['Ouvrir l’application','Abrir aplicativo','Open app'],browser:['Continuer dans le navigateur','Continuar no navegador','Continue in browser'],appstore:['Télécharger sur l’App Store','Baixar na App Store','Download on the App Store'],accept:['Activer mon accès','Ativar meu acesso','Activate my access'],invitation:['Invitation à rejoindre l’équipe','Convite para entrar na equipe','Invitation to join the team'],
+ deleteWorkerConfirm:['Supprimer définitivement votre accès personnel ? L’historique détenu par votre entreprise sera conservé. Saisissez votre e-mail pour confirmer.','Apagar definitivamente seu acesso pessoal? O histórico mantido pela empresa será preservado. Digite seu e-mail para confirmar.','Permanently delete your personal account? Company-owned work history will be retained. Enter your email to confirm.'],logoutRecovery:['Vous pouvez fermer cette fenêtre après l’enregistrement.','Após salvar, você poderá fechar esta janela.','You may close this window after saving.'],usernameEmail:['Identifiant ou e-mail','Usuário ou e-mail','Username or email'],payrollApproved:['Seules les journées approuvées sont incluses dans les paiements et rapports.','Somente dias aprovados entram nos pagamentos e relatórios.','Only approved days are included in payments and reports.'],notes:['Notes','Observações','Notes'],owner:['Administrateur','Administrador','Administrator'],fullName:['Nom complet','Nome completo','Full name'],allSaved:['Données synchronisées avec votre compte','Dados sincronizados com sua conta','Data synced with your account']
+};
+function tt(key){const lang=$('languageCode')?.value||document.documentElement.lang||'fr';const row=teamWords[key];return row?row[lang.startsWith('pt')?1:lang.startsWith('en')?2:0]:teamWords.failed[lang.startsWith('pt')?1:lang.startsWith('en')?2:0]}
+function teamLabel(key){return `<span data-team-text="${key}">${esc(tt(key))}</span>`}
+function teamTranslate(){document.querySelectorAll('[data-team-text]').forEach(e=>e.textContent=tt(e.dataset.teamText));$('email').placeholder=tt('usernameEmail');}
+async function teamCall(action,payload={}){
+ const {data:auth}=await sb.auth.getSession();
+ const response=await fetch(SUPABASE_URL+'/functions/v1/team-access',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,...(auth.session?{Authorization:'Bearer '+auth.session.access_token}:{})},body:JSON.stringify({action,...payload})});
+ const data=await response.json();if(!response.ok){const error=new Error(tt(data.error));error.code=data.error;throw error;}return data;
+}
+function teamNotice(error){const message=typeof error==='string'?error:error instanceof Error?error.message:tt('failed');const target=teamState.role==='employee'?$('workerNotice'):$('upgradeNotice');if(target){target.textContent=message;target.setAttribute('role','status');}else setLogin(message);}
+function showPane(pane){
+ teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamPanel','team'],['timesheetPanel','team'],['accessPanel','team'],['sitesPanel','sites'],['reportActions','reports'],['reviewPanel','team'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
+ closeCompanyReport();closeIndividualReport();document.querySelectorAll('[data-pane]').forEach(e=>e.classList.toggle('selected',e.dataset.pane===pane));
+ $('upgradeNotice').textContent='';$('mainNav')?.scrollIntoView({block:'start',behavior:'smooth'});
+}
+function teamField(key,id,type='text',value=''){return `<div><label for="${id}">${teamLabel(key)}</label><input id="${id}" type="${type}" value="${esc(value)}" ${type==='number'?'min="0" step="1"':''} required></div>`}
+function setupOwnerUI(){
+ if($('mainNav'))return;
+ $('profileHeading').closest('section').id='settingsPanel';$('employee').closest('section').id='teamPanel';$('title').closest('section').id='timesheetPanel';
+ // Remove inherited test banner from the released interface.
+ const banner=$('app').firstElementChild;if(banner?.textContent.includes('VERSÃO DE TESTE')||banner?.textContent.includes('Version de test'))banner.remove();
+ const shell=document.createElement('div');shell.id='upgradeShell';shell.className='no-print';shell.innerHTML=`<nav id="mainNav" class="app-nav" aria-label="Navigation">${['home','team','sites','reports','settings'].map((p,i)=>`<button class="secondary" data-pane="${p}" onclick="teamUI.pane('${p}')"><span aria-hidden="true">${['⌂','♙','▦','▤','⚙'][i]}</span>${teamLabel(p)}</button>`).join('')}</nav><p id="upgradeNotice" class="status" role="status"></p><section id="dashboard" class="card"><div class="dashboard-head"><div><small>${teamLabel('owner')}</small><h2 id="dashboardCompany"></h2></div><input id="dashboardMonth" type="month" aria-label="${esc(tt('month'))}" onchange="teamUI.month(this.value)"></div><h2>${teamLabel('month')}</h2><div id="dashboardStats" class="summary"></div><button class="register-button" onclick="teamUI.day()">＋ ${teamLabel('register')}</button><h2>${teamLabel('team')}</h2><div id="dashboardTeam"></div><p class="muted">${teamLabel('payrollApproved')}</p><p class="muted">✓ ${teamLabel('allSaved')}</p></section>`;
+ $('app').prepend(shell);
+ const access=document.createElement('section');access.id='accessPanel';access.className='card hidden no-print';access.innerHTML=`<h2>${teamLabel('invite')}</h2><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
+ $('app').append(access);$('invitePhone').required=false;$('inviteUsername').pattern='[a-zA-Z0-9][a-zA-Z0-9._-]{2,39}';$('inviteUsername').maxLength=40;
+ $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
+ const sites=document.createElement('section');sites.id='sitesPanel';sites.className='card hidden no-print';sites.innerHTML=`<h2>${teamLabel('sites')}</h2><form id="siteForm"><div class="grid">${teamField('siteName','siteName')}${teamField('address','siteAddress')}</div><button type="submit">＋ ${teamLabel('addSite')}</button></form><div id="siteList"></div>`;
+ $('app').append(sites);$('siteAddress').required=false;$('siteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,async()=>{const {error}=await sb.from('work_sites').insert({owner_id:user.id,name:$('siteName').value.trim(),address:$('siteAddress').value.trim()});if(error)throw Error(tt('failed'));$('siteForm').reset();await upgradeRefresh();teamNotice(tt('saveOK'));});};
+ const review=document.createElement('section');review.id='reviewPanel';review.className='card hidden no-print';review.innerHTML=`<h2>${teamLabel('reviewTitle')}</h2><p class="muted">${teamLabel('reviewHelp')}</p><div id="reviewList"></div>`;$('app').append(review);
+ $('email').type='text';showPane('home');
+}
+async function withTeamButton(button,fn){if(button?.disabled)return;if(button)button.disabled=true;try{await fn()}catch(error){teamNotice(error)}finally{if(button)button.disabled=false}}
+async function upgradeRefresh(){
+ if(teamState.role!=='owner'||!$('dashboard'))return;const request=++teamState.refresh,month=ym();if(!/^\d{4}-\d{2}$/.test(month))return;
+ const results=await Promise.all([sb.from('employees').select('*').eq('owner_id',user.id).order('name'),sb.from('work_days').select('*').eq('owner_id',user.id).gte('work_date',monthStart()).lte('work_date',monthEnd()),sb.from('monthly_payments').select('*').eq('owner_id',user.id).eq('month',monthStart()),sb.from('work_sites').select('id,name,address').eq('owner_id',user.id).eq('active',true).order('name'),teamCall('members')]);
+ if(request!==teamState.refresh)return;for(const result of results.slice(0,4))if(result.error)throw Error(tt('failed'));
+ const [staff,days,payments,sites]=results.slice(0,4).map(r=>r.data||[]),report=buildCompanyReport(staff,days,payments);teamState.sites=sites;teamState.members=results[4].members;
+ const currencies=[...new Set(report.rows.map(r=>r.currency))],currency=currencies[0]||profile.preferred_currency||'EUR';
+ const stats=[[tt('hours'),fmt(days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes),0))],[tt('days'),report.rows.reduce((sum,r)=>sum+r.days,0)],[tt('advances'),currencies.length>1?'—':formatMoney(report.advance,currency)],[tt('due'),currencies.length>1?'—':formatMoney(report.due,currency)]];
+ $('dashboardStats').innerHTML=stats.map(([label,value])=>`<div class="stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join('');$('dashboardCompany').textContent=profile.company_name||'Suivi des heures Pro';$('dashboardMonth').value=month;
+ $('dashboardTeam').innerHTML=staff.filter(e=>e.active).map(e=>`<button class="worker-tile secondary" data-employee="${e.id}"><strong>${esc(e.name)}</strong><span>${fmt(days.filter(d=>d.employee_id===e.id).reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes),0))} ›</span></button>`).join('')||`<p>${esc(tt('noTeam'))}</p>`;
+ $('dashboardTeam').querySelectorAll('[data-employee]').forEach(b=>b.onclick=async()=>{$('employee').value=b.dataset.employee;await loadRecords();showPane('team');});
+ const selected=$('inviteEmployee').value;$('inviteEmployee').innerHTML=staff.filter(e=>e.active).map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');if(selected)$('inviteEmployee').value=selected;
+ $('siteList').innerHTML=sites.map(s=>`<article class="project-tile"><strong>${esc(s.name)}</strong><p>${esc(s.address)}</p></article>`).join('')||`<p>${esc(tt('noSites'))}</p>`;
+ $('memberList').innerHTML=teamState.members.map(m=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===m.employee_id)?.name||m.username)}</strong><p>${esc(m.username)} · ${esc(m.activated_at?tt('active'):tt('pending'))}</p><button class="secondary" data-member="${m.id}" data-enabled="${!m.enabled}">${esc(tt(m.enabled?'block':'unblock'))}</button></article>`).join('');
+ $('memberList').querySelectorAll('[data-member]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('set_access',{id:b.dataset.member,enabled:b.dataset.enabled==='true'});await upgradeRefresh()}));
+ $('reviewList').innerHTML=days.filter(d=>d.approval_status==='pending').map(d=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===d.employee_id)?.name||'')} · ${esc(d.work_date)}</strong><p>${esc(d.entry_time?.slice(0,5)||'')}–${esc(d.exit_time?.slice(0,5)||'')} · ${Number(d.break_minutes)} min · ${esc(d.workplace||'')}</p><div class="actions"><button class="green" data-review="${d.id}" data-status="approved">${esc(tt('approve'))}</button><button class="secondary" data-review="${d.id}" data-status="rejected">${esc(tt('reject'))}</button></div></article>`).join('')||`<p>${esc(tt('noPending'))}</p>`;
+ $('reviewList').querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('review_day',{id:b.dataset.review,status:b.dataset.status});await upgradeRefresh();await loadRecords()}));
+ teamTranslate();
+}
+
+async function createTeamInvite(){
+ const invitation=await teamCall('invite',{employee_id:$('inviteEmployee').value,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value});
+ const result=$('inviteResult');result.classList.remove('hidden');result.innerHTML=`<p><strong>${esc(invitation.username)}</strong></p><input readonly aria-label="Invitation" value="${esc(invitation.url)}"><div class="actions"><a class="button green" id="shareWhatsApp" target="_blank" rel="noopener">WhatsApp</a><a class="button secondary" id="shareSMS">SMS</a><a class="button secondary" id="shareEmail">E-mail</a><button class="secondary" id="copyInvite">${esc(tt('copy'))}</button></div>`;
+ const message=tt('invitation')+' — '+(profile.company_name||'Suivi des heures Pro')+'\n'+invitation.url;
+ const phone=invitation.phone.replace(/\D/g,'');$('shareWhatsApp').href='https://wa.me/'+phone+'?text='+encodeURIComponent(message);$('shareSMS').href='sms:'+phone+(/iPhone|iPad/.test(navigator.userAgent)?'&':'?')+'body='+encodeURIComponent(message);$('shareEmail').href='mailto:'+encodeURIComponent(invitation.email)+'?subject='+encodeURIComponent(tt('invitation'))+'&body='+encodeURIComponent(message);
+ $('copyInvite').onclick=async()=>{try{await navigator.clipboard.writeText(invitation.url);$('copyInvite').textContent=tt('copied')}catch{result.querySelector('input').select()}};
+ await upgradeRefresh();
+}
+function selectSiteHtml(id){return `<select id="${id}" aria-label="${esc(tt('sites'))}"><option value="">—</option>${teamState.sites.map(s=>`<option value="${esc(s.name+(s.address?' — '+s.address:''))}">${esc(s.name)}</option>`).join('')}</select>`}
+function dayFormHTML(prefix,employeeSelect=''){
+ return `<form id="${prefix}Form">${employeeSelect}<div class="grid">${teamField('date',prefix+'Date','date',ym()+'-01')}${teamField('entry',prefix+'Entry','time','08:00')}${teamField('exit',prefix+'Exit','time','17:30')}${teamField('pause',prefix+'Pause','number','30')}</div><label for="${prefix}Site">${teamLabel('sites')}</label>${selectSiteHtml(prefix+'Site')}${teamField('workplace',prefix+'Workplace')}<p id="${prefix}Hours"></p><div class="actions"><button type="submit">${teamLabel(teamState.role==='employee'?'sendHours':'save')}</button><button type="button" class="secondary" onclick="this.closest('dialog').close()">${teamLabel('cancel')}</button></div><p id="${prefix}Error" class="status err" role="alert"></p></form>`;
+}
+function wireDayForm(prefix){
+ const site=$(prefix+'Site'),place=$(prefix+'Workplace');site.onchange=()=>{place.value=site.value};place.required=false;
+ const update=()=>{$(prefix+'Hours').textContent=tt('hours')+': '+fmt(minutes($(prefix+'Entry').value,$(prefix+'Exit').value,$(prefix+'Pause').value));};
+ for(const suffix of ['Entry','Exit','Pause'])$(prefix+suffix).oninput=update;update();
+}
+function readDayForm(prefix){return {work_date:$(prefix+'Date').value,entry_time:$(prefix+'Entry').value,exit_time:$(prefix+'Exit').value,break_minutes:Number($(prefix+'Pause').value),workplace:$(prefix+'Workplace').value.trim()};}
+function ownerDayDialog(){
+ if(!employees.length){showPane('team');return;}
+ let dialog=$('ownerDayDialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='ownerDayDialog';document.body.append(dialog)}
+ dialog.innerHTML=`<h2>${teamLabel('register')}</h2>`+dayFormHTML('ownerDay',`<label for="ownerDayEmployee">${teamLabel('worker')}</label><select id="ownerDayEmployee">${employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select>`);
+ $('ownerDayEmployee').value=$('employee').value;wireDayForm('ownerDay');$('ownerDayDate').value=$('newDate').value||ym()+'-01';
+ $('ownerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{const {error}=await sb.from('work_days').insert({...readDayForm('ownerDay'),owner_id:user.id,employee_id:$('ownerDayEmployee').value});if(error)throw Error(error.code==='23505'?tt('date_exists'):tt('failed'));$('employee').value=$('ownerDayEmployee').value;await loadRecords();await upgradeRefresh();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('ownerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
+}
+async function workerPortal(){
+ $('app').classList.add('hidden');$('loginCard').classList.add('hidden');
+ let portal=$('workerPortal');if(!portal){portal=document.createElement('section');portal.id='workerPortal';portal.className='card';document.querySelector('main').append(portal);}
+ portal.innerHTML=`<p class="muted">${esc(teamState.access.company)}</p><h2>${esc(teamState.access.employee.name)}</h2><div class="actions"><button onclick="teamUI.workerDay()">＋ ${teamLabel('register')}</button><button class="secondary" onclick="logout()">${teamLabel('signout')}</button></div><label for="workerMonth">${teamLabel('month')}</label><input id="workerMonth" type="month" value="${esc(teamState.month)}"><p id="workerNotice" class="status" role="status"></p><p class="muted">${teamLabel('reviewHelp')}</p><h2>${teamLabel('ownDays')}</h2><div id="workerDays"></div>`;
+ $('workerMonth').onchange=async()=>{teamState.month=$('workerMonth').value;try{await loadWorkerDays()}catch(e){teamNotice(e)}};portal.classList.remove('hidden');const settings=document.createElement('details');settings.className='project-tile';settings.innerHTML=`<summary>${teamLabel('settings')}</summary><button id="workerDelete" class="secondary" style="margin-top:12px;color:#a52b24">${esc(tr('Supprimer mon compte et mes données'))}</button>`;portal.append(settings);$('workerDelete').onclick=requestEmployeeDeletion;await loadWorkerDays();
+}
+async function loadWorkerDays(){
+ const result=await teamCall('my_days',{month:teamState.month});teamState.days=result.days;teamState.sites=result.sites;
+ $('workerDays').innerHTML=result.days.map(d=>`<article class="project-tile"><strong>${esc(d.work_date)}</strong><span class="approval ${d.approval_status}">${esc(tt(d.approval_status))}</span><p>${esc(d.entry_time?.slice(0,5)||'')}–${esc(d.exit_time?.slice(0,5)||'')} · ${Number(d.break_minutes)} min · ${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes))}</p><p>${esc(d.workplace||'')}</p>${d.approval_status!=='approved'?`<button class="secondary" data-day="${d.id}">${esc(tt('edit'))}</button>`:''}</article>`).join('')||`<p>${esc(tt('noDays'))}</p>`;
+ $('workerDays').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>workerDayDialog(b.dataset.day));
+}
+function workerDayDialog(id){
+ const record=teamState.days.find(d=>d.id===id);let dialog=$('workerDayDialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='workerDayDialog';document.body.append(dialog)}
+ dialog.innerHTML=`<h2>${teamLabel('register')}</h2>`+dayFormHTML('workerDay');wireDayForm('workerDay');const employee=teamState.access.employee;
+ $('workerDayDate').value=record?.work_date||teamState.month+'-01';$('workerDayEntry').value=(record?.entry_time||employee.default_entry_time||'08:00').slice(0,5);$('workerDayExit').value=(record?.exit_time||employee.default_exit_time||'17:30').slice(0,5);$('workerDayPause').value=record?.break_minutes??employee.default_break_minutes??30;$('workerDayWorkplace').value=record?.workplace||'';$('workerDayEntry').oninput();
+ $('workerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await teamCall('save_my_day',{...readDayForm('workerDay'),...(id?{id}:{})});teamState.month=$('workerDayDate').value.slice(0,7);$('workerMonth').value=teamState.month;await loadWorkerDays();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('workerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
+}
+function passwordSetup(activate=false){
+ let dialog=$('passwordSetup');if(!dialog){dialog=document.createElement('dialog');dialog.id='passwordSetup';document.body.append(dialog)}
+ dialog.innerHTML=`<h2>${teamLabel('setPassword')}</h2><form id="passwordSetupForm">${teamField('password','newAccessPassword','password')}${teamField('confirm','newAccessConfirmation','password')}<button type="submit">${teamLabel('save')}</button><p id="passwordSetupError" role="alert" class="status err"></p></form>`;
+ for(const id of ['newAccessPassword','newAccessConfirmation']){$(id).minLength=8;$(id).autocomplete='new-password';}
+ $('passwordSetupForm').onsubmit=async e=>{e.preventDefault();if($('newAccessPassword').value!==$('newAccessConfirmation').value){$('passwordSetupError').textContent=tt('check');return;}const button=e.submitter;button.disabled=true;try{const {error}=await sb.auth.updateUser({password:$('newAccessPassword').value});if(error)throw Error(tt('check'));if(activate)await teamCall('activate');sessionStorage.removeItem('suivi_recovery');sessionStorage.removeItem('suivi_invite');sessionStorage.removeItem('suivi_new_invite');dialog.close();teamState.role=null;await teamBoot();}catch(error){$('passwordSetupError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
+}
+async function requestPasswordReset(){
+ const identifier=$('email').value.trim();if(!identifier){setLogin(tt('usernameEmail'));return;}
+ const button=$('passwordResetButton');button.disabled=true;try{if(identifier.includes('@'))await sb.auth.resetPasswordForEmail(identifier,{redirectTo:'https://jefrisrenovation-netizen.github.io/preview/'});else await teamCall('recover',{username:identifier});setLogin(tt('recoverySent'),true)}catch{setLogin(tt('failed'))}finally{button.disabled=false}
+}
+async function teamBoot(){
+ const {data}=await sb.auth.getSession();if(!data.session)return;if(teamState.booting)return;teamState.booting=true;
+ try{
+  user=data.session.user;
+  const token=sessionStorage.getItem('suivi_invite');const recovery=sessionStorage.getItem('suivi_recovery');
+  // Existing users prove possession of their verified email before linking an invitation.
+  if(token&&!sessionStorage.getItem('suivi_new_invite')){await teamCall('claim_invite',{token});sessionStorage.removeItem('suivi_invite');}
+  const access=await teamCall('access');teamState.access=access;teamState.role=access.role;
+  if(access.language)$('languageCode').value=access.language;
+  if(recovery||access.role==='activation'){passwordSetup(access.role==='activation');return;}
+  if(access.role==='blocked'){$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');setLogin(tt('blocked'));return;}
+  if(access.role==='employee'){await workerPortal();return;}
+  $('workerPortal')?.classList.add('hidden');await startLegacy();setupOwnerUI();await upgradeRefresh();teamTranslate();
+ }catch(error){$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');setLogin(error.message||tt('failed'));}
+ finally{teamState.booting=false}
+}
+// Recovery state is captured before Auth removes tokens from the address bar.
+try{const params=new URLSearchParams(location.hash.slice(1));if(params.get('type')==='recovery')sessionStorage.setItem('suivi_recovery','1');if(params.get('type')==='invite')sessionStorage.setItem('suivi_new_invite','1');}catch{}
+window.teamUI={pane:showPane,day:ownerDayDialog,workerDay:workerDayDialog,month:async value=>{if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return;$('year').value=value.slice(0,4);$('month').value=value.slice(5,7);await loadRecords();await upgradeRefresh();},recover:requestPasswordReset};
+window.showPasswordSetup=passwordSetup;
+const resetButton=document.createElement('button');resetButton.id='passwordResetButton';resetButton.type='button';resetButton.className='secondary';resetButton.style.marginTop='10px';resetButton.innerHTML=teamLabel('reset');resetButton.onclick=requestPasswordReset;$('loginCard').append(resetButton);$('email').type='text';
+const previousLanguage=applyLanguage;applyLanguage=function(){previousLanguage();teamTranslate();if(teamState.role==='owner')upgradeRefresh().catch(teamNotice)};
+for(const fn of ['loadEmployees','loadRecords']){
+ const original=fn==='loadEmployees'?loadEmployees:loadRecords;
+ const wrapped=async(...args)=>{await original(...args);if(teamState.role==='owner'&&$('dashboard'))await upgradeRefresh()};
+ if(fn==='loadEmployees')loadEmployees=wrapped;else loadRecords=wrapped;
+}
+teamTranslate();
+
+async function handleTeamInvite(token){
+ if(!/^[a-f0-9]{64}$/.test(token||'')){setLogin(tt('expired_invite'));return;}
+ sessionStorage.setItem('suivi_invite',token);
+ const result=await teamCall('resolve_invite',{token,native:true});
+ if(result.activation_url){sessionStorage.setItem('suivi_new_invite','1');location.assign(result.activation_url);}
+ else {setLogin(tt('inviteHelp')+' '+result.username);await start();}
+}
+
+async function requestEmployeeDeletion(){
+ const text=tt('deleteWorkerConfirm');
+ const email=prompt(text);if(email===null)return;
+ if(email.trim().toLowerCase()!==user.email.toLowerCase()){teamNotice(tt('check'));return;}
+ const {error}=await sb.functions.invoke('delete-own-account',{body:{confirm_email:email.trim()}});
+ if(error){teamNotice(tt('failed'));return;}await sb.auth.signOut();location.reload();
+}
 
 </script>
 </body>

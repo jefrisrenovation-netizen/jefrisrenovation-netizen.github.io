@@ -237,7 +237,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 </div>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3"></script>
 <script>
 const SUPABASE_URL="https://nnrelfuewfhkirgzbwsi.supabase.co";
 const SUPABASE_KEY="sb_publishable_3GY1ZI3m6ZLejVqHGL7Pnw_ZnnViDwb";
@@ -452,10 +452,10 @@ function formatMoney(n,currency="EUR"){
   return Number(n).toLocaleString(locales[$("languageCode").value]||"fr-BE",{style:"currency",currency});
 }
 function refreshCalculated(){
-  let total=0,full=0,half=0;
+  let total=0,full=0,half=0,payableMinutes=0,payableDays=0;
   records.forEach(r=>{
     const m=minutes(r.entry_time,r.exit_time,r.break_minutes??30);
-    total+=m;
+    total+=m;if(!r.approval_status||r.approval_status==="approved"){payableMinutes+=m;payableDays+=m>240?1:m>0?0.5:0;}
     if(m>0){if(m>240)full++;else half++}
   });
   document.querySelectorAll("#rows tr").forEach((row,i)=>{
@@ -466,7 +466,7 @@ function refreshCalculated(){
   $("halfDays").textContent=half;
   const advance=Number($("advance").value)||0;
   const currency=$("currencyCode").value;
-  const gross=calculateGross(total,full+half/2,{payment_mode:$("paymentMode").value,daily_rate:$("dailyRate").value,hourly_rate:$("hourlyRate").value,fixed_salary:$("fixedSalary").value});
+  const gross=calculateGross(payableMinutes,payableDays,{payment_mode:$("paymentMode").value,daily_rate:$("dailyRate").value,hourly_rate:$("hourlyRate").value,fixed_salary:$("fixedSalary").value});
   $("gross").textContent=formatMoney(gross,currency);
   $("balance").textContent=formatMoney(gross-advance,currency);
   $("equivDays").textContent=(full+half/2).toFixed(1).replace(".0","");
@@ -562,7 +562,8 @@ async function showIndividualReport(){
     ]);
     if(selectedMonth!==ym()||id!==$("employee").value)return;
     for(const result of results)if(result.error)throw result.error;
-    const [worker,days,paymentRow]=results.map(result=>result.data);
+    const [worker,rawDays,paymentRow]=results.map(result=>result.data);
+    const days=rawDays.filter(d=>!d.approval_status||d.approval_status==="approved");
     const report=buildCompanyReport([worker],days,paymentRow?[paymentRow]:[]);
     const row=report.rows[0];
     const totalMinutes=days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
@@ -624,7 +625,7 @@ async function showCompanyReport(){
 }
 function buildCompanyReport(staff,days,payments){
   const rows=staff.filter(e=>days.some(d=>d.employee_id===e.id)||payments.some(p=>p.employee_id===e.id)).map(e=>{
-    const employeeDays=days.filter(d=>d.employee_id===e.id);
+    const employeeDays=days.filter(d=>d.employee_id===e.id&&(!d.approval_status||d.approval_status==="approved"));
     const minutesWorked=employeeDays.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
     const equivalent=employeeDays.reduce((sum,d)=>{const m=minutes(d.entry_time,d.exit_time,d.break_minutes??30);return sum+(m>240?1:m>0?0.5:0)},0);
     const p=payments.find(p=>p.employee_id===e.id)||{};
@@ -654,7 +655,7 @@ $("employee").addEventListener("change",loadRecords);
 $("year").addEventListener("change",()=>{updateMonthUI();loadRecords()});
 $("month").addEventListener("change",()=>{updateMonthUI();loadRecords()});
 
-async function start(){
+async function startLegacy(){
   if(starting)return;starting=true;
   try{
   const {data}=await sb.auth.getSession();
@@ -667,6 +668,10 @@ async function start(){
   await loadProfile();
   await loadEmployees();startedFor=user.id;
   }finally{starting=false}
+}
+async function start(){
+ if(typeof teamBoot==="function")return teamBoot();
+ return startLegacy();
 }
 sb.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;if(user)setTimeout(start,0)});
 start();

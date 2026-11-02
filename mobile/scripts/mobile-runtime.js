@@ -8,7 +8,9 @@ async function loginWithPassword(){
   button.disabled=true;
   setLogin(tr('Connexion en cours…'),true);
   try{
-    const {error}=await sb.auth.signInWithPassword({email,password});
+    let error;
+    if(email.includes('@'))({error}=await sb.auth.signInWithPassword({email,password}));
+    else {try{const result=await teamCall('login',{username:email,password});({error}=await sb.auth.setSession(result.session));}catch{error={message:'invalid_credentials'};}}
     if(error){setLogin(tr('Connexion impossible. Vérifiez vos identifiants.'));return;}
     $('loginPassword').value='';
     await start();
@@ -37,7 +39,7 @@ async function registerWithPassword(){
   const button=$('passwordSignupButton');
   if(button.disabled)return;
   const email=$('email').value.trim(),password=$('signupPassword').value;
-  if(!email||!$('email').checkValidity()){setLogin(tr('Digite seu e-mail.'));return;}
+  if(!email||!email.includes('@')||!$('email').checkValidity()){setLogin(tr('Digite seu e-mail.'));return;}
   if(password.length<8||password!==$('signupConfirmation').value){setLogin(tr('Les mots de passe doivent être identiques et contenir au moins 8 caractères.'));return;}
   button.disabled=true;
   setLogin(tr('Création du compte…'),true);
@@ -54,6 +56,8 @@ const signup=document.createElement('details');signup.style.marginTop='16px';
 signup.innerHTML='<summary data-text="Créer un compte">Créer un compte</summary><form id="signupForm"><label for="signupPassword" data-text="Mot de passe">Mot de passe</label><input id="signupPassword" type="password" autocomplete="new-password" minlength="8" required><label for="signupConfirmation" data-text="Confirmer le mot de passe">Confirmer le mot de passe</label><input id="signupConfirmation" type="password" autocomplete="new-password" minlength="8" required><button id="passwordSignupButton" type="submit" data-text="Créer un compte">Créer un compte</button></form>';
 $('loginCard').append(signup);$('signupForm').onsubmit=e=>{e.preventDefault();registerWithPassword();};
 async function handleAuthLink(url){
+  try{const incoming=new URL(url);if(incoming.protocol==='suiviheurespro:'&&incoming.hostname==='invite'){await handleTeamInvite(incoming.searchParams.get('token'));return;}
+  const params=new URLSearchParams(incoming.hash.slice(1));if(params.get('type')==='recovery')sessionStorage.setItem('suivi_recovery','1');if(params.get('type')==='invite')sessionStorage.setItem('suivi_new_invite','1');}catch{}
   const tokens=authTokens(url);
   if(!tokens)return;
   const {error}=await sb.auth.setSession(tokens);
