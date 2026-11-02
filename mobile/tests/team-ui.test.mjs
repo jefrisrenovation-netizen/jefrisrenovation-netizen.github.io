@@ -27,3 +27,11 @@ test('employee portal hides employer controls and keeps personal account deletio
  const f=fixture();f.run('teamState.role="employee";teamState.access={company:"Test Company",employee:{id:"worker",name:"Test Employee"}};teamCall=async()=>({days:[{id:"day",work_date:"2026-11-01",entry_time:"08:00",exit_time:"17:30",break_minutes:30,workplace:"Forest",approval_status:"approved"}],sites:[]});');
  await f.run('workerPortal()');assert(f.document.getElementById('app').classList.contains('hidden'));assert(f.document.getElementById('workerDays').textContent.includes('Forest'));assert.equal(f.document.querySelectorAll('#workerDays [data-day]').length,0);assert(f.document.getElementById('workerDelete'));
 });
+test('invite username pattern accepts supported usernames in modern and older browsers',()=>{
+ const f=fixture();const input=f.document.getElementById('inviteUsername');
+ for(const flag of ['u','v']){
+  const pattern=new RegExp('^(?:'+input.pattern+')$',flag);
+  for(const value of ['testefuncionario','teste_funcionario','teste.funcionario','teste-funcionario'])assert(pattern.test(value),value);
+  for(const value of ['teste funcionario','ab','@teste','funcionário'])assert(!pattern.test(value),value);
+ }
+});
