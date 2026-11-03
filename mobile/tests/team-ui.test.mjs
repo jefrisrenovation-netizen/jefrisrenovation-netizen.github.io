@@ -35,3 +35,21 @@ test('invite username pattern accepts supported usernames in modern and older br
   for(const value of ['teste funcionario','ab','@teste','funcionário'])assert(!pattern.test(value),value);
  }
 });
+
+test('email is optional and phone becomes required without email',()=>{
+ const f=fixture();const email=f.document.getElementById('inviteEmail'),phone=f.document.getElementById('invitePhone');assert.equal(email.required,false);assert.equal(phone.required,true);
+ email.value='worker@example.invalid';email.oninput();assert.equal(phone.required,false);email.value='';email.oninput();assert.equal(phone.required,true);
+});
+test('reset links can be shared without an email address',()=>{
+ const f=fixture();f.run('showTeamInvitation({username:"worker.test",email:null,phone:"+32470123456",url:"https://example.invalid/invite/",reset:true})');
+ assert(f.document.getElementById('shareEmail').classList.contains('hidden'));assert(f.document.getElementById('shareWhatsApp').getAttribute('href').startsWith('https://wa.me/32470123456?text='));assert(decodeURIComponent(f.document.getElementById('shareWhatsApp').getAttribute('href')).includes('nova senha'));
+});
+
+test('saved owner days are compact rows and editing opens a separate form',()=>{
+ const f=fixture();f.run('$("employee").value="worker";records=[{id:"day1",employee_id:"worker",work_date:"2026-11-03",entry_time:"08:00",exit_time:"17:30",break_minutes:30,workplace:"Forest"}];render()');
+ const rows=f.document.getElementById('rows');assert.equal(rows.querySelectorAll('tr').length,1);assert.equal(rows.querySelectorAll('input').length,0);assert(rows.textContent.includes('03/11'));assert(rows.textContent.includes('9h00'));
+ f.run('window.teamUI.editDay("day1")');assert.equal(f.document.getElementById('ownerDayDate').value,'2026-11-03');assert.equal(f.document.getElementById('ownerDayWorkplace').value,'Forest');
+});
+test('default hours live in collapsed settings, outside the monthly sheet',()=>{
+ const f=fixture();const defaults=f.document.getElementById('employeeDefaults');assert(defaults.closest('#settingsPanel'));assert(defaults.closest('details'));assert(!defaults.closest('details').hasAttribute('open'));assert(!f.document.getElementById('timesheetPanel').querySelector('#defaultEntry'));
+});

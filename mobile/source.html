@@ -180,8 +180,8 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 
 <section class="card">
   <div class="sheet-title" id="title">Feuille mensuelle</div>
-  <div class="sheet-sub" data-i18n="sheetHelp">Cada funcionário tem sua própria folha em cada mês. Configure o horário padrão de cada funcionário abaixo.</div>
-  <div class="grid no-print" style="margin-top:12px">
+
+  <div id="employeeDefaults" class="grid no-print" style="margin-top:12px">
     <div><label data-i18n="defaultEntry">Entrada padrão</label><input id="defaultEntry" type="time" value="08:00"></div>
     <div><label data-i18n="defaultExit">Saída padrão</label><input id="defaultExit" type="time" value="17:30"></div>
     <div><label data-i18n="defaultBreak">Pausa padrão (minutos)</label><input id="defaultBreak" type="number" min="0" step="1" value="30"></div>
@@ -191,15 +191,15 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
   <div class="table day-table-wrap" style="margin-top:12px">
     <table id="dayTable">
       <thead>
-        <tr><th data-text="Data">Data</th><th data-text="Entrada">Entrada</th><th data-text="Saída">Saída</th><th data-text="Pausa (min)">Pausa (min)</th><th data-text="Horas">Horas</th><th data-text="Local de trabalho">Local de trabalho</th><th></th></tr>
+        <tr><th data-text="Data">Data</th><th data-text="Entrada">Entrada</th><th data-text="Saída">Saída</th><th data-text="Pausa (min)">Pausa (min)</th><th data-text="Local de trabalho">Local de trabalho</th><th data-text="Horas">Horas</th><th></th></tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
 
-  <div class="no-print" style="margin-top:12px"><label data-i18n="newDate">Data do próximo dia (pode alterar)</label><input id="newDate" type="date"></div>
+  <div class="hidden no-print" style="margin-top:12px"><label data-i18n="newDate">Data do próximo dia (pode alterar)</label><input id="newDate" type="date"></div>
   <div class="actions no-print">
-    <button onclick="addRow()" data-i18n="addDay">＋ Adicionar dia</button>
+    <button onclick="teamUI.day()" data-i18n="addDay">＋ Adicionar dia</button>
   </div>
 
   <div class="grid" style="margin-top:14px">
@@ -420,13 +420,11 @@ function render(){
 
   $("rows").innerHTML=records.map((r,i)=>`
     <tr>
-      <td class="day-date"><label class="day-field-label" data-text="Data" for="day-date-${i}">${esc(tr("Data"))}</label><input id="day-date-${i}" aria-label="${esc(tr("Data"))}" type="date" min="${monthStart()}" max="${monthEnd()}" value="${esc(r.work_date||"")}" onchange="upd(${i},'work_date',this.value)"></td>
-      <td><label class="day-field-label" data-text="Entrada" for="day-entry-${i}">${esc(tr("Entrada"))}</label><input id="day-entry-${i}" aria-label="${esc(tr("Entrada"))}" type="time" value="${esc((r.entry_time||"").slice(0,5))}" onchange="upd(${i},'entry_time',this.value)"></td>
-      <td><label class="day-field-label" data-text="Saída" for="day-exit-${i}">${esc(tr("Saída"))}</label><input id="day-exit-${i}" aria-label="${esc(tr("Saída"))}" type="time" value="${esc((r.exit_time||"").slice(0,5))}" onchange="upd(${i},'exit_time',this.value)"></td>
-      <td><label class="day-field-label" data-text="Pausa (min)" for="day-break-${i}">${esc(tr("Pausa (min)"))}</label><input id="day-break-${i}" aria-label="${esc(tr("Pausa (min)"))}" type="number" inputmode="numeric" min="0" step="1" value="${Number(r.break_minutes??30)}" onchange="upd(${i},'break_minutes',this.value)"></td>
-      <td><span class="day-field-label" data-text="Horas">${esc(tr("Horas"))}</span><b class="day-hours">${fmt(minutes(r.entry_time,r.exit_time,r.break_minutes??30))}</b></td>
-      <td class="day-workplace"><label class="day-field-label" data-text="Local de trabalho" for="day-workplace-${i}">${esc(tr("Local de trabalho"))}</label><input id="day-workplace-${i}" aria-label="${esc(tr("Local de trabalho"))}" value="${esc(r.workplace||"")}" placeholder="Ex. : Bruxelles" onchange="upd(${i},'workplace',this.value)"></td>
-      <td class="day-delete"><button class="danger no-print" style="width:auto;padding:8px" aria-label="${esc(tr("Excluir este dia?"))}" onclick="del(${i})">×</button></td>
+      <td class="day-date"><time datetime="${esc(r.work_date)}">${esc(r.work_date.slice(8,10)+'/'+r.work_date.slice(5,7))}</time></td>
+      <td>${esc((r.entry_time||'').slice(0,5))}</td><td>${esc((r.exit_time||'').slice(0,5))}</td>
+      <td>${Number(r.break_minutes??30)}</td><td class="day-workplace">${esc(r.workplace||'—')}</td>
+      <td><b class="day-hours">${fmt(minutes(r.entry_time,r.exit_time,r.break_minutes??30))}</b></td>
+      <td class="day-actions no-print"><button class="secondary" aria-label="${esc(tr('Data')+' '+r.work_date)}" onclick="teamUI.editDay('${esc(r.id)}')">✎</button><button class="danger" aria-label="${esc(tr('Excluir este dia?'))}" onclick="del(${i})">×</button></td>
     </tr>`).join("");
   const last=records.reduce((max,r)=>Math.max(max,Number(r.work_date.slice(-2))),0);
   const days=Number(monthEnd().slice(-2));

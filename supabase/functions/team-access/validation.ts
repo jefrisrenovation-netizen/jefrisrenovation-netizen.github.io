@@ -6,3 +6,5 @@ export function dayInput(body:Record<string,unknown>){
  const pause=Number(body.break_minutes);if(!Number.isInteger(pause)||pause<0||pause>1440)throw Error('invalid_break');
  return {work_date:date,entry_time:time(body.entry_time),exit_time:time(body.exit_time),break_minutes:pause,workplace:String(body.workplace||'').trim().slice(0,300),notes:String(body.notes||'').slice(0,1000)};
 }
+
+export function phoneNumber(value:unknown){const v=String(value||'').trim().replace(/[\s().-]/g,'').replace(/^00/,'+');if(!/^\+[1-9]\d{7,14}$/.test(v))throw Error('invalid_phone');return v;}
