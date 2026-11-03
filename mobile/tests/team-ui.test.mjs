@@ -64,3 +64,29 @@ test('employee default start persists to next entry while a one-day edit leaves 
  f.document.getElementById('workerDayEntry').value='09:00';
  f.run('workerDayDialog()');assert.equal(f.document.getElementById('workerDayEntry').value,'07:00');
 });
+
+test('workplace filter keeps the chosen records and includes legacy unnamed places without adding a client field',()=>{
+ const f=fixture();f.run(`$('employee').value='worker';refreshPersonalReportFilters([{employee_id:'worker',workplace:'Forest'},{employee_id:'worker',workplace:'Uccle'},{employee_id:'worker',workplace:null},{employee_id:'other',workplace:'Private'}],employees);`);
+ assert(!f.document.getElementById('reportClient'));assert(!f.document.getElementById('reportWorkplace').textContent.includes('Private'));
+ f.run(`window.selected=selectReportDays([{id:1,workplace:'Forest'},{id:2,workplace:'Uccle'},{id:3,workplace:null}],{workplace:JSON.stringify('Forest')});`);assert.equal(f.context.window.selected.length,1);assert.equal(f.context.window.selected[0].id,1);
+ f.run(`window.selected=selectReportDays([{id:1,workplace:'Forest'},{id:3,workplace:null}],{workplace:JSON.stringify('')});`);assert.equal(f.context.window.selected[0].id,3);
+});
+test('worker report exports only their selected workplace and month, including approval status',async()=>{
+ const f=fixture();f.run(`teamState.role='employee';teamState.month='2026-11';teamState.access={company:'Company',employee:{id:'worker',name:'Anderson'}};teamCall=async()=>({days:[{id:'a',work_date:'2026-11-01',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Forest',approval_status:'approved'},{employee_id:'worker',id:'b',work_date:'2026-11-02',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Uccle',approval_status:'pending'}],sites:[]});`);
+ await f.run('workerPortal()');f.document.getElementById('workerReportPlace').value=JSON.stringify('Forest');f.run('showWorkerReport()');const source=f.document.getElementById('workerReport');assert.equal(source.dataset.reportMonth,'2026-11');assert(source.textContent.includes('Anderson'));assert(source.textContent.includes('Forest'));assert(!source.textContent.includes('Uccle'));assert(source.textContent.includes('9h00'));assert.equal(source.querySelectorAll('tbody tr').length,1);
+});
+
+test('individual workplace report recomputes hours and hourly pay without allocating monthly advances',async()=>{
+ const f=fixture();f.run(`$('employee').value='worker';$('reportWorkplace').value=JSON.stringify('Forest');
+ const reportDays=[{employee_id:'worker',id:'a',work_date:'2026-11-01',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Forest',approval_status:'approved'},{employee_id:'worker',id:'b',work_date:'2026-11-02',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Uccle',approval_status:'approved'},{employee_id:'worker',id:'c',work_date:'2026-11-03',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Forest',approval_status:'pending'}];
+ sb.from=table=>{const q={select(){return q},eq(){return q},gte(){return q},lte(){return q},order(){return Promise.resolve({data:reportDays})},single(){return Promise.resolve({data:employees[0]})},maybeSingle(){return Promise.resolve({data:{employee_id:'worker',payment_mode:'hourly',hourly_rate:20,currency_code:'EUR',advance:500}})}};return q;};`);
+ await f.run('showIndividualReport()');const source=f.document.getElementById('individualReport');assert(!source.classList.contains('hidden'));assert.equal(source.querySelectorAll('tbody tr').length,1);assert(source.textContent.includes('Forest'));assert(!source.textContent.includes('Uccle'));assert(source.textContent.includes('9h00'));const summary=f.document.getElementById('individualReportSummary');assert.equal(summary.querySelectorAll('.stat').length,4);assert(summary.textContent.includes('180,00'));assert(!summary.textContent.includes('500,00'));assert(summary.textContent.includes('não são divididos'));
+});
+test('worker PDF is a real PDF containing only the selected workplace and uses the employee month',async()=>{
+ const {jsPDF}=await import('jspdf');const {autoTable}=await import('jspdf-autotable');const {reportFilename}=await import('../src/helpers.mjs');
+ const f=fixture();Object.assign(f.context,{jsPDF,autoTable,File,reportFilename});f.context.navigator.canShare=()=>true;f.context.navigator.share=async data=>{f.context.window.sharedPDF=data;};
+ const mobile=fs.readFileSync('scripts/mobile-runtime.js','utf8');f.run(mobile.slice(mobile.indexOf('async function exportMobileReport'),mobile.indexOf('async function requestAccountDeletion')));
+ f.run(`teamState.role='employee';teamState.month='2026-10';teamState.access={company:'Company',employee:{id:'worker',name:'Anderson'}};teamCall=async()=>({days:[{id:'a',work_date:'2026-10-01',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Forest',approval_status:'approved'},{id:'b',work_date:'2026-10-02',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Uccle',approval_status:'pending'}],sites:[]});`);
+ await f.run('workerPortal()');f.document.getElementById('workerReportPlace').value=JSON.stringify('Forest');await f.run('exportWorkerReport()');
+ const file=f.context.window.sharedPDF?.files[0];assert(file,'PDF must reach file sharing');assert.equal(file.name,'suivi-individuel-2026-10.pdf');const content=await file.text();assert(content.startsWith('%PDF-'));assert(content.includes('Forest'));assert(!content.includes('Uccle'));assert(content.includes('9h00'));
+});
