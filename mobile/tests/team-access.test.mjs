@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 import {webcrypto} from 'node:crypto';
-import {username,monthRange,dayInput} from '../../supabase/functions/team-access/validation.ts';
+import {username,monthRange,dayInput,phoneNumber} from '../../supabase/functions/team-access/validation.ts';
 const employee={id:'employee-a',name:'A',active:true};
 const member={id:'member-a',owner_id:'company-a',employee_id:employee.id,user_id:'staff-a',username:'staff.a',email:'staff@example.invalid',enabled:true,activated_at:'2026-11-01'};
 function handler(options={}){
@@ -13,12 +13,13 @@ function handler(options={}){
   constructor(table){this.table=table;this.operations=[];queries.push(this)}
   select(...v){this.operations.push(['select',...v]);return this}eq(...v){this.operations.push(['eq',...v]);return this}is(...v){this.operations.push(['is',...v]);return this}gt(...v){this.operations.push(['gt',...v]);return this}gte(...v){this.operations.push(['gte',...v]);return this}lte(...v){this.operations.push(['lte',...v]);return this}order(...v){this.operations.push(['order',...v]);return this}in(...v){this.operations.push(['in',...v]);return this}or(...v){this.operations.push(['or',...v]);return this}insert(v){this.operations.push(['insert',v]);return this}update(v){this.operations.push(['update',v]);return this}
   result(){let data=this.table==='team_accounts'?(options.member===undefined?member:options.member):this.table==='employees'?employee:this.table==='app_profiles'?{company_name:'Company A',language_code:'fr'}:this.table==='work_sites'?[]:this.table==='team_invites'?(options.invite||null):[];
+   if(this.table==='team_invites'&&this.operations.some(o=>o[0]==='update'))data=options.used?[]:[{token_hash:'test'}];
    if(this.table==='work_days'&&this.operations.some(o=>o[0]==='insert'||o[0]==='update'))data=options.locked?[]:[{id:'day-a'}];
    return {data,error:null};}
   single(){return Promise.resolve(this.result())}maybeSingle(){return Promise.resolve(this.result())}then(ok,bad){return Promise.resolve(this.result()).then(ok,bad)}
  }
  const client={from:table=>new Query(table),rpc:async()=>({data:options.rate!==false,error:null}),auth:{getUser:async()=>options.unauthenticated?{data:{user:null},error:Error('denied')}:{data:{user:{id:options.userId||'staff-a',email:options.email||'staff@example.invalid',email_confirmed_at:'2026-11-01'}},error:null},admin:{getUserById:async()=>({data:{user:{email_confirmed_at:'2026-11-01'}}}),generateLink:async()=>{throw Error('must not generate a link for existing accounts')}}}};
- const context={createClient:()=>client,username,monthRange,dayInput,Request,Response,TextEncoder,Uint8Array,crypto:webcrypto,URL,Date,Deno:{env:{get:()=> 'test'},serve:fn=>{captured=fn}}};
+ const context={createClient:()=>client,username,monthRange,dayInput,phoneNumber,Request,Response,TextEncoder,Uint8Array,crypto:webcrypto,URL,Date,Deno:{env:{get:()=> 'test'},serve:fn=>{captured=fn}}};
  let code=fs.readFileSync('../supabase/functions/team-access/index.ts','utf8').replace(/^import .*;\n/gm,'');code=stripTypeScriptTypes(code);vm.createContext(context);vm.runInContext(code,context);
  return {queries,call:async(body,authenticated=true)=>{const response=await captured(new Request('https://test.invalid/team-access',{method:'POST',headers:{'Content-Type':'application/json',...(authenticated?{Authorization:'Bearer test-token'}:{})},body:JSON.stringify(body)}));return {status:response.status,data:await response.json()};}};
 }
@@ -61,4 +62,22 @@ test('existing-account invitations require the recipient’s verified email',asy
 });
 test('rate limiting rejects requests before authentication and database reads',async()=>{
  const api=handler({rate:false});assert.equal((await api.call({action:'access'})).status,429);assert.equal(api.queries.length,0);
+});
+
+test('phone validation requires country code and normalizes formatting',()=>{
+ assert.equal(phoneNumber('+32 (470) 12-34-56'),'+32470123456');assert.equal(phoneNumber('0032470123456'),'+32470123456');
+ for(const v of ['', '0470123456', '+000123456', '+32oops'])assert.throws(()=>phoneNumber(v));
+});
+test('initial links cannot reset activated accounts; reset links cannot activate pending accounts',async()=>{
+ for(const [purpose,activated_at] of [['invite','2026-11-01'],['reset',null]]){
+  const api=handler({member:{...member,activated_at,login_method:'phone',auth_email:'test@staff.suivi.invalid'},invite:{purpose,account_id:member.id,token_hash:'test'}});
+  const r=await api.call({action:'redeem_phone',token:'a'.repeat(64),password:'long-enough-password'},false);assert.equal(r.status,403);assert.equal(r.data.error,'access_denied');
+ }
+});
+test('atomic token consumption rejects simultaneous password submissions',async()=>{
+ const api=handler({used:true,member:{...member,activated_at:null,user_id:null,login_method:'phone',auth_email:'test@staff.suivi.invalid'},invite:{purpose:'invite',account_id:member.id,token_hash:'test'}});
+ const r=await api.call({action:'redeem_phone',token:'a'.repeat(64),password:'long-enough-password'},false);assert.equal(r.status,410);assert.equal(r.data.error,'expired_invite');
+});
+test('employees cannot generate reset links for coworkers',async()=>{
+ const r=await handler().call({action:'reset_phone',id:'other-member'});assert.equal(r.status,403);assert.equal(r.data.error,'owner_required');
 });

@@ -35,3 +35,12 @@ test('invite username pattern accepts supported usernames in modern and older br
   for(const value of ['teste funcionario','ab','@teste','funcionário'])assert(!pattern.test(value),value);
  }
 });
+
+test('email is optional and phone becomes required without email',()=>{
+ const f=fixture();const email=f.document.getElementById('inviteEmail'),phone=f.document.getElementById('invitePhone');assert.equal(email.required,false);assert.equal(phone.required,true);
+ email.value='worker@example.invalid';email.oninput();assert.equal(phone.required,false);email.value='';email.oninput();assert.equal(phone.required,true);
+});
+test('reset links can be shared without an email address',()=>{
+ const f=fixture();f.run('showTeamInvitation({username:"worker.test",email:null,phone:"+32470123456",url:"https://example.invalid/invite/",reset:true})');
+ assert(f.document.getElementById('shareEmail').classList.contains('hidden'));assert(f.document.getElementById('shareWhatsApp').getAttribute('href').startsWith('https://wa.me/32470123456?text='));assert(decodeURIComponent(f.document.getElementById('shareWhatsApp').getAttribute('href')).includes('nova senha'));
+});
