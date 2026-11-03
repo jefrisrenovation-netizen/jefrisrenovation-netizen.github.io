@@ -81,3 +81,11 @@ test('atomic token consumption rejects simultaneous password submissions',async(
 test('employees cannot generate reset links for coworkers',async()=>{
  const r=await handler().call({action:'reset_phone',id:'other-member'});assert.equal(r.status,403);assert.equal(r.data.error,'owner_required');
 });
+
+test('employee defaults update only their verified profile and never existing days',async()=>{
+ const api=handler();const response=await api.call({action:'save_my_defaults',entry_time:'07:00',exit_time:'17:30',break_minutes:0,owner_id:'company-b',employee_id:'employee-b'});assert.equal(response.status,200);
+ const q=api.queries.find(q=>q.table==='employees'&&q.operations.some(o=>o[0]==='update'));
+ assert(q.operations.some(o=>o[0]==='eq'&&o[1]==='id'&&o[2]==='employee-a'));assert(q.operations.some(o=>o[0]==='eq'&&o[1]==='owner_id'&&o[2]==='company-a'));assert.equal(q.operations.find(o=>o[0]==='update')[1].default_break_minutes,0);assert(!api.queries.some(q=>q.table==='work_days'));
+ assert.equal((await handler().call({action:'save_my_defaults',entry_time:'25:00',exit_time:'17:30',break_minutes:30})).status,400);
+ assert.equal((await handler({member:{...member,enabled:false}}).call({action:'save_my_defaults'})).status,403);
+});
