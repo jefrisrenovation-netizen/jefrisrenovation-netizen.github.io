@@ -33,3 +33,5 @@ New migrations add tables and approval columns without deleting existing records
 ## November 3 verification
 
 32 automated tests pass, covering phone normalization, optional email, WhatsApp sharing, employee authorization, one-use token reservation and separation of initial activation from password reset. Packaged web compilation succeeds. No production deployment or Apple submission was performed in this update. The server already has migration `20261102181042_team_phone_access` and version 3 of `team-access`; this branch recovers that deployed backend source and adds a purpose/activation guard. The updated invitation screen uses that phone API. Physical-device and live end-to-end validation remain pending.
+
+Saved days now use one compact spreadsheet row (date, start, end, break, workplace, hours). The large form opens only for registering or editing and closes on save. Default schedules are in collapsed Settings, outside the monthly sheet. Mobile tables scroll horizontally rather than expanding each day into a card.

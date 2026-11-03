@@ -1,6 +1,7 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
+ status:['Statut','Situação','Status'],schedule:['Horaires par défaut','Horários padrão','Default hours'],
  resetMember:['Créer un lien pour un nouveau mot de passe','Criar link para nova senha','Create password reset link'],resetShare:['Lien pour définir un nouveau mot de passe (1 heure)','Link para definir nova senha (1 hora)','Password reset link (1 hour)'],invalid_phone:['Téléphone avec indicatif du pays, ex. +32470123456.','Telefone com código do país, ex. +32470123456.','Phone with country code, e.g. +32470123456.'],passwordSaved:['Mot de passe enregistré. Connectez-vous avec votre identifiant ou téléphone.','Senha salva. Entre com seu usuário ou telefone.','Password saved. Sign in with your username or phone.'],deleteUsername:['Saisissez votre identifiant pour supprimer votre accès personnel. L’historique de l’entreprise sera conservé.','Digite seu usuário para apagar seu acesso pessoal. O histórico da empresa será preservado.','Enter your username to delete your personal access. Company history will be retained.'],
 
  home:['Accueil','Início','Home'],team:['Équipe','Equipe','Team'],sites:['Chantiers','Obras','Projects'],reports:['Rapports','Relatórios','Reports'],settings:['Paramètres','Configurações','Settings'],
@@ -34,7 +35,8 @@ function showPane(pane){
 function teamField(key,id,type='text',value=''){return `<div><label for="${id}">${teamLabel(key)}</label><input id="${id}" type="${type}" value="${esc(value)}" ${type==='number'?'min="0" step="1"':''} required></div>`}
 function setupOwnerUI(){
  if($('mainNav'))return;
- $('profileHeading').closest('section').id='settingsPanel';$('employee').closest('section').id='teamPanel';$('title').closest('section').id='timesheetPanel';
+ $('profileHeading').closest('section').id='settingsPanel';$('employee').closest('section').id='teamPanel';
+ const defaults=$('employeeDefaults');if(defaults){const details=document.createElement('details');details.className='schedule-settings no-print';details.innerHTML=`<summary>${teamLabel('schedule')}</summary>`;details.append(defaults);$('settingsPanel').append(details);}$('title').closest('section').id='timesheetPanel';
  // Remove inherited test banner from the released interface.
  const banner=$('app').firstElementChild;if(banner?.textContent.includes('VERSÃO DE TESTE')||banner?.textContent.includes('Version de test'))banner.remove();
  const shell=document.createElement('div');shell.id='upgradeShell';shell.className='no-print';shell.innerHTML=`<nav id="mainNav" class="app-nav" aria-label="Navigation">${['home','team','sites','reports','settings'].map((p,i)=>`<button class="secondary" data-pane="${p}" onclick="teamUI.pane('${p}')"><span aria-hidden="true">${['⌂','♙','▦','▤','⚙'][i]}</span>${teamLabel(p)}</button>`).join('')}</nav><p id="upgradeNotice" class="status" role="status"></p><section id="dashboard" class="card"><div class="dashboard-head"><div><small>${teamLabel('owner')}</small><h2 id="dashboardCompany"></h2></div><input id="dashboardMonth" type="month" aria-label="${esc(tt('month'))}" onchange="teamUI.month(this.value)"></div><h2>${teamLabel('month')}</h2><div id="dashboardStats" class="summary"></div><button class="register-button" onclick="teamUI.day()">＋ ${teamLabel('register')}</button><h2>${teamLabel('team')}</h2><div id="dashboardTeam"></div><p class="muted">${teamLabel('payrollApproved')}</p><p class="muted">✓ ${teamLabel('allSaved')}</p></section>`;
@@ -81,20 +83,21 @@ function showTeamInvitation(invitation){
 }
 function selectSiteHtml(id){return `<select id="${id}" aria-label="${esc(tt('sites'))}"><option value="">—</option>${teamState.sites.map(s=>`<option value="${esc(s.name+(s.address?' — '+s.address:''))}">${esc(s.name)}</option>`).join('')}</select>`}
 function dayFormHTML(prefix,employeeSelect=''){
- return `<form id="${prefix}Form">${employeeSelect}<div class="grid">${teamField('date',prefix+'Date','date',ym()+'-01')}${teamField('entry',prefix+'Entry','time','08:00')}${teamField('exit',prefix+'Exit','time','17:30')}${teamField('pause',prefix+'Pause','number','30')}</div><label for="${prefix}Site">${teamLabel('sites')}</label>${selectSiteHtml(prefix+'Site')}${teamField('workplace',prefix+'Workplace')}<p id="${prefix}Hours"></p><div class="actions"><button type="submit">${teamLabel(teamState.role==='employee'?'sendHours':'save')}</button><button type="button" class="secondary" onclick="this.closest('dialog').close()">${teamLabel('cancel')}</button></div><p id="${prefix}Error" class="status err" role="alert"></p></form>`;
+ return `<form id="${prefix}Form">${employeeSelect}<div class="grid">${teamField('date',prefix+'Date','date',ym()+'-01')}${teamField('entry',prefix+'Entry','time','08:00')}${teamField('exit',prefix+'Exit','time','17:30')}${teamField('pause',prefix+'Pause','number','30')}<div><label>${teamLabel('hours')}</label><p id="${prefix}Hours"></p></div></div><label for="${prefix}Site">${teamLabel('sites')}</label>${selectSiteHtml(prefix+'Site')}${teamField('workplace',prefix+'Workplace')}<div class="actions"><button type="submit">${teamLabel(teamState.role==='employee'?'sendHours':'save')}</button><button type="button" class="secondary" onclick="this.closest('dialog').close()">${teamLabel('cancel')}</button></div><p id="${prefix}Error" class="status err" role="alert"></p></form>`;
 }
 function wireDayForm(prefix){
  const site=$(prefix+'Site'),place=$(prefix+'Workplace');site.onchange=()=>{place.value=site.value};place.required=false;
- const update=()=>{$(prefix+'Hours').textContent=tt('hours')+': '+fmt(minutes($(prefix+'Entry').value,$(prefix+'Exit').value,$(prefix+'Pause').value));};
+ const update=()=>{$(prefix+'Hours').textContent=fmt(minutes($(prefix+'Entry').value,$(prefix+'Exit').value,$(prefix+'Pause').value));};
  for(const suffix of ['Entry','Exit','Pause'])$(prefix+suffix).oninput=update;update();
 }
 function readDayForm(prefix){return {work_date:$(prefix+'Date').value,entry_time:$(prefix+'Entry').value,exit_time:$(prefix+'Exit').value,break_minutes:Number($(prefix+'Pause').value),workplace:$(prefix+'Workplace').value.trim()};}
-function ownerDayDialog(){
+function ownerDayDialog(id){
+ const record=records.find(r=>r.id===id);
  if(!employees.length){showPane('team');return;}
  let dialog=$('ownerDayDialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='ownerDayDialog';document.body.append(dialog)}
  dialog.innerHTML=`<h2>${teamLabel('register')}</h2>`+dayFormHTML('ownerDay',`<label for="ownerDayEmployee">${teamLabel('worker')}</label><select id="ownerDayEmployee">${employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select>`);
- $('ownerDayEmployee').value=$('employee').value;wireDayForm('ownerDay');$('ownerDayDate').value=$('newDate').value||ym()+'-01';
- $('ownerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{const {error}=await sb.from('work_days').insert({...readDayForm('ownerDay'),owner_id:user.id,employee_id:$('ownerDayEmployee').value});if(error)throw Error(error.code==='23505'?tt('date_exists'):tt('failed'));$('employee').value=$('ownerDayEmployee').value;await loadRecords();await upgradeRefresh();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('ownerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
+ $('ownerDayEmployee').value=record?.employee_id||$('employee').value;wireDayForm('ownerDay');const defaults=employees.find(e=>e.id===$('ownerDayEmployee').value);$('ownerDayDate').value=record?.work_date||$('newDate').value||ym()+'-01';$('ownerDayEntry').value=(record?.entry_time||defaults?.default_entry_time||'08:00').slice(0,5);$('ownerDayExit').value=(record?.exit_time||defaults?.default_exit_time||'17:30').slice(0,5);$('ownerDayPause').value=record?.break_minutes??defaults?.default_break_minutes??30;$('ownerDayWorkplace').value=record?.workplace||'';$('ownerDayEntry').oninput();
+ $('ownerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{const payload={...readDayForm('ownerDay'),owner_id:user.id,employee_id:$('ownerDayEmployee').value};const {error}=record?await sb.from('work_days').update(payload).eq('id',record.id).eq('owner_id',user.id):await sb.from('work_days').insert(payload);if(error)throw Error(error.code==='23505'?tt('date_exists'):tt('failed'));$('employee').value=$('ownerDayEmployee').value;await loadRecords();await upgradeRefresh();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('ownerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
 }
 async function workerPortal(){
  $('app').classList.add('hidden');$('loginCard').classList.add('hidden');
@@ -104,7 +107,7 @@ async function workerPortal(){
 }
 async function loadWorkerDays(){
  const result=await teamCall('my_days',{month:teamState.month});teamState.days=result.days;teamState.sites=result.sites;
- $('workerDays').innerHTML=result.days.map(d=>`<article class="project-tile"><strong>${esc(d.work_date)}</strong><span class="approval ${d.approval_status}">${esc(tt(d.approval_status))}</span><p>${esc(d.entry_time?.slice(0,5)||'')}–${esc(d.exit_time?.slice(0,5)||'')} · ${Number(d.break_minutes)} min · ${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes))}</p><p>${esc(d.workplace||'')}</p>${d.approval_status!=='approved'?`<button class="secondary" data-day="${d.id}">${esc(tt('edit'))}</button>`:''}</article>`).join('')||`<p>${esc(tt('noDays'))}</p>`;
+ $('workerDays').innerHTML=result.days.length?`<div class="compact-sheet-wrap"><table class="compact-sheet"><thead><tr>${['date','entry','exit','pause','workplace','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}<th></th></tr></thead><tbody>${result.days.map(d=>`<tr><td><time datetime="${esc(d.work_date)}">${esc(d.work_date.slice(8,10)+'/'+d.work_date.slice(5,7))}</time></td><td>${esc(d.entry_time?.slice(0,5)||'')}</td><td>${esc(d.exit_time?.slice(0,5)||'')}</td><td>${Number(d.break_minutes)}</td><td>${esc(d.workplace||'—')}</td><td><b>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes))}</b></td><td><span class="approval ${d.approval_status}">${esc(tt(d.approval_status))}</span></td><td>${d.approval_status!=='approved'?`<button class="secondary" aria-label="${esc(tt('edit'))}" data-day="${d.id}">✎</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:`<p>${esc(tt('noDays'))}</p>`;
  $('workerDays').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>workerDayDialog(b.dataset.day));
 }
 function workerDayDialog(id){
@@ -141,7 +144,7 @@ async function teamBoot(){
 }
 // Recovery state is captured before Auth removes tokens from the address bar.
 try{const params=new URLSearchParams(location.hash.slice(1));if(params.get('type')==='recovery')sessionStorage.setItem('suivi_recovery','1');if(params.get('type')==='invite')sessionStorage.setItem('suivi_new_invite','1');}catch{}
-window.teamUI={pane:showPane,day:ownerDayDialog,workerDay:workerDayDialog,month:async value=>{if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return;$('year').value=value.slice(0,4);$('month').value=value.slice(5,7);await loadRecords();await upgradeRefresh();},recover:requestPasswordReset};
+window.teamUI={pane:showPane,day:ownerDayDialog,editDay:id=>ownerDayDialog(id),workerDay:workerDayDialog,month:async value=>{if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return;$('year').value=value.slice(0,4);$('month').value=value.slice(5,7);await loadRecords();await upgradeRefresh();},recover:requestPasswordReset};
 window.showPasswordSetup=passwordSetup;
 const resetButton=document.createElement('button');resetButton.id='passwordResetButton';resetButton.type='button';resetButton.className='secondary';resetButton.style.marginTop='10px';resetButton.innerHTML=teamLabel('reset');resetButton.onclick=requestPasswordReset;$('loginCard').append(resetButton);$('email').type='text';
 const previousLanguage=applyLanguage;applyLanguage=function(){previousLanguage();teamTranslate();if(teamState.role==='owner')upgradeRefresh().catch(teamNotice)};
