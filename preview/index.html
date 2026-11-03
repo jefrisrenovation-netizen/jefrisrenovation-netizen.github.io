@@ -132,6 +132,8 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 .schedule-settings{margin-top:14px}.schedule-settings summary{cursor:pointer;font-weight:600}
 
 #dayTable .day-hours{display:inline!important;min-height:0;font-size:13px}
+
+.default-schedule{margin:12px 0 24px}.default-schedule h2{background:#e5e7eb;border-radius:12px;padding:14px;font-size:20px}.schedule-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 4px;border-bottom:1px solid #e5e7eb}.schedule-row label{margin:0;font-weight:600}.schedule-row input{width:132px;min-width:0;margin:0;text-align:center}.default-schedule .status:empty{display:none}
 </style>
 </head>
 <body>
@@ -766,11 +768,11 @@ applyLanguage();
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
- status:['Statut','Situação','Status'],schedule:['Horaires par défaut','Horários padrão','Default hours'],
+ status:['Statut','Situação','Status'],schedule:['Horaire par défaut','Horário padrão','Default hours'],
  resetMember:['Créer un lien pour un nouveau mot de passe','Criar link para nova senha','Create password reset link'],resetShare:['Lien pour définir un nouveau mot de passe (1 heure)','Link para definir nova senha (1 hora)','Password reset link (1 hour)'],invalid_phone:['Téléphone avec indicatif du pays, ex. +32470123456.','Telefone com código do país, ex. +32470123456.','Phone with country code, e.g. +32470123456.'],passwordSaved:['Mot de passe enregistré. Connectez-vous avec votre identifiant ou téléphone.','Senha salva. Entre com seu usuário ou telefone.','Password saved. Sign in with your username or phone.'],deleteUsername:['Saisissez votre identifiant pour supprimer votre accès personnel. L’historique de l’entreprise sera conservé.','Digite seu usuário para apagar seu acesso pessoal. O histórico da empresa será preservado.','Enter your username to delete your personal access. Company history will be retained.'],
 
  home:['Accueil','Início','Home'],team:['Équipe','Equipe','Team'],sites:['Chantiers','Obras','Projects'],reports:['Rapports','Relatórios','Reports'],settings:['Paramètres','Configurações','Settings'],
- register:['Enregistrer une journée','Registrar dia','Record day'],month:['Résumé du mois','Resumo do mês','Monthly overview'],hours:['Heures','Horas','Hours'],days:['Jours','Dias','Days'],advances:['Avances','Adiantamentos','Advances'],due:['Total à payer','Total a pagar','Total due'],
+ register:['Enregistrer un nouvel horaire','Registrar novo horário','Record new hours'],month:['Résumé du mois','Resumo do mês','Monthly overview'],hours:['Heures','Horas','Hours'],days:['Jours','Dias','Days'],advances:['Avances','Adiantamentos','Advances'],due:['Total à payer','Total a pagar','Total due'],
  invite:['Inviter un employé','Convidar funcionário','Invite employee'],username:['Identifiant','Usuário','Username'],email:['E-mail (facultatif)','E-mail (opcional)','Email (optional)'],phone:['Téléphone','Telefone','Phone'],createInvite:['Créer le lien d’invitation','Criar link de convite','Create invite link'],share:['Partager','Compartilhar','Share'],copy:['Copier le lien','Copiar link','Copy link'],copied:['Lien copié','Link copiado','Link copied'],
  pending:['À approuver','Aguardando aprovação','Pending approval'],approved:['Approuvé','Aprovado','Approved'],rejected:['À corriger','Precisa de correção','Needs correction'],approve:['Approuver','Aprovar','Approve'],reject:['Demander une correction','Pedir correção','Request correction'],
  block:['Bloquer','Bloquear','Block'],unblock:['Débloquer','Desbloquear','Unblock'],active:['Actif','Ativo','Active'],blocked:['Accès bloqué. Contactez votre responsable.','Acesso bloqueado. Fale com seu administrador.','Access blocked. Contact your administrator.'],
@@ -847,6 +849,28 @@ function showTeamInvitation(invitation){
  $('copyInvite').onclick=async()=>{try{await navigator.clipboard.writeText(invitation.url);$('copyInvite').textContent=tt('copied')}catch{result.querySelector('input').select()}};
 }
 function selectSiteHtml(id){return `<select id="${id}" aria-label="${esc(tt('sites'))}"><option value="">—</option>${teamState.sites.map(s=>`<option value="${esc(s.name+(s.address?' — '+s.address:''))}">${esc(s.name)}</option>`).join('')}</select>`}
+function scheduleHTML(prefix){
+ return `<section class="default-schedule"><h2>${teamLabel('schedule')}</h2>${['entry','exit','pause'].map((key,i)=>`<div class="schedule-row"><label for="${prefix}${['Entry','Exit','Pause'][i]}">${teamLabel(key)}</label><input id="${prefix}${['Entry','Exit','Pause'][i]}" type="${i===2?'number':'time'}" ${i===2?'min="0" max="1440" step="1"':''} required></div>`).join('')}<p id="${prefix}Status" class="status" role="status"></p></section>`;
+}
+function wireSchedule(prefix,getEmployee,isWorker=false){
+ const fill=()=>{const emp=getEmployee()||{};$(prefix+'Entry').value=(emp.default_entry_time||'08:00').slice(0,5);$(prefix+'Exit').value=(emp.default_exit_time||'17:30').slice(0,5);$(prefix+'Pause').value=emp.default_break_minutes??30;};fill();
+ let saving=false;
+ for(const suffix of ['Entry','Exit','Pause'])$(prefix+suffix).onchange=async()=>{
+  if(saving)return;const emp=getEmployee();if(!emp?.id)return;
+  const entry=$(prefix+'Entry').value,exit=$(prefix+'Exit').value,pause=Number($(prefix+'Pause').value);
+  if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(entry)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(exit)||!Number.isInteger(pause)||pause<0||pause>1440){$(prefix+'Status').textContent=tt('check');return;}
+  saving=true;for(const key of ['Entry','Exit','Pause'])$(prefix+key).disabled=true;
+  const values={default_entry_time:entry,default_exit_time:exit,default_break_minutes:pause};
+  try{
+   if(isWorker){await teamCall('save_my_defaults',{entry_time:entry,exit_time:exit,break_minutes:pause});}
+   else {const {error}=await sb.from('employees').update(values).eq('id',emp.id).eq('owner_id',user.id).select('id').single();if(error)throw Error(tt('failed'));}
+   Object.assign(emp,values);$(prefix+'Status').textContent=tt('saveOK');if(isWorker){for(const other of ['workerSchedule','workerDialogSchedule'])if(other!==prefix&&$(other+'Entry')){$(other+'Entry').value=entry;$(other+'Exit').value=exit;$(other+'Pause').value=pause;}}
+   if(!isWorker&&$('employee').value===emp.id){$('defaultEntry').value=entry;$('defaultExit').value=exit;$('defaultBreak').value=pause;}
+  }catch(error){$(prefix+'Status').textContent=error.message;fill();}
+  finally{saving=false;for(const key of ['Entry','Exit','Pause'])$(prefix+key).disabled=false;}
+ };
+ return fill;
+}
 function dayFormHTML(prefix,employeeSelect=''){
  return `<form id="${prefix}Form">${employeeSelect}<div class="grid">${teamField('date',prefix+'Date','date',ym()+'-01')}${teamField('entry',prefix+'Entry','time','08:00')}${teamField('exit',prefix+'Exit','time','17:30')}${teamField('pause',prefix+'Pause','number','30')}<div><label>${teamLabel('hours')}</label><p id="${prefix}Hours"></p></div></div><label for="${prefix}Site">${teamLabel('sites')}</label>${selectSiteHtml(prefix+'Site')}${teamField('workplace',prefix+'Workplace')}<div class="actions"><button type="submit">${teamLabel(teamState.role==='employee'?'sendHours':'save')}</button><button type="button" class="secondary" onclick="this.closest('dialog').close()">${teamLabel('cancel')}</button></div><p id="${prefix}Error" class="status err" role="alert"></p></form>`;
 }
@@ -860,14 +884,16 @@ function ownerDayDialog(id){
  const record=records.find(r=>r.id===id);
  if(!employees.length){showPane('team');return;}
  let dialog=$('ownerDayDialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='ownerDayDialog';document.body.append(dialog)}
- dialog.innerHTML=`<h2>${teamLabel('register')}</h2>`+dayFormHTML('ownerDay',`<label for="ownerDayEmployee">${teamLabel('worker')}</label><select id="ownerDayEmployee">${employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select>`);
+ dialog.innerHTML=scheduleHTML('ownerSchedule')+`<h2>${teamLabel('register')}</h2>`+dayFormHTML('ownerDay',`<label for="ownerDayEmployee">${teamLabel('worker')}</label><select id="ownerDayEmployee">${employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select>`);
  $('ownerDayEmployee').value=record?.employee_id||$('employee').value;wireDayForm('ownerDay');const defaults=employees.find(e=>e.id===$('ownerDayEmployee').value);$('ownerDayDate').value=record?.work_date||$('newDate').value||ym()+'-01';$('ownerDayEntry').value=(record?.entry_time||defaults?.default_entry_time||'08:00').slice(0,5);$('ownerDayExit').value=(record?.exit_time||defaults?.default_exit_time||'17:30').slice(0,5);$('ownerDayPause').value=record?.break_minutes??defaults?.default_break_minutes??30;$('ownerDayWorkplace').value=record?.workplace||'';$('ownerDayEntry').oninput();
+ const fillSchedule=wireSchedule('ownerSchedule',()=>employees.find(e=>e.id===$('ownerDayEmployee').value));$('ownerDayEmployee').onchange=()=>{fillSchedule();if(!record){const emp=employees.find(e=>e.id===$('ownerDayEmployee').value);$('ownerDayEntry').value=(emp?.default_entry_time||'08:00').slice(0,5);$('ownerDayExit').value=(emp?.default_exit_time||'17:30').slice(0,5);$('ownerDayPause').value=emp?.default_break_minutes??30;$('ownerDayEntry').oninput();}};
  $('ownerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{const payload={...readDayForm('ownerDay'),owner_id:user.id,employee_id:$('ownerDayEmployee').value};const {error}=record?await sb.from('work_days').update(payload).eq('id',record.id).eq('owner_id',user.id):await sb.from('work_days').insert(payload);if(error)throw Error(error.code==='23505'?tt('date_exists'):tt('failed'));$('employee').value=$('ownerDayEmployee').value;await loadRecords();await upgradeRefresh();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('ownerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
 }
 async function workerPortal(){
  $('app').classList.add('hidden');$('loginCard').classList.add('hidden');
  let portal=$('workerPortal');if(!portal){portal=document.createElement('section');portal.id='workerPortal';portal.className='card';document.querySelector('main').append(portal);}
- portal.innerHTML=`<p class="muted">${esc(teamState.access.company)}</p><h2>${esc(teamState.access.employee.name)}</h2><div class="actions"><button onclick="teamUI.workerDay()">＋ ${teamLabel('register')}</button><button class="secondary" onclick="logout()">${teamLabel('signout')}</button></div><label for="workerMonth">${teamLabel('month')}</label><input id="workerMonth" type="month" value="${esc(teamState.month)}"><p id="workerNotice" class="status" role="status"></p><p class="muted">${teamLabel('reviewHelp')}</p><h2>${teamLabel('ownDays')}</h2><div id="workerDays"></div>`;
+ portal.innerHTML=`<p class="muted">${esc(teamState.access.company)}</p><h2>${esc(teamState.access.employee.name)}</h2>${scheduleHTML('workerSchedule')}<div class="actions"><button onclick="teamUI.workerDay()">＋ ${teamLabel('register')}</button><button class="secondary" onclick="logout()">${teamLabel('signout')}</button></div><label for="workerMonth">${teamLabel('month')}</label><input id="workerMonth" type="month" value="${esc(teamState.month)}"><p id="workerNotice" class="status" role="status"></p><p class="muted">${teamLabel('reviewHelp')}</p><h2>${teamLabel('ownDays')}</h2><div id="workerDays"></div>`;
+ wireSchedule('workerSchedule',()=>teamState.access.employee,true);
  $('workerMonth').onchange=async()=>{teamState.month=$('workerMonth').value;try{await loadWorkerDays()}catch(e){teamNotice(e)}};portal.classList.remove('hidden');const settings=document.createElement('details');settings.className='project-tile';settings.innerHTML=`<summary>${teamLabel('settings')}</summary><button id="workerDelete" class="secondary" style="margin-top:12px;color:#a52b24">${esc(tr('Supprimer mon compte et mes données'))}</button>`;portal.append(settings);$('workerDelete').onclick=requestEmployeeDeletion;await loadWorkerDays();
 }
 async function loadWorkerDays(){
@@ -877,7 +903,7 @@ async function loadWorkerDays(){
 }
 function workerDayDialog(id){
  const record=teamState.days.find(d=>d.id===id);let dialog=$('workerDayDialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='workerDayDialog';document.body.append(dialog)}
- dialog.innerHTML=`<h2>${teamLabel('register')}</h2>`+dayFormHTML('workerDay');wireDayForm('workerDay');const employee=teamState.access.employee;
+ dialog.innerHTML=scheduleHTML('workerDialogSchedule')+`<h2>${teamLabel('register')}</h2>`+dayFormHTML('workerDay');wireDayForm('workerDay');wireSchedule('workerDialogSchedule',()=>teamState.access.employee,true);const employee=teamState.access.employee;
  $('workerDayDate').value=record?.work_date||teamState.month+'-01';$('workerDayEntry').value=(record?.entry_time||employee.default_entry_time||'08:00').slice(0,5);$('workerDayExit').value=(record?.exit_time||employee.default_exit_time||'17:30').slice(0,5);$('workerDayPause').value=record?.break_minutes??employee.default_break_minutes??30;$('workerDayWorkplace').value=record?.workplace||'';$('workerDayEntry').oninput();
  $('workerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await teamCall('save_my_day',{...readDayForm('workerDay'),...(id?{id}:{})});teamState.month=$('workerDayDate').value.slice(0,7);$('workerMonth').value=teamState.month;await loadWorkerDays();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('workerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
 }
