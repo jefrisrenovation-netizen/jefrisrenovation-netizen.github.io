@@ -114,10 +114,16 @@ Deno.serve(async(req:Request)=>{
    return reply(200,{active:true});
   }
   // Employee requests cannot choose another employee or company: both IDs come from the verified membership.
-  if(['my_days','save_my_day'].includes(action)){
+  if(['my_days','save_my_day','save_my_defaults'].includes(action)){
    if(!account?.activated_at)return reply(403,{error:'access_denied'});
    const employee=await admin.from('employees').select('active').eq('id',account.employee_id).eq('owner_id',account.owner_id).single();
    if(employee.error||!employee.data.active)return reply(403,{error:'access_blocked'});
+   if(action==='save_my_defaults'){
+    const input=dayInput({...body,work_date:'2000-01-01'});
+    const values={default_entry_time:input.entry_time,default_exit_time:input.exit_time,default_break_minutes:input.break_minutes};
+    const result=await admin.from('employees').update(values).eq('id',account.employee_id).eq('owner_id',account.owner_id).eq('active',true).select('id').single();
+    if(result.error)throw result.error;return reply(200,{saved:true});
+   }
    if(action==='my_days'){
     const range=monthRange(body.month);
     const [days,sites]=await Promise.all([admin.from('work_days').select('id,work_date,entry_time,exit_time,break_minutes,workplace,notes,approval_status').eq('owner_id',account.owner_id).eq('employee_id',account.employee_id).gte('work_date',range.start).lte('work_date',range.end).order('work_date'),admin.from('work_sites').select('id,name,address').eq('owner_id',account.owner_id).eq('active',true).order('name')]);
