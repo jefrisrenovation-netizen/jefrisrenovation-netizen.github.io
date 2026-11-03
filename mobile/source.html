@@ -561,15 +561,22 @@ async function showIndividualReport(){
     if(selectedMonth!==ym()||id!==$("employee").value)return;
     for(const result of results)if(result.error)throw result.error;
     const [worker,rawDays,paymentRow]=results.map(result=>result.data);
-    const days=rawDays.filter(d=>!d.approval_status||d.approval_status==="approved");
-    const report=buildCompanyReport([worker],days,paymentRow?[paymentRow]:[]);
+    const selection=personalReportSelection();const filtered=!!selection.workplace;
+    const days=selectReportDays(rawDays.filter(d=>!d.approval_status||d.approval_status==="approved"),selection);
+    const report=buildCompanyReport([worker],days,paymentRow?[{...paymentRow,...(filtered?{advance:0}: {})}]:[]);
     const row=report.rows[0];
     const totalMinutes=days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
     const currency=paymentRow?.currency_code||profile.preferred_currency||"EUR";
     $("individualReportTitle").textContent=tr("Rapport individuel")+" — "+worker.name;
-    $("individualReportMonth").textContent=monthName()+" — "+(profile.company_name||"Suivi des heures");
+    $("individualReport").dataset.reportMonth=selectedMonth;
+    $("individualReportMonth").textContent=monthName()+" — "+(profile.company_name||"Suivi des heures")+(filtered?" — "+personalReportCaption(selection):"");
     $("individualReportRows").innerHTML=days.map(d=>`<tr><td>${esc(d.work_date)}</td><td>${esc(d.entry_time||"")}</td><td>${esc(d.exit_time||"")}</td><td>${Number(d.break_minutes??30)}</td><td>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes??30))}</td><td>${esc(d.workplace||d.work_location||d.location||"")}</td></tr>`).join("");
     $("individualReportSummary").innerHTML=`<div class="stat"><b>${formatMoney(row?.rate??0,currency)}</b><span>${esc(row?.modeLabel||"")}</span></div><div class="stat"><b>${fmt(totalMinutes)}</b><span>${esc(tr("Horas trabalhadas"))}</span></div><div class="stat"><b>${row?.days??0}</b><span>${esc(tr("Dias equivalentes"))}</span></div><div class="stat"><b>${formatMoney(row?.gross??0,currency)}</b><span>${esc(tr("Valor bruto"))}</span></div><div class="stat"><b>${formatMoney(row?.advance??0,currency)}</b><span>${esc(tr("Adiantamentos"))}</span></div><div class="stat"><b>${formatMoney(row?.balance??0,currency)}</b><span>${esc(tr("Valor líquido"))}</span></div>`;
+    if(filtered){
+      const summary=$('individualReportSummary');const stats=[...summary.querySelectorAll('.stat')];stats.slice(4).forEach(el=>el.remove());if(paymentRow?.payment_mode==='fixed')stats[3]?.remove();
+      const note=document.createElement('p');note.id='personalReportNote';note.className='muted';note.textContent=tt('filterNotice');summary.append(note);
+    }
+    teamTranslate();
     closeCompanyReport();$("individualReport").classList.remove("hidden");$("individualReport").scrollIntoView({behavior:"smooth"});
   }catch(error){closeIndividualReport();setStatus(tr("Erro no relatório individual: ")+error.message,false)}
 }

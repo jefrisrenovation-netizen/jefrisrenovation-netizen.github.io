@@ -1,7 +1,7 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
- accountManagement:['Gestion du compte','Gestão da conta','Account management'],status:['Statut','Situação','Status'],schedule:['Horaire par défaut','Horário padrão','Default hours'],
+ reportPlaces:['Tous les lieux de travail','Todos os locais de trabalho','All workplaces'],noWorkplace:['Sans lieu de travail','Sem local de trabalho','No workplace'],personalFilters:['Rapport individuel : mois et lieu de travail','Relatório individual: mês e local de trabalho','Individual report: month and workplace'],exportPDF:['Exporter PDF / WhatsApp','Exportar PDF / WhatsApp','Export PDF / WhatsApp'],filterNotice:['Rapport filtré : les avances et le salaire mensuel ne sont pas répartis par lieu de travail.','Relatório filtrado: os adiantamentos e o salário mensal não são divididos por local de trabalho.','Filtered report: monthly advances and fixed salary are not allocated to workplaces.'], accountManagement:['Gestion du compte','Gestão da conta','Account management'],status:['Statut','Situação','Status'],schedule:['Horaire par défaut','Horário padrão','Default hours'],
  resetMember:['Créer un lien pour un nouveau mot de passe','Criar link para nova senha','Create password reset link'],resetShare:['Lien pour définir un nouveau mot de passe (1 heure)','Link para definir nova senha (1 hora)','Password reset link (1 hour)'],invalid_phone:['Téléphone avec indicatif du pays, ex. +32470123456.','Telefone com código do país, ex. +32470123456.','Phone with country code, e.g. +32470123456.'],passwordSaved:['Mot de passe enregistré. Connectez-vous avec votre identifiant ou téléphone.','Senha salva. Entre com seu usuário ou telefone.','Password saved. Sign in with your username or phone.'],deleteUsername:['Saisissez votre identifiant pour supprimer votre accès personnel. L’historique de l’entreprise sera conservé.','Digite seu usuário para apagar seu acesso pessoal. O histórico da empresa será preservado.','Enter your username to delete your personal access. Company history will be retained.'],
 
  home:['Accueil','Início','Home'],team:['Équipe','Equipe','Team'],sites:['Chantiers','Obras','Projects'],reports:['Rapports','Relatórios','Reports'],settings:['Paramètres','Configurações','Settings'],
@@ -47,7 +47,7 @@ function setupOwnerUI(){
  const sites=document.createElement('section');sites.id='sitesPanel';sites.className='card hidden no-print';sites.innerHTML=`<h2>${teamLabel('sites')}</h2><form id="siteForm"><div class="grid">${teamField('siteName','siteName')}${teamField('address','siteAddress')}</div><button type="submit">＋ ${teamLabel('addSite')}</button></form><div id="siteList"></div>`;
  $('app').append(sites);$('siteAddress').required=false;$('siteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,async()=>{const {error}=await sb.from('work_sites').insert({owner_id:user.id,name:$('siteName').value.trim(),address:$('siteAddress').value.trim()});if(error)throw Error(tt('failed'));$('siteForm').reset();await upgradeRefresh();teamNotice(tt('saveOK'));});};
  const review=document.createElement('section');review.id='reviewPanel';review.className='card hidden no-print';review.innerHTML=`<h2>${teamLabel('reviewTitle')}</h2><p class="muted">${teamLabel('reviewHelp')}</p><div id="reviewList"></div>`;$('app').append(review);
- $('email').type='text';showPane('home');
+ setupPersonalReportFilters();$('email').type='text';showPane('home');
 }
 async function withTeamButton(button,fn){if(button?.disabled)return;if(button)button.disabled=true;try{await fn()}catch(error){teamNotice(error)}finally{if(button)button.disabled=false}}
 async function upgradeRefresh(){
@@ -67,7 +67,7 @@ async function upgradeRefresh(){
  $('memberList').querySelectorAll('[data-reset-member]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{showTeamInvitation({...await teamCall('reset_phone',{id:b.dataset.resetMember}),reset:true});}));
  $('reviewList').innerHTML=days.filter(d=>d.approval_status==='pending').map(d=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===d.employee_id)?.name||'')} · ${esc(d.work_date)}</strong><p>${esc(d.entry_time?.slice(0,5)||'')}–${esc(d.exit_time?.slice(0,5)||'')} · ${Number(d.break_minutes)} min · ${esc(d.workplace||'')}</p><div class="actions"><button class="green" data-review="${d.id}" data-status="approved">${esc(tt('approve'))}</button><button class="secondary" data-review="${d.id}" data-status="rejected">${esc(tt('reject'))}</button></div></article>`).join('')||`<p>${esc(tt('noPending'))}</p>`;
  $('reviewList').querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('review_day',{id:b.dataset.review,status:b.dataset.status});await upgradeRefresh();await loadRecords()}));
- teamTranslate();
+ refreshPersonalReportFilters(days,staff);teamTranslate();
 }
 
 async function createTeamInvite(){
@@ -104,6 +104,33 @@ function wireSchedule(prefix,getEmployee,isWorker=false){
  };
  return fill;
 }
+function personalReportSelection(){
+ return {workplace:$('reportWorkplace')?.value||''};
+}
+function selectReportDays(days,selection){
+ return days.filter(d=>(!selection.workplace||JSON.stringify(d.workplace||'')===selection.workplace));
+}
+function setupPersonalReportFilters(){
+ const filters=document.createElement('div');filters.id='personalReportFilters';filters.innerHTML=`<h2>${teamLabel('personalFilters')}</h2><div class="grid"><div><label for="personalReportMonth">${teamLabel('month')}</label><input id="personalReportMonth" type="month"></div><div><label for="personalReportWorker">${teamLabel('worker')}</label><select id="personalReportWorker"></select></div><div><label for="reportWorkplace">${teamLabel('sites')}</label><select id="reportWorkplace"></select></div></div>`;
+ $('reportActions').prepend(filters);$('personalReportMonth').onchange=()=>window.teamUI.month($('personalReportMonth').value).catch(teamNotice);
+ $('personalReportWorker').onchange=async()=>{$('employee').value=$('personalReportWorker').value;closeIndividualReport();await loadRecords();await upgradeRefresh();};
+ for(const id of ['reportWorkplace'])$(id).onchange=()=>{closeIndividualReport();closeCompanyReport();};
+}
+function refreshPersonalReportFilters(days,staff){
+ if(!$('personalReportFilters'))return;$('personalReportMonth').value=ym();
+ $('personalReportWorker').innerHTML=staff.map(e=>`<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('');$('personalReportWorker').value=$('employee').value;
+ const ownDays=days.filter(d=>d.employee_id===$('employee').value);
+ for(const [id,key,all,empty] of [['reportWorkplace','workplace','reportPlaces','noWorkplace']]){
+  const el=$(id),value=el.value;el.innerHTML=`<option value="">${esc(tt(all))}</option>`+[...new Set(ownDays.map(d=>d[key]||''))].sort().map(v=>`<option value="${esc(JSON.stringify(v))}">${esc(v||tt(empty))}</option>`).join('');el.value=[...el.options].some(o=>o.value===value)?value:'';
+ }
+}
+function personalReportCaption(selection){return [selection.workplace?tt('sites')+': '+(JSON.parse(selection.workplace)||tt('noWorkplace')):''].filter(Boolean).join(' · ');}
+function showWorkerReport(){
+ if(teamState.role!=='employee')return;const source=$('workerReport');if(!source)return;
+ const selection={workplace:$('workerReportPlace')?.value||''};const days=selectReportDays(teamState.days,selection);source.dataset.reportMonth=teamState.month;
+ source.innerHTML=`<h2>${esc(tt('ownDays'))} — ${esc(teamState.access.employee.name)}</h2><p>${esc(teamState.month)} — ${esc(teamState.access.company)}${selection.workplace?' — '+esc(personalReportCaption(selection)):''}</p><div class="table"><table><thead><tr>${['date','entry','exit','pause','workplace','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}</tr></thead><tbody>${days.map(d=>`<tr><td>${esc(d.work_date)}</td><td>${esc(d.entry_time?.slice(0,5)||'')}</td><td>${esc(d.exit_time?.slice(0,5)||'')}</td><td>${Number(d.break_minutes??0)}</td><td>${esc(d.workplace||'')}</td><td>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes))}</td><td>${esc(tt(d.approval_status||'approved'))}</td></tr>`).join('')}</tbody></table></div><div class="summary"><div class="stat"><b>${fmt(days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes),0))}</b><span>${esc(tt('hours'))}</span></div></div>`;source.classList.remove('hidden');
+}
+async function exportWorkerReport(){showWorkerReport();if($('workerReport'))await printSelectedReport('print-worker');}
 function dayFormHTML(prefix,employeeSelect=''){
  return `<form id="${prefix}Form">${employeeSelect}<div class="grid">${teamField('date',prefix+'Date','date',ym()+'-01')}${teamField('entry',prefix+'Entry','time','08:00')}${teamField('exit',prefix+'Exit','time','17:30')}${teamField('pause',prefix+'Pause','number','30')}<div><label>${teamLabel('hours')}</label><p id="${prefix}Hours"></p></div></div><label for="${prefix}Site">${teamLabel('sites')}</label>${selectSiteHtml(prefix+'Site')}${teamField('workplace',prefix+'Workplace')}<div class="actions"><button type="submit">${teamLabel(teamState.role==='employee'?'sendHours':'save')}</button><button type="button" class="secondary" onclick="this.closest('dialog').close()">${teamLabel('cancel')}</button></div><p id="${prefix}Error" class="status err" role="alert"></p></form>`;
 }
@@ -125,12 +152,12 @@ function ownerDayDialog(id){
 async function workerPortal(){
  $('app').classList.add('hidden');$('loginCard').classList.add('hidden');
  let portal=$('workerPortal');if(!portal){portal=document.createElement('section');portal.id='workerPortal';portal.className='card';document.querySelector('main').append(portal);}
- portal.innerHTML=`<p class="muted">${esc(teamState.access.company)}</p><h2>${esc(teamState.access.employee.name)}</h2>${scheduleHTML('workerSchedule')}<div class="actions"><button onclick="teamUI.workerDay()">＋ ${teamLabel('register')}</button></div><label for="workerMonth">${teamLabel('month')}</label><input id="workerMonth" type="month" value="${esc(teamState.month)}"><p id="workerNotice" class="status" role="status"></p><p class="muted">${teamLabel('reviewHelp')}</p><h2>${teamLabel('ownDays')}</h2><div id="workerDays"></div>`;
+ portal.innerHTML=`<p class="muted">${esc(teamState.access.company)}</p><h2>${esc(teamState.access.employee.name)}</h2>${scheduleHTML('workerSchedule')}<div class="actions"><button onclick="teamUI.workerDay()">＋ ${teamLabel('register')}</button></div><label for="workerMonth">${teamLabel('month')}</label><input id="workerMonth" type="month" value="${esc(teamState.month)}"><p id="workerNotice" class="status" role="status"></p><p class="muted">${teamLabel('reviewHelp')}</p><label for="workerReportPlace">${teamLabel('workplace')}</label><select id="workerReportPlace"></select><button class="green" onclick="teamUI.workerReport()">${teamLabel('exportPDF')}</button><h2>${teamLabel('ownDays')}</h2><div id="workerDays"></div><section id="workerReport" class="hidden"></section>`;
  wireSchedule('workerSchedule',()=>teamState.access.employee,true);
  $('workerMonth').onchange=async()=>{teamState.month=$('workerMonth').value;try{await loadWorkerDays()}catch(e){teamNotice(e)}};portal.classList.remove('hidden');const settings=document.createElement('details');settings.className='project-tile';settings.innerHTML=`<summary>${teamLabel('accountManagement')}</summary><button id="workerLogout" class="secondary" style="display:block;width:100%;margin-top:16px" onclick="logout()">${teamLabel('signout')}</button><div style="border-top:1px solid #e5e7eb;margin-top:20px;padding-top:4px"><button id="workerDelete" class="secondary" style="margin-top:12px;color:#a52b24">${esc(tr('Supprimer mon compte et mes données'))}</button></div>`;portal.append(settings);$('workerDelete').onclick=requestEmployeeDeletion;await loadWorkerDays();
 }
 async function loadWorkerDays(){
- const result=await teamCall('my_days',{month:teamState.month});teamState.days=result.days;teamState.sites=result.sites;
+ const selectedMonth=teamState.month;const result=await teamCall('my_days',{month:selectedMonth});if(selectedMonth!==teamState.month)return;teamState.days=result.days;teamState.sites=result.sites;$('workerReport')?.classList.add('hidden');const place=$('workerReportPlace'),previous=place.value;place.innerHTML=`<option value="">${esc(tt('reportPlaces'))}</option>`+[...new Set(result.days.map(d=>d.workplace||''))].sort().map(v=>`<option value="${esc(JSON.stringify(v))}">${esc(v||tt('noWorkplace'))}</option>`).join('');place.value=[...place.options].some(o=>o.value===previous)?previous:'';place.onchange=()=>$('workerReport').classList.add('hidden');
  $('workerDays').innerHTML=result.days.length?`<div class="compact-sheet-wrap"><table class="compact-sheet"><thead><tr>${['date','entry','exit','pause','workplace','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}<th></th></tr></thead><tbody>${result.days.map(d=>`<tr><td><time datetime="${esc(d.work_date)}">${esc(d.work_date.slice(8,10)+'/'+d.work_date.slice(5,7))}</time></td><td>${esc(d.entry_time?.slice(0,5)||'')}</td><td>${esc(d.exit_time?.slice(0,5)||'')}</td><td>${Number(d.break_minutes)}</td><td>${esc(d.workplace||'—')}</td><td><b>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes))}</b></td><td><span class="approval ${d.approval_status}">${esc(tt(d.approval_status))}</span></td><td>${d.approval_status!=='approved'?`<button class="secondary" aria-label="${esc(tt('edit'))}" data-day="${d.id}">✎</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:`<p>${esc(tt('noDays'))}</p>`;
  $('workerDays').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>workerDayDialog(b.dataset.day));
 }
@@ -168,7 +195,7 @@ async function teamBoot(){
 }
 // Recovery state is captured before Auth removes tokens from the address bar.
 try{const params=new URLSearchParams(location.hash.slice(1));if(params.get('type')==='recovery')sessionStorage.setItem('suivi_recovery','1');if(params.get('type')==='invite')sessionStorage.setItem('suivi_new_invite','1');}catch{}
-window.teamUI={pane:showPane,day:ownerDayDialog,editDay:id=>ownerDayDialog(id),workerDay:workerDayDialog,month:async value=>{if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return;$('year').value=value.slice(0,4);$('month').value=value.slice(5,7);await loadRecords();await upgradeRefresh();},recover:requestPasswordReset};
+window.teamUI={pane:showPane,day:ownerDayDialog,editDay:id=>ownerDayDialog(id),workerDay:workerDayDialog,month:async value=>{if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return;$('year').value=value.slice(0,4);$('month').value=value.slice(5,7);await loadRecords();await upgradeRefresh();},recover:requestPasswordReset,workerReport:exportWorkerReport};
 window.showPasswordSetup=passwordSetup;
 const resetButton=document.createElement('button');resetButton.id='passwordResetButton';resetButton.type='button';resetButton.className='secondary';resetButton.style.marginTop='10px';resetButton.innerHTML=teamLabel('reset');resetButton.onclick=requestPasswordReset;$('loginCard').append(resetButton);$('email').type='text';
 const previousLanguage=applyLanguage;applyLanguage=function(){previousLanguage();teamTranslate();if(teamState.role==='owner')upgradeRefresh().catch(teamNotice)};
