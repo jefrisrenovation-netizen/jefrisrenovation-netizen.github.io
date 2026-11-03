@@ -53,3 +53,14 @@ test('saved owner days are compact rows and editing opens a separate form',()=>{
 test('default hours live in collapsed settings, outside the monthly sheet',()=>{
  const f=fixture();const defaults=f.document.getElementById('employeeDefaults');assert(defaults.closest('#settingsPanel'));assert(defaults.closest('details'));assert(!defaults.closest('details').hasAttribute('open'));assert(!f.document.getElementById('timesheetPanel').querySelector('#defaultEntry'));
 });
+
+test('employee default start persists to next entry while a one-day edit leaves defaults unchanged',async()=>{
+ const f=fixture();f.run(`teamState.role='employee';teamState.access={company:'Company',employee:{id:'worker',name:'Anderson'}};teamCall=async()=>({days:[],sites:[]});`);
+ await f.run('workerPortal()');
+ assert(!f.document.getElementById('workerScheduleDate'));
+ f.document.getElementById('workerScheduleEntry').value='07:00';
+ await f.document.getElementById('workerScheduleEntry').onchange();
+ f.run('workerDayDialog()');assert.equal(f.document.getElementById('workerDayEntry').value,'07:00');
+ f.document.getElementById('workerDayEntry').value='09:00';
+ f.run('workerDayDialog()');assert.equal(f.document.getElementById('workerDayEntry').value,'07:00');
+});
