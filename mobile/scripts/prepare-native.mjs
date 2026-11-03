@@ -3,6 +3,8 @@ import {execFileSync} from 'node:child_process';
 const platform=process.argv[2];
 if(!['ios','android'].includes(platform))throw new Error('Expected ios or android');
 const bundle='io.github.jefrisrenovation-netizen.suividesheures';
+const appVersion=JSON.parse(fs.readFileSync('package.json','utf8')).version;
+if(!/^\d+\.\d+\.\d+$/.test(appVersion))throw new Error('Invalid application version');
 if(!fs.existsSync(platform))execFileSync('npx',['cap','add',platform],{stdio:'inherit'});
 execFileSync('npx',['cap','sync',platform],{stdio:'inherit'});
 if(fs.existsSync(`${platform}/.suivi-prepared`)){console.log('Native project already prepared');process.exit(0)}
@@ -11,8 +13,8 @@ if(platform==='ios'){
   pbx=pbx.replaceAll('PRODUCT_BUNDLE_IDENTIFIER = io.github.jefrisrenovation.suividesheures;',`PRODUCT_BUNDLE_IDENTIFIER = "${bundle}";`);
   pbx=pbx.replaceAll('CODE_SIGN_STYLE = Automatic;','CODE_SIGN_STYLE = Automatic;\n\t\t\t\tDEVELOPMENT_TEAM = ZFF7B3HXTT;\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = App/App.entitlements;');
   pbx=pbx.replaceAll('DEVELOPMENT_TEAM = "";','DEVELOPMENT_TEAM = ZFF7B3HXTT;');
-  // A released 1.0 app needs a new marketing version for the update.
-  pbx=pbx.replace(/MARKETING_VERSION = [^;]+;/g,'MARKETING_VERSION = 1.0.1;');
+  // Use the release version from the package manifest for App Store updates.
+  pbx=pbx.replace(/MARKETING_VERSION = [^;]+;/g,`MARKETING_VERSION = ${appVersion};`);
   // Restrict the App Store device family to iPhone only (1 = iPhone, 2 = iPad).
   pbx=pbx.replace(/TARGETED_DEVICE_FAMILY = [^;]+;/g,'TARGETED_DEVICE_FAMILY = "1";');
   // Add the app privacy manifest to the generated Xcode project.
