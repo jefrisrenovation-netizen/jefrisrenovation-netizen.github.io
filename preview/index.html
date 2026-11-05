@@ -134,13 +134,17 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 #dayTable .day-hours{display:inline!important;min-height:0;font-size:13px}
 
 .default-schedule{margin:12px 0 24px}.default-schedule h2{background:#e5e7eb;border-radius:12px;padding:14px;font-size:20px}.schedule-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 4px;border-bottom:1px solid #e5e7eb}.schedule-row label{margin:0;font-weight:600}.schedule-row input{width:132px;min-width:0;margin:0;text-align:center}.default-schedule .status:empty{display:none}
+
+.access-language{display:flex;align-items:center;gap:12px;max-width:420px;margin-top:14px}.access-language label{color:white;white-space:nowrap}.access-language select{padding:9px;font-size:14px}#workerSummary{margin-top:16px}.login details[open]>summary{margin-bottom:8px}
+
+.app-version{display:block;margin-top:4px;opacity:.7}
 </style>
 </head>
 <body>
 <header>
   <div class="brand">
     <img id="brandLogo" src="assets/suivi-logo.png" alt="Logo da empresa">
-    <div><h1 id="brandName">Suivi des heures</h1><small id="brandSubtitle">Gestion des heures de travail</small></div>
+    <div><h1 id="brandName">Suivi des heures</h1><small id="brandSubtitle">Gestion des heures de travail</small><small class="app-version">v1.0.3</small></div>
   </div>
 </header>
 
@@ -277,7 +281,7 @@ const selected=$("month").value;[...$("month").options].forEach((o,i)=>o.textCon
 if($("month").value&&$("year").value){$("monthLabel").textContent=monthName();renderHistory();const emp=employees.find(e=>e.id===$("employee").value);$("title").textContent=(emp?.name||tr("Funcionário"))+" — "+monthName();}
 closeIndividualReport();closeCompanyReport();$("cloudStatus").textContent="";updateAccountMode();}
 function updateBrand(){const name=$("companyName").value.trim();$("brandName").textContent="Suivi des heures";const logo=$("companyLogo").value.trim();$("brandLogo").src=/^https:\/\//i.test(logo)?logo:"assets/suivi-logo.png";$("brandLogo").alt=name||"Logo";}
-async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus(tr("Erro ao carregar perfil: ")+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"individual",company_name:"",language_code:"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
+async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus(tr("Erro ao carregar perfil: ")+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"individual",company_name:"",language_code:(typeof readAccessPreference==="function"?readAccessPreference("suivi_language"):null)||"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
 async function saveProfile(){
   const button=document.querySelector('[onclick="saveProfile()"]');
   const previousLabel=button?.textContent;
@@ -714,6 +718,7 @@ async function loginWithPassword(){
     if(email.includes('@'))({error}=await sb.auth.signInWithPassword({email,password}));
     else {try{const result=await teamCall('login',{username:email,password});({error}=await sb.auth.setSession(result.session));}catch{error={message:'invalid_credentials'};}}
     if(error){setLogin(tr('Connexion impossible. Vérifiez vos identifiants.'));return;}
+    if(typeof saveAccessPreference==='function')saveAccessPreference('suivi_identifier',email);
     $('loginPassword').value='';
     await start();
   }catch{setLogin(tr('Connexion impossible. Vérifiez votre connexion Internet et réessayez.'));}
@@ -736,7 +741,7 @@ passwordButton.dataset.text='Se connecter';passwordButton.textContent=tr(passwor
 passwordForm.append(passwordLabel,passwordInput,passwordButton);
 passwordForm.onsubmit=event=>{event.preventDefault();loginWithPassword();};
 passwordAccess.append(passwordSummary,passwordForm);
-$('loginCard').append(passwordAccess);
+$('loginCard').insertBefore(passwordAccess,$('loginCard').querySelector('button'));
 async function registerWithPassword(){
   const button=$('passwordSignupButton');
   if(button.disabled)return;
@@ -773,8 +778,9 @@ const deletionCard=document.createElement('section');deletionCard.className='car
 applyLanguage();
 
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
-const teamState={role:null,booting:false,access:null,sites:[],members:[],days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
+const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
+ paymentMissing:['Tarif non renseigné par l’entreprise','Valor ainda não informado pela empresa','Rate not yet entered by the company'],gross:['Montant brut','Valor bruto','Gross amount'],net:['Solde à recevoir','Saldo a receber','Balance due'],approvedHours:['Heures approuvées','Horas aprovadas','Approved hours'],approvedDays:['Jours approuvés','Dias aprovados','Approved days'],language:['Langue','Idioma','Language'],accessLink:['Accès habituel','Acesso habitual','Regular access'],copyUser:['Copier mon identifiant','Copiar meu usuário','Copy my username'],
  reportPlaces:['Tous les lieux de travail','Todos os locais de trabalho','All workplaces'],noWorkplace:['Sans lieu de travail','Sem local de trabalho','No workplace'],personalFilters:['Rapport individuel : mois et lieu de travail','Relatório individual: mês e local de trabalho','Individual report: month and workplace'],exportPDF:['Exporter PDF / WhatsApp','Exportar PDF / WhatsApp','Export PDF / WhatsApp'],filterNotice:['Rapport filtré : les avances et le salaire mensuel ne sont pas répartis par lieu de travail.','Relatório filtrado: os adiantamentos e o salário mensal não são divididos por local de trabalho.','Filtered report: monthly advances and fixed salary are not allocated to workplaces.'], accountManagement:['Gestion du compte','Gestão da conta','Account management'],status:['Statut','Situação','Status'],schedule:['Horaire par défaut','Horário padrão','Default hours'],
  resetMember:['Créer un lien pour un nouveau mot de passe','Criar link para nova senha','Create password reset link'],resetShare:['Lien pour définir un nouveau mot de passe (1 heure)','Link para definir nova senha (1 hora)','Password reset link (1 hour)'],invalid_phone:['Téléphone avec indicatif du pays, ex. +32470123456.','Telefone com código do país, ex. +32470123456.','Phone with country code, e.g. +32470123456.'],passwordSaved:['Mot de passe enregistré. Connectez-vous avec votre identifiant ou téléphone.','Senha salva. Entre com seu usuário ou telefone.','Password saved. Sign in with your username or phone.'],deleteUsername:['Saisissez votre identifiant pour supprimer votre accès personnel. L’historique de l’entreprise sera conservé.','Digite seu usuário para apagar seu acesso pessoal. O histórico da empresa será preservado.','Enter your username to delete your personal access. Company history will be retained.'],
 
@@ -789,7 +795,7 @@ const teamWords={
  saveOK:['Enregistré et synchronisé','Salvo e sincronizado','Saved and synced'],check:['Vérifiez les champs et réessayez.','Confira os campos e tente novamente.','Check the fields and try again.'],failed:['Impossible de terminer. Réessayez.','Não foi possível concluir. Tente novamente.','Unable to complete. Try again.'],loading:['Chargement…','Carregando…','Loading…'],sendHours:['Envoyer pour approbation','Enviar para aprovação','Submit for approval'],signout:['Déconnexion','Sair','Sign out'],
  invalid_credentials:['Identifiant ou mot de passe incorrect.','Usuário ou senha incorretos.','Incorrect username or password.'],username_taken:['Cet identifiant est déjà utilisé.','Este usuário já está em uso.','This username is already taken.'],invalid_username:['Utilisez 3 à 40 caractères : lettres sans accent, chiffres, point, tiret ou soulignement.','Use 3 a 40 caracteres: letras sem acento, números, ponto, hífen ou sublinhado.','Use 3–40 characters: unaccented letters, numbers, dots, hyphens or underscores.'],
  invalid_email:['Indiquez un e-mail valide différent du vôtre.','Informe um e-mail válido diferente do seu.','Enter a valid email different from yours.'],expired_invite:['Invitation expirée. Demandez un nouveau lien.','Convite expirado. Peça um novo link.','Invite expired. Request a new link.'],invite_email_mismatch:['Connectez-vous avec l’e-mail qui a reçu l’invitation.','Entre com o e-mail cadastrado no convite.','Sign in with the email registered on the invitation.'],try_later:['Trop de tentatives. Réessayez dans 15 minutes.','Muitas tentativas. Tente novamente em 15 minutos.','Too many attempts. Try again in 15 minutes.'],date_exists:['Cette date existe déjà. Modifiez la journée enregistrée.','Esta data já existe. Edite o dia registrado.','This date already exists. Edit the recorded day.'],approved_day_locked:['Journée approuvée. Demandez la modification au responsable.','Dia aprovado. Peça a alteração ao administrador.','Approved day. Ask your manager to make changes.'],linked_email_locked:['L’e-mail d’un accès activé ne peut pas être modifié ici.','O e-mail de um acesso ativado não pode ser alterado aqui.','An activated account’s email cannot be changed here.'],access_blocked:['Débloquez cet accès avant de créer une invitation.','Desbloqueie o acesso antes de criar um convite.','Unblock this account before creating an invite.'],
- inviteHelp:['Sans e-mail : partagez le lien par WhatsApp ou SMS. L’employé choisit son propre mot de passe. Téléphone avec indicatif du pays.','Sem e-mail: compartilhe o link por WhatsApp ou SMS. O funcionário escolhe a própria senha. Telefone com código do país.','Without email: share the link via WhatsApp or SMS. The employee chooses their own password. Include the phone country code.'],reviewHelp:['Les journées approuvées ne peuvent être modifiées que par le responsable.','Somente o administrador pode alterar dias aprovados.','Only the manager can edit approved days.'],reviewTitle:['Journées à approuver','Dias para aprovar','Days to approve'],noPending:['Aucune journée en attente','Nenhum dia aguardando aprovação','No days awaiting approval'],openApp:['Ouvrir l’application','Abrir aplicativo','Open app'],browser:['Continuer dans le navigateur','Continuar no navegador','Continue in browser'],appstore:['Télécharger sur l’App Store','Baixar na App Store','Download on the App Store'],accept:['Activer mon accès','Ativar meu acesso','Activate my access'],invitation:['Invitation à rejoindre l’équipe','Convite para entrar na equipe','Invitation to join the team'],
+ inviteHelp:['Sans e-mail : partagez le lien par WhatsApp ou SMS. L’employé accepte le lien pour activer son accès. Téléphone avec indicatif du pays.','Sem e-mail: compartilhe o link por WhatsApp ou SMS. O funcionário aceita o link para ativar o acesso. Telefone com código do país.','Without email: share the link via WhatsApp or SMS. The employee accepts the link to activate access. Include the phone country code.'],reviewHelp:['Les journées approuvées ne peuvent être modifiées que par le responsable.','Somente o administrador pode alterar dias aprovados.','Only the manager can edit approved days.'],reviewTitle:['Journées à approuver','Dias para aprovar','Days to approve'],noPending:['Aucune journée en attente','Nenhum dia aguardando aprovação','No days awaiting approval'],openApp:['Ouvrir l’application','Abrir aplicativo','Open app'],browser:['Continuer dans le navigateur','Continuar no navegador','Continue in browser'],appstore:['Télécharger sur l’App Store','Baixar na App Store','Download on the App Store'],accept:['Activer mon accès','Ativar meu acesso','Activate my access'],invitation:['Invitation à rejoindre l’équipe','Convite para entrar na equipe','Invitation to join the team'],
  deleteWorkerConfirm:['Supprimer définitivement votre accès personnel ? L’historique détenu par votre entreprise sera conservé. Saisissez votre e-mail pour confirmer.','Apagar definitivamente seu acesso pessoal? O histórico mantido pela empresa será preservado. Digite seu e-mail para confirmar.','Permanently delete your personal account? Company-owned work history will be retained. Enter your email to confirm.'],logoutRecovery:['Vous pouvez fermer cette fenêtre après l’enregistrement.','Após salvar, você poderá fechar esta janela.','You may close this window after saving.'],usernameEmail:['Identifiant, téléphone ou e-mail','Usuário, telefone ou e-mail','Username, phone or email'],payrollApproved:['Seules les journées approuvées sont incluses dans les paiements et rapports.','Somente dias aprovados entram nos pagamentos e relatórios.','Only approved days are included in payments and reports.'],notes:['Notes','Observações','Notes'],owner:['Administrateur','Administrador','Administrator'],fullName:['Nom complet','Nome completo','Full name'],allSaved:['Données synchronisées avec votre compte','Dados sincronizados com sua conta','Data synced with your account']
 };
 function tt(key){const lang=$('languageCode')?.value||document.documentElement.lang||'fr';const row=teamWords[key];return row?row[lang.startsWith('pt')?1:lang.startsWith('en')?2:0]:teamWords.failed[lang.startsWith('pt')?1:lang.startsWith('en')?2:0]}
@@ -887,7 +893,7 @@ function selectReportDays(days,selection){
 function setupPersonalReportFilters(){
  const filters=document.createElement('div');filters.id='personalReportFilters';filters.innerHTML=`<h2>${teamLabel('personalFilters')}</h2><div class="grid"><div><label for="personalReportMonth">${teamLabel('month')}</label><input id="personalReportMonth" type="month"></div><div><label for="personalReportWorker">${teamLabel('worker')}</label><select id="personalReportWorker"></select></div><div><label for="reportWorkplace">${teamLabel('sites')}</label><select id="reportWorkplace"></select></div></div>`;
  $('reportActions').prepend(filters);$('personalReportMonth').onchange=()=>window.teamUI.month($('personalReportMonth').value).catch(teamNotice);
- $('personalReportWorker').onchange=async()=>{$('employee').value=$('personalReportWorker').value;closeIndividualReport();await loadRecords();await upgradeRefresh();};
+ $('personalReportWorker').onchange=async()=>{$('employee').value=$('personalReportWorker').value;closeIndividualReport();await loadRecords();};
  for(const id of ['reportWorkplace'])$(id).onchange=()=>{closeIndividualReport();closeCompanyReport();};
 }
 function refreshPersonalReportFilters(days,staff){
@@ -899,10 +905,28 @@ function refreshPersonalReportFilters(days,staff){
  }
 }
 function personalReportCaption(selection){return [selection.workplace?tt('sites')+': '+(JSON.parse(selection.workplace)||tt('noWorkplace')):''].filter(Boolean).join(' · ');}
+function workerReportSummary(days,filtered=false){
+ const approved=days.filter(d=>!d.approval_status||d.approval_status==='approved');
+ const total=days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
+ const payable=approved.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
+ // Group by calendar date so multiple intervals cannot count as multiple daily wages.
+ const byDate=new Map();for(const d of approved)byDate.set(d.work_date,(byDate.get(d.work_date)||0)+minutes(d.entry_time,d.exit_time,d.break_minutes??30));
+ const equivalent=[...byDate.values()].reduce((sum,m)=>sum+(m>240?1:m>0?.5:0),0);
+ const p=teamState.payment,currency=teamState.currency||'EUR',mode=p?.payment_mode||'daily';
+ const stats=[[tt('hours'),fmt(total)],[tt('approvedHours'),fmt(payable)],[tt('approvedDays'),equivalent.toLocaleString($('languageCode').value)]];
+ if(p){
+  const labels=TRANSLATIONS[$('languageCode').value]||TRANSLATIONS.fr;
+  const rate=Number(mode==='hourly'?p.hourly_rate:mode==='fixed'?p.fixed_salary:p.daily_rate)||0;
+  stats.push([mode==='hourly'?labels.hourlyRate:mode==='fixed'?labels.fixedSalary:labels.dailyRate,formatMoney(rate,currency)]);
+  if(!filtered||mode!=='fixed')stats.push([tt('gross'),formatMoney(calculateGross(payable,equivalent,p),currency)]);
+  if(!filtered){const gross=calculateGross(payable,equivalent,p),advance=Number(p.advance)||0;stats.push([tt('advances'),formatMoney(advance,currency)],[tt('net'),formatMoney(Math.round((gross-advance)*100)/100,currency)]);}
+ }
+ return stats.map(([label,value])=>`<div class="stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join('')+(!p?`<p class="muted">${esc(tt('paymentMissing'))}</p>`:'');
+}
 function showWorkerReport(){
  if(teamState.role!=='employee')return;const source=$('workerReport');if(!source)return;
- const selection={workplace:$('workerReportPlace')?.value||''};const days=selectReportDays(teamState.days,selection);source.dataset.reportMonth=teamState.month;
- source.innerHTML=`<h2>${esc(tt('ownDays'))} — ${esc(teamState.access.employee.name)}</h2><p>${esc(teamState.month)} — ${esc(teamState.access.company)}${selection.workplace?' — '+esc(personalReportCaption(selection)):''}</p><div class="table"><table><thead><tr>${['date','entry','exit','pause','workplace','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}</tr></thead><tbody>${days.map(d=>`<tr><td>${esc(d.work_date)}</td><td>${esc(d.entry_time?.slice(0,5)||'')}</td><td>${esc(d.exit_time?.slice(0,5)||'')}</td><td>${Number(d.break_minutes??0)}</td><td>${esc(d.workplace||'')}</td><td>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes))}</td><td>${esc(tt(d.approval_status||'approved'))}</td></tr>`).join('')}</tbody></table></div><div class="summary"><div class="stat"><b>${fmt(days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes),0))}</b><span>${esc(tt('hours'))}</span></div></div>`;source.classList.remove('hidden');
+ const selection={workplace:$('workerReportPlace')?.value||''};const days=selectReportDays(teamState.days,selection),filtered=!!selection.workplace;source.dataset.reportMonth=teamState.month;
+ source.innerHTML=`<h2>${esc(tt('ownDays'))} — ${esc(teamState.access.employee.name)}</h2><p>${esc(teamState.month)} — ${esc(teamState.access.company)}${filtered?' — '+esc(personalReportCaption(selection)):''}</p><div class="table"><table><thead><tr>${['date','entry','exit','pause','workplace','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}</tr></thead><tbody>${days.map(d=>`<tr><td>${esc(d.work_date)}</td><td>${esc(d.entry_time?.slice(0,5)||'')}</td><td>${esc(d.exit_time?.slice(0,5)||'')}</td><td>${Number(d.break_minutes??30)}</td><td>${esc(d.workplace||'')}</td><td>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes??30))}</td><td>${esc(tt(d.approval_status||'approved'))}</td></tr>`).join('')}</tbody></table></div><div class="summary">${workerReportSummary(days,filtered)}</div><p id="personalReportNote" class="muted">${esc((!teamState.payment?tt('paymentMissing')+' · ':'')+tt(filtered?'filterNotice':'payrollApproved'))}</p>`;source.classList.remove('hidden');
 }
 async function exportWorkerReport(){showWorkerReport();if($('workerReport'))await printSelectedReport('print-worker');}
 function dayFormHTML(prefix,employeeSelect=''){
@@ -921,17 +945,18 @@ function ownerDayDialog(id){
  dialog.innerHTML=scheduleHTML('ownerSchedule')+`<h2>${teamLabel('register')}</h2>`+dayFormHTML('ownerDay',`<label for="ownerDayEmployee">${teamLabel('worker')}</label><select id="ownerDayEmployee">${employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select>`);
  $('ownerDayEmployee').value=record?.employee_id||$('employee').value;wireDayForm('ownerDay');const defaults=employees.find(e=>e.id===$('ownerDayEmployee').value);$('ownerDayDate').value=record?.work_date||$('newDate').value||ym()+'-01';$('ownerDayEntry').value=(record?.entry_time||defaults?.default_entry_time||'08:00').slice(0,5);$('ownerDayExit').value=(record?.exit_time||defaults?.default_exit_time||'17:30').slice(0,5);$('ownerDayPause').value=record?.break_minutes??defaults?.default_break_minutes??30;$('ownerDayWorkplace').value=record?.workplace||'';$('ownerDayEntry').oninput();
  const fillSchedule=wireSchedule('ownerSchedule',()=>employees.find(e=>e.id===$('ownerDayEmployee').value));$('ownerDayEmployee').onchange=()=>{fillSchedule();if(!record){const emp=employees.find(e=>e.id===$('ownerDayEmployee').value);$('ownerDayEntry').value=(emp?.default_entry_time||'08:00').slice(0,5);$('ownerDayExit').value=(emp?.default_exit_time||'17:30').slice(0,5);$('ownerDayPause').value=emp?.default_break_minutes??30;$('ownerDayEntry').oninput();}};
- $('ownerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{const payload={...readDayForm('ownerDay'),owner_id:user.id,employee_id:$('ownerDayEmployee').value};const {error}=record?await sb.from('work_days').update(payload).eq('id',record.id).eq('owner_id',user.id):await sb.from('work_days').insert(payload);if(error)throw Error(error.code==='23505'?tt('date_exists'):tt('failed'));$('employee').value=$('ownerDayEmployee').value;await loadRecords();await upgradeRefresh();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('ownerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
+ $('ownerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{const payload={...readDayForm('ownerDay'),owner_id:user.id,employee_id:$('ownerDayEmployee').value};const {error}=record?await sb.from('work_days').update(payload).eq('id',record.id).eq('owner_id',user.id):await sb.from('work_days').insert(payload);if(error)throw Error(error.code==='23505'?tt('date_exists'):tt('failed'));$('employee').value=$('ownerDayEmployee').value;await loadRecords();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('ownerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
 }
 async function workerPortal(){
  $('app').classList.add('hidden');$('loginCard').classList.add('hidden');
  let portal=$('workerPortal');if(!portal){portal=document.createElement('section');portal.id='workerPortal';portal.className='card';document.querySelector('main').append(portal);}
- portal.innerHTML=`<p class="muted">${esc(teamState.access.company)}</p><h2>${esc(teamState.access.employee.name)}</h2>${scheduleHTML('workerSchedule')}<div class="actions"><button onclick="teamUI.workerDay()">＋ ${teamLabel('register')}</button></div><label for="workerMonth">${teamLabel('month')}</label><input id="workerMonth" type="month" value="${esc(teamState.month)}"><p id="workerNotice" class="status" role="status"></p><p class="muted">${teamLabel('reviewHelp')}</p><label for="workerReportPlace">${teamLabel('workplace')}</label><select id="workerReportPlace"></select><button class="green" onclick="teamUI.workerReport()">${teamLabel('exportPDF')}</button><h2>${teamLabel('ownDays')}</h2><div id="workerDays"></div><section id="workerReport" class="hidden"></section>`;
+ portal.innerHTML=`<p class="muted">${esc(teamState.access.company)}</p><h2>${esc(teamState.access.employee.name)}</h2>${scheduleHTML('workerSchedule')}<div class="actions"><button onclick="teamUI.workerDay()">＋ ${teamLabel('register')}</button></div><label for="workerMonth">${teamLabel('month')}</label><input id="workerMonth" type="month" value="${esc(teamState.month)}"><p id="workerNotice" class="status" role="status"></p><p class="muted">${teamLabel('reviewHelp')}</p><label for="workerReportPlace">${teamLabel('workplace')}</label><select id="workerReportPlace"></select><button class="green" onclick="teamUI.workerReport()">${teamLabel('exportPDF')}</button><div id="workerSummary" class="summary"></div><h2>${teamLabel('ownDays')}</h2><div id="workerDays"></div><section id="workerReport" class="hidden"></section>`;
  wireSchedule('workerSchedule',()=>teamState.access.employee,true);
- $('workerMonth').onchange=async()=>{teamState.month=$('workerMonth').value;try{await loadWorkerDays()}catch(e){teamNotice(e)}};portal.classList.remove('hidden');const settings=document.createElement('details');settings.className='project-tile';settings.innerHTML=`<summary>${teamLabel('accountManagement')}</summary><button id="workerLogout" class="secondary" style="display:block;width:100%;margin-top:16px" onclick="logout()">${teamLabel('signout')}</button><div style="border-top:1px solid #e5e7eb;margin-top:20px;padding-top:4px"><button id="workerDelete" class="secondary" style="margin-top:12px;color:#a52b24">${esc(tr('Supprimer mon compte et mes données'))}</button></div>`;portal.append(settings);$('workerDelete').onclick=requestEmployeeDeletion;await loadWorkerDays();
+ $('workerMonth').onchange=async()=>{teamState.month=$('workerMonth').value;try{await loadWorkerDays()}catch(e){teamNotice(e)}};portal.classList.remove('hidden');const settings=document.createElement('details');settings.className='project-tile';settings.innerHTML=`<summary>${teamLabel('accountManagement')}</summary><p>${teamLabel('username')}: <strong id="workerUsername">${esc(teamState.access.username||'')}</strong></p><button class="secondary" id="copyWorkerUsername">${teamLabel('copyUser')}</button><p><a href="https://jefrisrenovation-netizen.github.io/preview/">${teamLabel('accessLink')}</a></p><button id="workerLogout" class="secondary" style="display:block;width:100%;margin-top:16px" onclick="logout()">${teamLabel('signout')}</button><div style="border-top:1px solid #e5e7eb;margin-top:20px;padding-top:4px"><button id="workerDelete" class="secondary" style="margin-top:12px;color:#a52b24">${esc(tr('Supprimer mon compte et mes données'))}</button></div>`;portal.append(settings);$('copyWorkerUsername').onclick=()=>navigator.clipboard.writeText(teamState.access.username||'').catch(teamNotice);$('workerDelete').onclick=requestEmployeeDeletion;await loadWorkerDays();
 }
 async function loadWorkerDays(){
- const selectedMonth=teamState.month;const result=await teamCall('my_days',{month:selectedMonth});if(selectedMonth!==teamState.month)return;teamState.days=result.days;teamState.sites=result.sites;$('workerReport')?.classList.add('hidden');const place=$('workerReportPlace'),previous=place.value;place.innerHTML=`<option value="">${esc(tt('reportPlaces'))}</option>`+[...new Set(result.days.map(d=>d.workplace||''))].sort().map(v=>`<option value="${esc(JSON.stringify(v))}">${esc(v||tt('noWorkplace'))}</option>`).join('');place.value=[...place.options].some(o=>o.value===previous)?previous:'';place.onchange=()=>$('workerReport').classList.add('hidden');
+ const selectedMonth=teamState.month;const result=await teamCall('my_days',{month:selectedMonth});if(selectedMonth!==teamState.month)return;teamState.days=result.days;teamState.sites=result.sites;teamState.payment=result.payment||null;teamState.currency=result.currency||'EUR';$('workerReport')?.classList.add('hidden');const place=$('workerReportPlace'),previous=place.value;place.innerHTML=`<option value="">${esc(tt('reportPlaces'))}</option>`+[...new Set(result.days.map(d=>d.workplace||''))].sort().map(v=>`<option value="${esc(JSON.stringify(v))}">${esc(v||tt('noWorkplace'))}</option>`).join('');place.value=[...place.options].some(o=>o.value===previous)?previous:'';place.onchange=()=>$('workerReport').classList.add('hidden');
+ $('workerSummary').innerHTML=workerReportSummary(result.days);
  $('workerDays').innerHTML=result.days.length?`<div class="compact-sheet-wrap"><table class="compact-sheet"><thead><tr>${['date','entry','exit','pause','workplace','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}<th></th></tr></thead><tbody>${result.days.map(d=>`<tr><td><time datetime="${esc(d.work_date)}">${esc(d.work_date.slice(8,10)+'/'+d.work_date.slice(5,7))}</time></td><td>${esc(d.entry_time?.slice(0,5)||'')}</td><td>${esc(d.exit_time?.slice(0,5)||'')}</td><td>${Number(d.break_minutes)}</td><td>${esc(d.workplace||'—')}</td><td><b>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes))}</b></td><td><span class="approval ${d.approval_status}">${esc(tt(d.approval_status))}</span></td><td>${d.approval_status!=='approved'?`<button class="secondary" aria-label="${esc(tt('edit'))}" data-day="${d.id}">✎</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:`<p>${esc(tt('noDays'))}</p>`;
  $('workerDays').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>workerDayDialog(b.dataset.day));
 }
@@ -959,7 +984,7 @@ async function teamBoot(){
   // Existing users prove possession of their verified email before linking an invitation.
   if(token&&!sessionStorage.getItem('suivi_new_invite')){await teamCall('claim_invite',{token});sessionStorage.removeItem('suivi_invite');}
   const access=await teamCall('access');teamState.access=access;teamState.role=access.role;
-  if(access.language)$('languageCode').value=access.language;
+  const chosen=readAccessPreference('suivi_language')||access.language||'fr';$('languageCode').value=chosen;applyLanguage();
   if(recovery||access.role==='activation'){passwordSetup(access.role==='activation');return;}
   if(access.role==='blocked'){$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');setLogin(tt('blocked'));return;}
   if(access.role==='employee'){await workerPortal();return;}
@@ -969,13 +994,23 @@ async function teamBoot(){
 }
 // Recovery state is captured before Auth removes tokens from the address bar.
 try{const params=new URLSearchParams(location.hash.slice(1));if(params.get('type')==='recovery')sessionStorage.setItem('suivi_recovery','1');if(params.get('type')==='invite')sessionStorage.setItem('suivi_new_invite','1');}catch{}
-window.teamUI={pane:showPane,day:ownerDayDialog,editDay:id=>ownerDayDialog(id),workerDay:workerDayDialog,month:async value=>{if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return;$('year').value=value.slice(0,4);$('month').value=value.slice(5,7);await loadRecords();await upgradeRefresh();},recover:requestPasswordReset,workerReport:exportWorkerReport};
+window.teamUI={pane:showPane,day:ownerDayDialog,editDay:id=>ownerDayDialog(id),workerDay:workerDayDialog,month:async value=>{if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return;$('year').value=value.slice(0,4);$('month').value=value.slice(5,7);await loadRecords();},recover:requestPasswordReset,workerReport:exportWorkerReport};
 window.showPasswordSetup=passwordSetup;
 const resetButton=document.createElement('button');resetButton.id='passwordResetButton';resetButton.type='button';resetButton.className='secondary';resetButton.style.marginTop='10px';resetButton.innerHTML=teamLabel('reset');resetButton.onclick=requestPasswordReset;$('loginCard').append(resetButton);$('email').type='text';
-const previousLanguage=applyLanguage;applyLanguage=function(){previousLanguage();teamTranslate();if(teamState.role==='owner')upgradeRefresh().catch(teamNotice)};
+function readAccessPreference(key){try{return localStorage.getItem(key)}catch{return null}}
+function saveAccessPreference(key,value){try{localStorage.setItem(key,value)}catch{}}
+const previousLanguage=applyLanguage;applyLanguage=function(){previousLanguage();saveAccessPreference('suivi_language',$('languageCode').value);if($('accessLanguage'))$('accessLanguage').value=$('languageCode').value;teamTranslate();if(teamState.role==='employee'&&$('workerMonth')){teamTranslate();loadWorkerDays().catch(teamNotice)}else if(teamState.role==='owner')upgradeRefresh().catch(teamNotice)};
+// Always reachable before login and inside the employee area.
+const languageBar=document.createElement('div');languageBar.className='access-language no-print';languageBar.innerHTML=`<label for="accessLanguage">${teamLabel('language')}</label><select id="accessLanguage"><option value="fr">Français</option><option value="pt-PT">Português (Portugal)</option><option value="pt-BR">Português (Brasil)</option><option value="en">English</option></select>`;document.querySelector('header').append(languageBar);
+$('accessLanguage').onchange=()=>{$('languageCode').value=$('accessLanguage').value;applyLanguage()};
+const savedLanguage=readAccessPreference('suivi_language');const browserLanguage=navigator.language||'fr';$('languageCode').value=savedLanguage||(/^(pt-BR|pt-PT|en|fr)$/.test(browserLanguage)?browserLanguage:browserLanguage.startsWith('pt')?'pt-PT':browserLanguage.startsWith('en')?'en':'fr');
+$('email').autocomplete='username';passwordAccess.open=true;
+const savedIdentifier=readAccessPreference('suivi_identifier');if(savedIdentifier)$('email').value=savedIdentifier;
+applyLanguage();
+let teamLoadDepth=0;
 for(const fn of ['loadEmployees','loadRecords']){
  const original=fn==='loadEmployees'?loadEmployees:loadRecords;
- const wrapped=async(...args)=>{await original(...args);if(teamState.role==='owner'&&$('dashboard'))await upgradeRefresh()};
+ const wrapped=async(...args)=>{teamLoadDepth++;try{await original(...args)}finally{teamLoadDepth--}if(!teamLoadDepth&&teamState.role==='owner'&&$('dashboard'))await upgradeRefresh()};
  if(fn==='loadEmployees')loadEmployees=wrapped;else loadRecords=wrapped;
 }
 teamTranslate();
@@ -985,7 +1020,11 @@ async function handleTeamInvite(token){
  if(!/^[a-f0-9]{64}$/.test(token||'')){setLogin(tt('expired_invite'));return;}
  sessionStorage.setItem('suivi_invite',token);
  const result=await teamCall('resolve_invite',{token,native:true});
- if(result.login_method==='phone'){sessionStorage.removeItem('suivi_invite');passwordSetup(false,token);return;}
+ if(result.login_method==='phone'){
+  sessionStorage.removeItem('suivi_invite');
+  if(result.purpose==='reset'){passwordSetup(false,token);return;}
+  const accepted=await teamCall('accept_phone',{token});const saved=await sb.auth.setSession(accepted.session);if(saved.error)throw saved.error;await start();return;
+ }
  if(result.activation_url){sessionStorage.setItem('suivi_new_invite','1');location.assign(result.activation_url);}
  else {setLogin(tt('inviteHelp')+' '+result.username);await start();}
 }
