@@ -110,3 +110,8 @@ test('worker language is reachable without owner settings and translates the rep
  const f=fixture();f.run(`teamState.role='employee';teamState.access={company:'Company',employee:{id:'worker',name:'Worker'}};teamCall=async()=>({days:[],sites:[],payment:{payment_mode:'hourly',hourly_rate:20},currency:'EUR'});`);await f.run('workerPortal()');
  const selector=f.document.getElementById('accessLanguage');assert(selector.closest('header'));selector.value='en';selector.onchange();await new Promise(resolve=>setTimeout(resolve,0));f.run('showWorkerReport()');assert.equal(f.document.documentElement.lang,'en');assert(f.document.getElementById('workerReport').textContent.includes('Approved days'));assert(!f.document.getElementById('workerReport').textContent.includes('Dias aprovados'));assert(f.document.getElementById('workerDays').textContent.includes('No days recorded'));
 });
+
+test('approved first access chooses language and account type before welcome and login',()=>{
+ const f=fixture();assert(f.document.getElementById('approvedIntro').textContent.includes('Escolha seu idioma'));
+ f.document.querySelector('[data-intro-type="business"]').onclick();f.document.getElementById('introNext').onclick();assert(f.document.getElementById('approvedIntro').textContent.includes('Bem-vindo'));f.document.getElementById('introLogin').onclick();assert(!f.document.getElementById('loginCard').classList.contains('hidden'));assert.equal(f.document.getElementById('accountType').value,'business');assert(f.document.getElementById('signupForm').closest('details').classList.contains('hidden'));
+});

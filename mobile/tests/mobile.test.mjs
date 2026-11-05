@@ -65,7 +65,7 @@ test('all days of long and leap-year months remain available',()=>{
  context.document.getElementById=id=>({value:id==='year'?'2028':'02'});assert.equal(api.monthEnd(),'2028-02-29');
 });
 test('new profiles do not inherit the owner’s company name',()=>{
- const source=fs.readFileSync('source.html','utf8');assert.ok(source.includes('account_type:"individual",company_name:""'));
+ const source=fs.readFileSync('source.html','utf8');assert.ok(source.includes('company_name:"",language_code:'));
 });
 
 function signupTest(signUp){
