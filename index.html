@@ -371,12 +371,22 @@ function render(){
   refreshCalculated();
 }
 
+// Sum periods for each employee and date before counting daily pay.
+function groupWorkDays(days){
+  const groups=new Map();
+  for(const day of [...days].sort((a,b)=>a.work_date.localeCompare(b.work_date)||(a.entry_time||'').localeCompare(b.entry_time||''))){
+    const key=(day.employee_id||'')+'|'+day.work_date;
+    if(!groups.has(key))groups.set(key,{date:day.work_date,days:[],minutes:0});
+    const group=groups.get(key);group.days.push(day);group.minutes+=minutes(day.entry_time,day.exit_time,day.break_minutes??30);
+  }
+  return [...groups.values()];
+}
+function equivalentWorkDays(days){return groupWorkDays(days).reduce((sum,g)=>sum+(g.minutes>240?1:g.minutes>0?0.5:0),0)}
 function refreshCalculated(){
   let total=0,full=0,half=0;
-  records.forEach(r=>{
-    const m=minutes(r.entry_time,r.exit_time,r.break_minutes??30);
-    total+=m;
-    if(m>0){if(m>240)full++;else half++}
+  groupWorkDays(records).forEach(group=>{
+    total+=group.minutes;
+    if(group.minutes>0){if(group.minutes>240)full++;else half++}
   });
   document.querySelectorAll("#rows tr").forEach((row,i)=>{
     row.children[4].innerHTML="<b>"+fmt(minutes(records[i].entry_time,records[i].exit_time,records[i].break_minutes??30))+"</b>";
@@ -395,7 +405,6 @@ async function addRow(){
   if(!$("employee").value){setStatus("Primeiro adicione um funcionário.",false);return}
   const d=$("newDate").value;
   if(!d||d<monthStart()||d>monthEnd()){setStatus("Escolha uma data deste mês para adicionar.",false);return}
-  if(records.some(r=>r.work_date===d)){setStatus("Esta data já foi adicionada.",false);return}
   const {data,error}=await sb.from("work_days").insert({
     owner_id:user.id,employee_id:$("employee").value,work_date:d,
     entry_time:"08:00",exit_time:"17:30",break_minutes:30,workplace:null
@@ -407,7 +416,7 @@ async function addRow(){
 async function upd(i,p,v){
   const record=records[i];if(!record)return;
   const payload={};
-  if(p==="work_date"&&(!v||v<monthStart()||v>monthEnd()||records.some(r=>r.id!==record.id&&r.work_date===v))){render();setStatus("Escolha uma data livre dentro deste mês.",false);return}
+  if(p==="work_date"&&(!v||v<monthStart()||v>monthEnd())){render();setStatus("Escolha uma data livre dentro deste mês.",false);return}
   if(p==="work_date")payload.work_date=v;
   else if(p==="entry_time")payload.entry_time=v||null;
   else if(p==="exit_time")payload.exit_time=v||null;
@@ -478,7 +487,7 @@ async function showCompanyReport(){
 }
 function buildCompanyReport(staff,days,payments){
   const rows=staff.filter(e=>days.some(d=>d.employee_id===e.id)||payments.some(p=>p.employee_id===e.id&&(Number(p.daily_rate)||Number(p.advance)))).map(e=>{
-    const equivalent=days.filter(d=>d.employee_id===e.id).reduce((total,d)=>{const m=minutes(d.entry_time,d.exit_time,d.break_minutes??30);return total+(m>240?1:m>0?0.5:0)},0);
+    const equivalent=equivalentWorkDays(days.filter(d=>d.employee_id===e.id&&(!d.approval_status||d.approval_status==="approved")));
     const payment=payments.find(p=>p.employee_id===e.id)||{};
     const rate=Number(payment.daily_rate)||0,advance=Number(payment.advance)||0,gross=Math.round(equivalent*rate*100)/100;
     return {...e,days:equivalent,rate,advance,gross,balance:Math.round((gross-advance)*100)/100};

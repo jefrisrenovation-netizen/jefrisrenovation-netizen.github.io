@@ -414,18 +414,31 @@ function renderHistory(){
   box.appendChild(info);
 }
 
+// Sum periods for each employee and date before counting daily pay.
+function groupWorkDays(days){
+  const groups=new Map();
+  for(const day of [...days].sort((a,b)=>a.work_date.localeCompare(b.work_date)||(a.entry_time||'').localeCompare(b.entry_time||''))){
+    const key=(day.employee_id||'')+'|'+day.work_date;
+    if(!groups.has(key))groups.set(key,{date:day.work_date,days:[],minutes:0});
+    const group=groups.get(key);group.days.push(day);group.minutes+=minutes(day.entry_time,day.exit_time,day.break_minutes??30);
+  }
+  return [...groups.values()];
+}
+function equivalentWorkDays(days){return groupWorkDays(days).reduce((sum,g)=>sum+(g.minutes>240?1:g.minutes>0?0.5:0),0)}
+function totalDayLabel(){return ({fr:'Total du jour','pt-PT':'Total do dia','pt-BR':'Total do dia',en:'Daily total'})[$('languageCode').value]||'Total du jour'}
+
 function render(){
   const emp=employees.find(e=>e.id===$("employee").value);
   $("title").textContent=(emp?emp.name:tr("Funcionário"))+" — "+monthName();
 
-  $("rows").innerHTML=records.map((r,i)=>`
-    <tr>
-      <td class="day-date"><time datetime="${esc(r.work_date)}">${esc(r.work_date.slice(8,10)+'/'+r.work_date.slice(5,7))}</time></td>
+  $("rows").innerHTML=groupWorkDays(records).map(group=>group.days.map((r,index)=>`
+    <tr data-record-id="${esc(r.id)}">
+      ${index===0?`<td class="day-date" rowspan="${group.days.length}"><time datetime="${esc(r.work_date)}">${esc(r.work_date.slice(8,10)+'/'+r.work_date.slice(5,7))}</time></td>`:''}
       <td>${esc((r.entry_time||'').slice(0,5))}</td><td>${esc((r.exit_time||'').slice(0,5))}</td>
       <td>${Number(r.break_minutes??30)}</td><td class="day-workplace">${esc(r.workplace||'—')}</td>
       <td><b class="day-hours">${fmt(minutes(r.entry_time,r.exit_time,r.break_minutes??30))}</b></td>
-      <td class="day-actions no-print"><button class="secondary" aria-label="${esc(tr('Data')+' '+r.work_date)}" onclick="teamUI.editDay('${esc(r.id)}')">✎</button><button class="danger" aria-label="${esc(tr('Excluir este dia?'))}" onclick="del(${i})">×</button></td>
-    </tr>`).join("");
+      <td class="day-actions no-print"><button class="secondary" aria-label="${esc(tr('Data')+' '+r.work_date)}" onclick="teamUI.editDay('${esc(r.id)}')">✎</button><button class="danger" aria-label="${esc(tr('Excluir este dia?'))}" onclick="del(${records.indexOf(r)})">×</button></td>
+    </tr>`).join('')+`<tr class="day-total"><td colspan="7"><strong>${esc(totalDayLabel())}: ${fmt(group.minutes)}</strong></td></tr>`).join('');
   const last=records.reduce((max,r)=>Math.max(max,Number(r.work_date.slice(-2))),0);
   const days=Number(monthEnd().slice(-2));
   $("newDate").min=monthStart();$("newDate").max=monthEnd();
@@ -450,15 +463,14 @@ function formatMoney(n,currency="EUR"){
   return Number(n).toLocaleString(locales[$("languageCode").value]||"fr-BE",{style:"currency",currency});
 }
 function refreshCalculated(){
-  let total=0,full=0,half=0,payableMinutes=0,payableDays=0;
-  records.forEach(r=>{
-    const m=minutes(r.entry_time,r.exit_time,r.break_minutes??30);
-    total+=m;if(!r.approval_status||r.approval_status==="approved"){payableMinutes+=m;payableDays+=m>240?1:m>0?0.5:0;}
-    if(m>0){if(m>240)full++;else half++}
+  const groups=groupWorkDays(records),approved=records.filter(r=>!r.approval_status||r.approval_status==='approved');
+  const total=groups.reduce((sum,g)=>sum+g.minutes,0),full=groups.filter(g=>g.minutes>240).length,half=groups.filter(g=>g.minutes>0&&g.minutes<=240).length;
+  const payableMinutes=approved.reduce((sum,r)=>sum+minutes(r.entry_time,r.exit_time,r.break_minutes??30),0),payableDays=equivalentWorkDays(approved);
+  document.querySelectorAll('#rows tr[data-record-id]').forEach(row=>{
+    const record=records.find(r=>r.id===row.dataset.recordId);
+    row.querySelector('.day-hours').textContent=fmt(minutes(record.entry_time,record.exit_time,record.break_minutes??30));
   });
-  document.querySelectorAll("#rows tr").forEach((row,i)=>{
-    row.querySelector(".day-hours").textContent=fmt(minutes(records[i].entry_time,records[i].exit_time,records[i].break_minutes??30));
-  });
+  document.querySelectorAll('#rows .day-total strong').forEach((node,i)=>{node.textContent=totalDayLabel()+': '+fmt(groups[i].minutes)});
   $("total").textContent=fmt(total);
   $("fullDays").textContent=full;
   $("halfDays").textContent=half;
@@ -483,7 +495,6 @@ async function addRow(){
   if(!$("employee").value){setStatus(tr("Primeiro adicione um funcionário."),false);return}
   const d=$("newDate").value;
   if(!d||d<monthStart()||d>monthEnd()){setStatus(tr("Escolha uma data deste mês para adicionar."),false);return}
-  if(records.some(r=>r.work_date===d)){setStatus(tr("Esta data já foi adicionada."),false);return}
   const {data,error}=await sb.from("work_days").insert({
     owner_id:user.id,employee_id:$("employee").value,work_date:d,
     entry_time:$("defaultEntry").value||"08:00",exit_time:$("defaultExit").value||"17:30",break_minutes:Number($("defaultBreak").value)||0,workplace:null
@@ -495,7 +506,7 @@ async function addRow(){
 async function upd(i,p,v){
   const record=records[i];if(!record)return;
   const payload={};
-  if(p==="work_date"&&(!v||v<monthStart()||v>monthEnd()||records.some(r=>r.id!==record.id&&r.work_date===v))){render();setStatus(tr("Escolha uma data livre dentro deste mês."),false);return}
+  if(p==="work_date"&&(!v||v<monthStart()||v>monthEnd())){render();setStatus(tr("Escolha uma data livre dentro deste mês."),false);return}
   if(p==="work_date")payload.work_date=v;
   else if(p==="entry_time")payload.entry_time=v||null;
   else if(p==="exit_time")payload.exit_time=v||null;
@@ -632,7 +643,7 @@ function buildCompanyReport(staff,days,payments){
   const rows=staff.filter(e=>days.some(d=>d.employee_id===e.id)||payments.some(p=>p.employee_id===e.id)).map(e=>{
     const employeeDays=days.filter(d=>d.employee_id===e.id&&(!d.approval_status||d.approval_status==="approved"));
     const minutesWorked=employeeDays.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
-    const equivalent=employeeDays.reduce((sum,d)=>{const m=minutes(d.entry_time,d.exit_time,d.break_minutes??30);return sum+(m>240?1:m>0?0.5:0)},0);
+    const equivalent=equivalentWorkDays(employeeDays);
     const p=payments.find(p=>p.employee_id===e.id)||{};
     const mode=p.payment_mode||"daily",currency=p.currency_code||"EUR";
     const rate=Number(mode==="hourly"?p.hourly_rate:mode==="fixed"?p.fixed_salary:p.daily_rate)||0;

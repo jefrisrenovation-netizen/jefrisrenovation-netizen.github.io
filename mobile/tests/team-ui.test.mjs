@@ -47,22 +47,18 @@ test('reset links can be shared without an email address',()=>{
 
 test('saved owner days are compact rows and editing opens a separate form',()=>{
  const f=fixture();f.run('$("employee").value="worker";records=[{id:"day1",employee_id:"worker",work_date:"2026-11-03",entry_time:"08:00",exit_time:"17:30",break_minutes:30,workplace:"Forest"}];render()');
- const rows=f.document.getElementById('rows');assert.equal(rows.querySelectorAll('tr').length,1);assert.equal(rows.querySelectorAll('input').length,0);assert(rows.textContent.includes('03/11'));assert(rows.textContent.includes('9h00'));
+ const rows=f.document.getElementById('rows');assert.equal(rows.querySelectorAll('tr[data-record-id]').length,1);assert.equal(rows.querySelectorAll('input').length,0);assert(rows.textContent.includes('03/11'));assert(rows.textContent.includes('9h00'));
  f.run('window.teamUI.editDay("day1")');assert.equal(f.document.getElementById('ownerDayDate').value,'2026-11-03');assert.equal(f.document.getElementById('ownerDayWorkplace').value,'Forest');
 });
 test('default hours live in collapsed settings, outside the monthly sheet',()=>{
  const f=fixture();const defaults=f.document.getElementById('employeeDefaults');assert(defaults.closest('#settingsPanel'));assert(defaults.closest('details'));assert(!defaults.closest('details').hasAttribute('open'));assert(!f.document.getElementById('timesheetPanel').querySelector('#defaultEntry'));
 });
 
-test('employee default start persists to next entry while a one-day edit leaves defaults unchanged',async()=>{
- const f=fixture();f.run(`teamState.role='employee';teamState.access={company:'Company',employee:{id:'worker',name:'Anderson'}};teamCall=async()=>({days:[],sites:[]});`);
- await f.run('workerPortal()');
- assert(!f.document.getElementById('workerScheduleDate'));
- f.document.getElementById('workerScheduleEntry').value='07:00';
- await f.document.getElementById('workerScheduleEntry').onchange();
- f.run('workerDayDialog()');assert.equal(f.document.getElementById('workerDayEntry').value,'07:00');
- f.document.getElementById('workerDayEntry').value='09:00';
- f.run('workerDayDialog()');assert.equal(f.document.getElementById('workerDayEntry').value,'07:00');
+test('employee entry keeps employer defaults private and starts each new period with no deducted break',async()=>{
+ const f=fixture();f.run(`teamState.role='employee';teamState.month='2026-11';teamState.access={company:'Company',employee:{id:'worker',name:'Anderson',default_entry_time:'07:00',default_break_minutes:30}};teamCall=async()=>({days:[],sites:[]});`);
+ await f.run('workerPortal()');assert(!f.document.getElementById('workerScheduleEntry'));
+ f.run('workerDayDialog()');assert(!f.document.getElementById('workerDialogSchedule'));assert.equal(f.document.getElementById('workerDayEntry').value,'07:00');assert.equal(f.document.getElementById('workerDayPause').value,'0');
+ f.document.getElementById('workerDayEntry').value='09:00';f.run('workerDayDialog()');assert.equal(f.document.getElementById('workerDayEntry').value,'07:00');
 });
 
 test('workplace filter keeps the chosen records and includes legacy unnamed places without adding a client field',()=>{
@@ -123,4 +119,26 @@ test('employee invite replaces an existing session before resolving membership',
 test('employee invite never falls through to an empty owner dashboard',async()=>{
  const f=fixture();await new Promise(resolve=>setTimeout(resolve,0));f.run(`sessionStorage.setItem('suivi_expected_employee','test.worker');sb.auth.getSession=async()=>({data:{session:{user:{id:'wrong-user'}}}});teamCall=async()=>({role:'owner'});startLegacy=async()=>{throw Error('owner dashboard must not open')};`);
  await f.run('teamBoot()');assert(f.document.getElementById('app').classList.contains('hidden'));assert(!f.document.getElementById('loginCard').classList.contains('hidden'));
+});
+
+test('split shifts share one date and daily total while approved hours drive pay by day',async()=>{
+ const f=fixture();f.run(`window.periods=[{id:'a',employee_id:'worker',work_date:'2026-11-05',entry_time:'08:00',exit_time:'11:00',break_minutes:0,workplace:'A',approval_status:'approved'},{id:'b',employee_id:'worker',work_date:'2026-11-05',entry_time:'11:30',exit_time:'13:30',break_minutes:0,workplace:'B',approval_status:'approved'},{id:'c',employee_id:'worker',work_date:'2026-11-05',entry_time:'14:00',exit_time:'16:00',break_minutes:0,workplace:'C',approval_status:'pending'}];$('employee').value='worker';records=window.periods;render();`);
+ assert.equal(f.document.querySelectorAll('#rows time').length,1);assert.equal(f.document.querySelector('#rows time').parentNode.getAttribute('rowspan'),'3');assert.match(f.document.querySelector('#rows .day-total').textContent,/7h00/);
+ const daily=f.run(`buildCompanyReport(employees,window.periods,[{employee_id:'worker',daily_rate:100}]).rows[0]`);assert.equal(daily.days,1);assert.equal(daily.gross,100);
+ const hourly=f.run(`buildCompanyReport(employees,window.periods,[{employee_id:'worker',payment_mode:'hourly',hourly_rate:20}]).rows[0]`);assert.equal(hourly.gross,100);
+ assert.equal(f.run(`equivalentWorkDays([{...window.periods[0],exit_time:'10:00'},{...window.periods[1],entry_time:'11:00',exit_time:'12:00'}])`),0.5);
+ assert.equal(f.run(`equivalentWorkDays([{...window.periods[0],exit_time:'12:00'}])`),0.5);
+ assert.equal(f.run(`equivalentWorkDays([{...window.periods[0],exit_time:'12:01'}])`),1);
+ assert.equal(f.run(`equivalentWorkDays([{...window.periods[0],exit_time:'08:00'}])`),0);
+ f.run(`teamState.role='employee';teamState.access={company:'Company',employee:{id:'worker',name:'Anderson'}};teamCall=async()=>({days:window.periods,sites:[],payment:{payment_mode:'daily',daily_rate:100}});`);await f.run('workerPortal()');
+ assert.equal(f.document.querySelectorAll('#workerDays time').length,1);assert.match(f.document.querySelector('#workerDays .day-total').textContent,/7h00/);assert.equal(f.document.querySelectorAll('#workerDays [data-day]').length,1);
+});
+test('a second period submits the same date and stays available after reopening the form',async()=>{
+ const f=fixture();f.run(`teamState.role='employee';teamState.month='2026-11';teamState.access={company:'Company',employee:{id:'worker',name:'Anderson'}};window.saved=[];teamCall=async(action,body)=>{if(action==='save_my_day'){window.saved.push(body);return {saved:true}}return {days:[],sites:[]}};`);
+ await f.run('workerPortal()');
+ for(const [entry,exit] of [['08:00','10:00'],['11:00','12:00']]){
+ f.run('workerDayDialog()');f.document.getElementById('workerDayDate').value='2026-11-05';f.document.getElementById('workerDayEntry').value=entry;f.document.getElementById('workerDayExit').value=exit;await f.document.getElementById('workerDayForm').onsubmit({preventDefault(){},submitter:{disabled:false}});
+ }
+ assert.equal(f.context.window.saved.length,2);assert.equal(f.context.window.saved[0].work_date,f.context.window.saved[1].work_date);assert.equal(f.context.window.saved[1].entry_time,'11:00');assert.equal(f.context.window.saved[1].break_minutes,0);
+ f.run('workerDayDialog()');assert.equal(f.document.getElementById('workerDayDate').value,'2026-11-05');
 });

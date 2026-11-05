@@ -141,7 +141,10 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 .intro-active{background:#fff;color:#081535}.intro-active header{background:linear-gradient(170deg,#f1f3f8 82%,#fff 83%);color:#081535;position:relative;padding:28px 16px 38px}.intro-active .brand{justify-content:center}.intro-active .brand h1{font-size:23px;color:#081535}.intro-active .brand img{width:48px;height:48px}.intro-active #brandSubtitle,.intro-active .app-version,.intro-active .access-language{display:none}.intro-active main{max-width:460px;padding:18px 24px}.approved-intro,.intro-active #loginCard{box-shadow:none;border-radius:0;padding:10px 0}.approved-intro h2{font-size:30px;text-align:center;letter-spacing:-.8px;margin:8px 0 28px}.approved-intro h3{font-size:23px;text-align:center;margin:25px 0 18px}.approved-intro button{border-radius:13px;min-height:58px;font-size:21px;margin-bottom:12px;background:#e60023}.approved-intro .intro-choice{background:white;color:#081535;border:1px solid #b8bfcd;text-align:left;padding:14px 20px}.approved-intro .intro-choice.selected{background:#fff0f2;border:2px solid #e60023}.intro-types{display:flex;gap:12px}.intro-types button{flex:1;font-size:18px;text-align:center!important}.intro-hint{background:#f0f2f7;border-radius:14px;padding:24px;font-size:21px;line-height:1.4;margin-top:35px}.intro-back{background:transparent!important;color:#081535!important;width:auto!important}.intro-active #loginCard{text-align:left}.intro-active #loginCard details>summary{display:none}.intro-active #loginCard h2{text-align:center}
 
 .intro-calendar{display:none}.intro-active .intro-calendar{display:block}.intro-active .brand img{display:none}
-#workerAddDay{display:block;width:100%;background:#d52228;color:#fff;font-size:22px;font-weight:800;padding:22px 16px;border:0;border-radius:15px;margin:18px 0 24px;min-height:70px;box-shadow:0 4px 12px #d5222825}#workerAddDay:active{transform:translateY(1px)}#workerDays .compact-sheet{width:100%;border-collapse:collapse}#workerDays .compact-sheet th{background:#f5f6f8;font-weight:750}#workerDays .compact-sheet td,#workerDays .compact-sheet th{padding:18px 12px;border-bottom:1px solid #dedfe4;text-align:left;white-space:nowrap}#workerDayDialog{width:min(560px,calc(100vw - 24px));max-width:calc(100vw - 24px);overflow-x:hidden}#workerDayForm .grid{grid-template-columns:repeat(2,minmax(0,1fr))}#workerDayForm .grid>*{min-width:0}#workerDayForm input,#workerDayForm select{width:100%;min-width:0;max-width:100%}#workerDayForm .actions{display:grid;grid-template-columns:1fr}#workerDayForm .actions button{width:100%;padding:16px}</style>
+#workerAddDay{display:block;width:100%;background:#d52228;color:#fff;font-size:22px;font-weight:800;padding:22px 16px;border:0;border-radius:15px;margin:18px 0 24px;min-height:70px;box-shadow:0 4px 12px #d5222825}#workerAddDay:active{transform:translateY(1px)}#workerDays .compact-sheet{width:100%;border-collapse:collapse}#workerDays .compact-sheet th{background:#f5f6f8;font-weight:750}#workerDays .compact-sheet td,#workerDays .compact-sheet th{padding:18px 12px;border-bottom:1px solid #dedfe4;text-align:left;white-space:nowrap}#workerDayDialog{width:min(560px,calc(100vw - 24px));max-width:calc(100vw - 24px);overflow-x:hidden}#workerDayForm .grid{grid-template-columns:repeat(2,minmax(0,1fr))}#workerDayForm .grid>*{min-width:0}#workerDayForm input,#workerDayForm select{width:100%;min-width:0;max-width:100%}#workerDayForm .actions{display:grid;grid-template-columns:1fr}#workerDayForm .actions button{width:100%;padding:16px}
+
+.day-total td{background:#f0f2f5!important;text-align:right!important;font-weight:700}.day-date{vertical-align:middle!important}
+</style>
 </head>
 <body>
 <header>
@@ -438,18 +441,31 @@ function renderHistory(){
   box.appendChild(info);
 }
 
+// Sum periods for each employee and date before counting daily pay.
+function groupWorkDays(days){
+  const groups=new Map();
+  for(const day of [...days].sort((a,b)=>a.work_date.localeCompare(b.work_date)||(a.entry_time||'').localeCompare(b.entry_time||''))){
+    const key=(day.employee_id||'')+'|'+day.work_date;
+    if(!groups.has(key))groups.set(key,{date:day.work_date,days:[],minutes:0});
+    const group=groups.get(key);group.days.push(day);group.minutes+=minutes(day.entry_time,day.exit_time,day.break_minutes??30);
+  }
+  return [...groups.values()];
+}
+function equivalentWorkDays(days){return groupWorkDays(days).reduce((sum,g)=>sum+(g.minutes>240?1:g.minutes>0?0.5:0),0)}
+function totalDayLabel(){return ({fr:'Total du jour','pt-PT':'Total do dia','pt-BR':'Total do dia',en:'Daily total'})[$('languageCode').value]||'Total du jour'}
+
 function render(){
   const emp=employees.find(e=>e.id===$("employee").value);
   $("title").textContent=(emp?emp.name:tr("Funcionário"))+" — "+monthName();
 
-  $("rows").innerHTML=records.map((r,i)=>`
-    <tr>
-      <td class="day-date"><time datetime="${esc(r.work_date)}">${esc(r.work_date.slice(8,10)+'/'+r.work_date.slice(5,7))}</time></td>
+  $("rows").innerHTML=groupWorkDays(records).map(group=>group.days.map((r,index)=>`
+    <tr data-record-id="${esc(r.id)}">
+      ${index===0?`<td class="day-date" rowspan="${group.days.length}"><time datetime="${esc(r.work_date)}">${esc(r.work_date.slice(8,10)+'/'+r.work_date.slice(5,7))}</time></td>`:''}
       <td>${esc((r.entry_time||'').slice(0,5))}</td><td>${esc((r.exit_time||'').slice(0,5))}</td>
       <td>${Number(r.break_minutes??30)}</td><td class="day-workplace">${esc(r.workplace||'—')}</td>
       <td><b class="day-hours">${fmt(minutes(r.entry_time,r.exit_time,r.break_minutes??30))}</b></td>
-      <td class="day-actions no-print"><button class="secondary" aria-label="${esc(tr('Data')+' '+r.work_date)}" onclick="teamUI.editDay('${esc(r.id)}')">✎</button><button class="danger" aria-label="${esc(tr('Excluir este dia?'))}" onclick="del(${i})">×</button></td>
-    </tr>`).join("");
+      <td class="day-actions no-print"><button class="secondary" aria-label="${esc(tr('Data')+' '+r.work_date)}" onclick="teamUI.editDay('${esc(r.id)}')">✎</button><button class="danger" aria-label="${esc(tr('Excluir este dia?'))}" onclick="del(${records.indexOf(r)})">×</button></td>
+    </tr>`).join('')+`<tr class="day-total"><td colspan="7"><strong>${esc(totalDayLabel())}: ${fmt(group.minutes)}</strong></td></tr>`).join('');
   const last=records.reduce((max,r)=>Math.max(max,Number(r.work_date.slice(-2))),0);
   const days=Number(monthEnd().slice(-2));
   $("newDate").min=monthStart();$("newDate").max=monthEnd();
@@ -474,15 +490,14 @@ function formatMoney(n,currency="EUR"){
   return Number(n).toLocaleString(locales[$("languageCode").value]||"fr-BE",{style:"currency",currency});
 }
 function refreshCalculated(){
-  let total=0,full=0,half=0,payableMinutes=0,payableDays=0;
-  records.forEach(r=>{
-    const m=minutes(r.entry_time,r.exit_time,r.break_minutes??30);
-    total+=m;if(!r.approval_status||r.approval_status==="approved"){payableMinutes+=m;payableDays+=m>240?1:m>0?0.5:0;}
-    if(m>0){if(m>240)full++;else half++}
+  const groups=groupWorkDays(records),approved=records.filter(r=>!r.approval_status||r.approval_status==='approved');
+  const total=groups.reduce((sum,g)=>sum+g.minutes,0),full=groups.filter(g=>g.minutes>240).length,half=groups.filter(g=>g.minutes>0&&g.minutes<=240).length;
+  const payableMinutes=approved.reduce((sum,r)=>sum+minutes(r.entry_time,r.exit_time,r.break_minutes??30),0),payableDays=equivalentWorkDays(approved);
+  document.querySelectorAll('#rows tr[data-record-id]').forEach(row=>{
+    const record=records.find(r=>r.id===row.dataset.recordId);
+    row.querySelector('.day-hours').textContent=fmt(minutes(record.entry_time,record.exit_time,record.break_minutes??30));
   });
-  document.querySelectorAll("#rows tr").forEach((row,i)=>{
-    row.querySelector(".day-hours").textContent=fmt(minutes(records[i].entry_time,records[i].exit_time,records[i].break_minutes??30));
-  });
+  document.querySelectorAll('#rows .day-total strong').forEach((node,i)=>{node.textContent=totalDayLabel()+': '+fmt(groups[i].minutes)});
   $("total").textContent=fmt(total);
   $("fullDays").textContent=full;
   $("halfDays").textContent=half;
@@ -507,7 +522,6 @@ async function addRow(){
   if(!$("employee").value){setStatus(tr("Primeiro adicione um funcionário."),false);return}
   const d=$("newDate").value;
   if(!d||d<monthStart()||d>monthEnd()){setStatus(tr("Escolha uma data deste mês para adicionar."),false);return}
-  if(records.some(r=>r.work_date===d)){setStatus(tr("Esta data já foi adicionada."),false);return}
   const {data,error}=await sb.from("work_days").insert({
     owner_id:user.id,employee_id:$("employee").value,work_date:d,
     entry_time:$("defaultEntry").value||"08:00",exit_time:$("defaultExit").value||"17:30",break_minutes:Number($("defaultBreak").value)||0,workplace:null
@@ -519,7 +533,7 @@ async function addRow(){
 async function upd(i,p,v){
   const record=records[i];if(!record)return;
   const payload={};
-  if(p==="work_date"&&(!v||v<monthStart()||v>monthEnd()||records.some(r=>r.id!==record.id&&r.work_date===v))){render();setStatus(tr("Escolha uma data livre dentro deste mês."),false);return}
+  if(p==="work_date"&&(!v||v<monthStart()||v>monthEnd())){render();setStatus(tr("Escolha uma data livre dentro deste mês."),false);return}
   if(p==="work_date")payload.work_date=v;
   else if(p==="entry_time")payload.entry_time=v||null;
   else if(p==="exit_time")payload.exit_time=v||null;
@@ -656,7 +670,7 @@ function buildCompanyReport(staff,days,payments){
   const rows=staff.filter(e=>days.some(d=>d.employee_id===e.id)||payments.some(p=>p.employee_id===e.id)).map(e=>{
     const employeeDays=days.filter(d=>d.employee_id===e.id&&(!d.approval_status||d.approval_status==="approved"));
     const minutesWorked=employeeDays.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes??30),0);
-    const equivalent=employeeDays.reduce((sum,d)=>{const m=minutes(d.entry_time,d.exit_time,d.break_minutes??30);return sum+(m>240?1:m>0?0.5:0)},0);
+    const equivalent=equivalentWorkDays(employeeDays);
     const p=payments.find(p=>p.employee_id===e.id)||{};
     const mode=p.payment_mode||"daily",currency=p.currency_code||"EUR";
     const rate=Number(mode==="hourly"?p.hourly_rate:mode==="fixed"?p.fixed_salary:p.daily_rate)||0;
@@ -797,7 +811,7 @@ const teamWords={
  password:['Mot de passe','Senha','Password'],confirm:['Confirmer le mot de passe','Confirmar senha','Confirm password'],setPassword:['Définir mon mot de passe','Definir minha senha','Set my password'],reset:['Mot de passe oublié','Esqueci minha senha','Forgot password'],recover:['Recevoir le lien par e-mail','Receber link por e-mail','Email reset link'],recoverySent:['Avec un e-mail, consultez votre boîte de réception. Sans e-mail, demandez un nouveau lien à votre responsable.','Com e-mail, confira sua caixa de entrada. Sem e-mail, peça um novo link ao administrador.','With email, check your inbox. Without email, ask your manager for a new link.'],
  saveOK:['Enregistré et synchronisé','Salvo e sincronizado','Saved and synced'],check:['Vérifiez les champs et réessayez.','Confira os campos e tente novamente.','Check the fields and try again.'],failed:['Impossible de terminer. Réessayez.','Não foi possível concluir. Tente novamente.','Unable to complete. Try again.'],loading:['Chargement…','Carregando…','Loading…'],sendHours:['Envoyer pour approbation','Enviar para aprovação','Submit for approval'],signout:['Déconnexion','Sair','Sign out'],
  invalid_credentials:['Identifiant ou mot de passe incorrect.','Usuário ou senha incorretos.','Incorrect username or password.'],username_taken:['Cet identifiant est déjà utilisé.','Este usuário já está em uso.','This username is already taken.'],invalid_username:['Utilisez 3 à 40 caractères : lettres sans accent, chiffres, point, tiret ou soulignement.','Use 3 a 40 caracteres: letras sem acento, números, ponto, hífen ou sublinhado.','Use 3–40 characters: unaccented letters, numbers, dots, hyphens or underscores.'],
- invalid_email:['Indiquez un e-mail valide différent du vôtre.','Informe um e-mail válido diferente do seu.','Enter a valid email different from yours.'],expired_invite:['Invitation expirée. Demandez un nouveau lien.','Convite expirado. Peça um novo link.','Invite expired. Request a new link.'],invite_email_mismatch:['Connectez-vous avec l’e-mail qui a reçu l’invitation.','Entre com o e-mail cadastrado no convite.','Sign in with the email registered on the invitation.'],try_later:['Trop de tentatives. Réessayez dans 15 minutes.','Muitas tentativas. Tente novamente em 15 minutos.','Too many attempts. Try again in 15 minutes.'],date_exists:['Cette date existe déjà. Modifiez la journée enregistrée.','Esta data já existe. Edite o dia registrado.','This date already exists. Edit the recorded day.'],approved_day_locked:['Journée approuvée. Demandez la modification au responsable.','Dia aprovado. Peça a alteração ao administrador.','Approved day. Ask your manager to make changes.'],linked_email_locked:['L’e-mail d’un accès activé ne peut pas être modifié ici.','O e-mail de um acesso ativado não pode ser alterado aqui.','An activated account’s email cannot be changed here.'],access_blocked:['Débloquez cet accès avant de créer une invitation.','Desbloqueie o acesso antes de criar um convite.','Unblock this account before creating an invite.'],
+ invalid_email:['Indiquez un e-mail valide différent du vôtre.','Informe um e-mail válido diferente do seu.','Enter a valid email different from yours.'],expired_invite:['Invitation expirée. Demandez un nouveau lien.','Convite expirado. Peça um novo link.','Invite expired. Request a new link.'],invite_email_mismatch:['Connectez-vous avec l’e-mail qui a reçu l’invitation.','Entre com o e-mail cadastrado no convite.','Sign in with the email registered on the invitation.'],try_later:['Trop de tentatives. Réessayez dans 15 minutes.','Muitas tentativas. Tente novamente em 15 minutos.','Too many attempts. Try again in 15 minutes.'],date_exists:['Cette plage horaire existe déjà. Vérifiez le début et la fin.','Este período já foi registrado. Confira o início e o fim.','This period already exists. Check its start and end.'],approved_day_locked:['Journée approuvée. Demandez la modification au responsable.','Dia aprovado. Peça a alteração ao administrador.','Approved day. Ask your manager to make changes.'],linked_email_locked:['L’e-mail d’un accès activé ne peut pas être modifié ici.','O e-mail de um acesso ativado não pode ser alterado aqui.','An activated account’s email cannot be changed here.'],access_blocked:['Débloquez cet accès avant de créer une invitation.','Desbloqueie o acesso antes de criar um convite.','Unblock this account before creating an invite.'],
  inviteHelp:['Sans e-mail : partagez le lien par WhatsApp ou SMS. L’employé accepte le lien pour activer son accès. Téléphone avec indicatif du pays.','Sem e-mail: compartilhe o link por WhatsApp ou SMS. O funcionário aceita o link para ativar o acesso. Telefone com código do país.','Without email: share the link via WhatsApp or SMS. The employee accepts the link to activate access. Include the phone country code.'],reviewHelp:['Les journées approuvées ne peuvent être modifiées que par le responsable.','Somente o administrador pode alterar dias aprovados.','Only the manager can edit approved days.'],reviewTitle:['Journées à approuver','Dias para aprovar','Days to approve'],noPending:['Aucune journée en attente','Nenhum dia aguardando aprovação','No days awaiting approval'],openApp:['Ouvrir l’application','Abrir aplicativo','Open app'],browser:['Continuer dans le navigateur','Continuar no navegador','Continue in browser'],appstore:['Télécharger sur l’App Store','Baixar na App Store','Download on the App Store'],accept:['Activer mon accès','Ativar meu acesso','Activate my access'],invitation:['Invitation à rejoindre l’équipe','Convite para entrar na equipe','Invitation to join the team'],
  deleteWorkerConfirm:['Supprimer définitivement votre accès personnel ? L’historique détenu par votre entreprise sera conservé. Saisissez votre e-mail pour confirmer.','Apagar definitivamente seu acesso pessoal? O histórico mantido pela empresa será preservado. Digite seu e-mail para confirmar.','Permanently delete your personal account? Company-owned work history will be retained. Enter your email to confirm.'],logoutRecovery:['Vous pouvez fermer cette fenêtre après l’enregistrement.','Após salvar, você poderá fechar esta janela.','You may close this window after saving.'],usernameEmail:['Identifiant, téléphone ou e-mail','Usuário, telefone ou e-mail','Username, phone or email'],payrollApproved:['Seules les journées approuvées sont incluses dans les paiements et rapports.','Somente dias aprovados entram nos pagamentos e relatórios.','Only approved days are included in payments and reports.'],notes:['Notes','Observações','Notes'],owner:['Administrateur','Administrador','Administrator'],fullName:['Nom complet','Nome completo','Full name'],allSaved:['Données synchronisées avec votre compte','Dados sincronizados com sua conta','Data synced with your account']
 };
@@ -955,19 +969,25 @@ async function workerPortal(){
  let portal=$('workerPortal');if(!portal){portal=document.createElement('section');portal.id='workerPortal';portal.className='card';document.querySelector('main').append(portal);}
  portal.innerHTML=`<p class="muted">${esc(teamState.access.company)}</p><h2>${esc(teamState.access.employee.name)}</h2><label for="workerMonth">${teamLabel('month')}</label><input id="workerMonth" type="month" value="${esc(teamState.month)}"><p id="workerNotice" class="status" role="status"></p><p class="muted">${teamLabel('reviewHelp')}</p><label for="workerReportPlace">${teamLabel('workplace')}</label><select id="workerReportPlace"></select><button class="green" onclick="teamUI.workerReport()">${teamLabel('exportPDF')}</button><div id="workerSummary" class="summary"></div><h2>${teamLabel('ownDays')}</h2><div id="workerDays"></div><button id="workerAddDay" onclick="teamUI.workerDay()">＋ ${esc(({fr:"Ajouter un jour",pt:"Adicionar novo dia","pt-PT":"Adicionar novo dia","pt-BR":"Adicionar novo dia",en:"Add a new day"})[$('languageCode').value]||teamLabel('register'))}</button><section id="workerReport" class="hidden"></section>`;
 
- $('workerMonth').onchange=async()=>{teamState.month=$('workerMonth').value;try{await loadWorkerDays()}catch(e){teamNotice(e)}};portal.classList.remove('hidden');const settings=document.createElement('details');settings.className='project-tile';settings.innerHTML=`<summary>${teamLabel('accountManagement')}</summary><p>${teamLabel('username')}: <strong id="workerUsername">${esc(teamState.access.username||'')}</strong></p><button class="secondary" id="copyWorkerUsername">${teamLabel('copyUser')}</button><p><a href="https://jefrisrenovation-netizen.github.io/preview/">${teamLabel('accessLink')}</a></p><button id="workerLogout" class="secondary" style="display:block;width:100%;margin-top:16px" onclick="logout()">${teamLabel('signout')}</button><div style="border-top:1px solid #e5e7eb;margin-top:20px;padding-top:4px"><button id="workerDelete" class="secondary" style="margin-top:12px;color:#a52b24">${esc(tr('Supprimer mon compte et mes données'))}</button></div>`;portal.append(settings);$('copyWorkerUsername').onclick=()=>navigator.clipboard.writeText(teamState.access.username||'').catch(teamNotice);$('workerDelete').onclick=requestEmployeeDeletion;await loadWorkerDays();
+ $('workerMonth').onchange=async()=>{teamState.month=$('workerMonth').value;teamState.lastWorkDate=null;try{await loadWorkerDays()}catch(e){teamNotice(e)}};portal.classList.remove('hidden');const settings=document.createElement('details');settings.className='project-tile';settings.innerHTML=`<summary>${teamLabel('accountManagement')}</summary><p>${teamLabel('username')}: <strong id="workerUsername">${esc(teamState.access.username||'')}</strong></p><button class="secondary" id="copyWorkerUsername">${teamLabel('copyUser')}</button><p><a href="https://jefrisrenovation-netizen.github.io/preview/">${teamLabel('accessLink')}</a></p><button id="workerLogout" class="secondary" style="display:block;width:100%;margin-top:16px" onclick="logout()">${teamLabel('signout')}</button><div style="border-top:1px solid #e5e7eb;margin-top:20px;padding-top:4px"><button id="workerDelete" class="secondary" style="margin-top:12px;color:#a52b24">${esc(tr('Supprimer mon compte et mes données'))}</button></div>`;portal.append(settings);$('copyWorkerUsername').onclick=()=>navigator.clipboard.writeText(teamState.access.username||'').catch(teamNotice);$('workerDelete').onclick=requestEmployeeDeletion;await loadWorkerDays();
+}
+function workerPeriodRows(days,editable=false){
+ return groupWorkDays(days).map(group=>group.days.map((d,index)=>`<tr>
+ ${index===0?`<td rowspan="${group.days.length}"><time datetime="${esc(d.work_date)}">${esc(d.work_date.slice(8,10)+'/'+d.work_date.slice(5,7))}</time></td>`:''}
+ <td>${esc(d.workplace||'—')}</td><td>${esc(d.entry_time?.slice(0,5)||'')}</td><td>${esc(d.exit_time?.slice(0,5)||'')}</td><td>${Number(d.break_minutes??30)}</td><td><b>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes??30))}</b></td><td><span class="approval ${esc(d.approval_status||'approved')}">${esc(tt(d.approval_status||'approved'))}</span></td>${editable?`<td>${d.approval_status!=='approved'?`<button class="secondary" aria-label="${esc(tt('edit'))}" data-day="${esc(d.id)}">✎</button>`:''}</td>`:''}
+ </tr>`).join('')+`<tr class="day-total"><td colspan="${editable?8:7}"><strong>${esc(totalDayLabel())}: ${fmt(group.minutes)}</strong></td></tr>`).join('');
 }
 async function loadWorkerDays(){
  const selectedMonth=teamState.month;const result=await teamCall('my_days',{month:selectedMonth});if(selectedMonth!==teamState.month)return;teamState.days=result.days;teamState.sites=result.sites;teamState.payment=result.payment||null;teamState.currency=result.currency||'EUR';$('workerReport')?.classList.add('hidden');const place=$('workerReportPlace'),previous=place.value;place.innerHTML=`<option value="">${esc(tt('reportPlaces'))}</option>`+[...new Set(result.days.map(d=>d.workplace||''))].sort().map(v=>`<option value="${esc(JSON.stringify(v))}">${esc(v||tt('noWorkplace'))}</option>`).join('');place.value=[...place.options].some(o=>o.value===previous)?previous:'';place.onchange=()=>$('workerReport').classList.add('hidden');
  $('workerSummary').innerHTML=workerReportSummary(result.days);
- $('workerDays').innerHTML=result.days.length?`<div class="compact-sheet-wrap"><table class="compact-sheet"><thead><tr>${['date','entry','exit','pause','workplace','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}<th></th></tr></thead><tbody>${result.days.map(d=>`<tr><td><time datetime="${esc(d.work_date)}">${esc(d.work_date.slice(8,10)+'/'+d.work_date.slice(5,7))}</time></td><td>${esc(d.entry_time?.slice(0,5)||'')}</td><td>${esc(d.exit_time?.slice(0,5)||'')}</td><td>${Number(d.break_minutes)}</td><td>${esc(d.workplace||'—')}</td><td><b>${fmt(minutes(d.entry_time,d.exit_time,d.break_minutes))}</b></td><td><span class="approval ${d.approval_status}">${esc(tt(d.approval_status))}</span></td><td>${d.approval_status!=='approved'?`<button class="secondary" aria-label="${esc(tt('edit'))}" data-day="${d.id}">✎</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:`<p>${esc(tt('noDays'))}</p>`;
+ $('workerDays').innerHTML=result.days.length?`<div class="compact-sheet-wrap"><table class="compact-sheet"><thead><tr>${['date','workplace','entry','exit','pause','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}<th></th></tr></thead><tbody>${workerPeriodRows(result.days,true)}</tbody></table></div>`:`<p>${esc(tt('noDays'))}</p>`;
  $('workerDays').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>workerDayDialog(b.dataset.day));
 }
 function workerDayDialog(id){
  const record=teamState.days.find(d=>d.id===id);let dialog=$('workerDayDialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='workerDayDialog';document.body.append(dialog)}
  dialog.innerHTML=`<h2>${teamLabel('register')}</h2>`+dayFormHTML('workerDay');wireDayForm('workerDay');const employee=teamState.access.employee;
- $('workerDayDate').value=record?.work_date||teamState.month+'-01';$('workerDayEntry').value=(record?.entry_time||employee.default_entry_time||'08:00').slice(0,5);$('workerDayExit').value=(record?.exit_time||employee.default_exit_time||'17:30').slice(0,5);$('workerDayPause').value=record?.break_minutes??employee.default_break_minutes??30;$('workerDayWorkplace').value=record?.workplace||'';$('workerDayEntry').oninput();
- $('workerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await teamCall('save_my_day',{...readDayForm('workerDay'),...(id?{id}:{})});teamState.month=$('workerDayDate').value.slice(0,7);$('workerMonth').value=teamState.month;await loadWorkerDays();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('workerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
+ const today=new Date();const localDate=today.getFullYear()+'-'+pad(today.getMonth()+1)+'-'+pad(today.getDate());$('workerDayDate').value=record?.work_date||teamState.lastWorkDate||(localDate.startsWith(teamState.month)?localDate:teamState.month+'-01');$('workerDayEntry').value=(record?.entry_time||employee.default_entry_time||'08:00').slice(0,5);$('workerDayExit').value=(record?.exit_time||employee.default_exit_time||'17:30').slice(0,5);$('workerDayPause').value=record?.break_minutes??0;$('workerDayWorkplace').value=record?.workplace||'';$('workerDayEntry').oninput();
+ $('workerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await teamCall('save_my_day',{...readDayForm('workerDay'),...(id?{id}:{})});teamState.lastWorkDate=$('workerDayDate').value;teamState.month=teamState.lastWorkDate.slice(0,7);$('workerMonth').value=teamState.month;await loadWorkerDays();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('workerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
 }
 function passwordSetup(activate=false,inviteToken=null){
  let dialog=$('passwordSetup');if(!dialog){dialog=document.createElement('dialog');dialog.id='passwordSetup';document.body.append(dialog)}
