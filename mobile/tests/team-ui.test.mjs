@@ -115,3 +115,12 @@ test('approved first access chooses language and account type before welcome and
  const f=fixture();assert(f.document.getElementById('approvedIntro').textContent.includes('Escolha seu idioma'));
  f.document.querySelector('[data-intro-type="business"]').onclick();f.document.getElementById('introNext').onclick();assert(f.document.getElementById('approvedIntro').textContent.includes('Bem-vindo'));f.document.getElementById('introLogin').onclick();assert(!f.document.getElementById('loginCard').classList.contains('hidden'));assert.equal(f.document.getElementById('accountType').value,'business');assert(f.document.getElementById('signupForm').closest('details').classList.contains('hidden'));
 });
+
+test('employee invite replaces an existing session before resolving membership',async()=>{
+ const f=fixture();await new Promise(resolve=>setTimeout(resolve,0));f.run(`sessionStorage.setItem('suivi_employee_session',JSON.stringify({access_token:'worker-token',refresh_token:'worker-refresh'}));sessionStorage.setItem('suivi_expected_employee','test.worker');window.order=[];sb.auth.setSession=async tokens=>{window.order.push('set:'+tokens.access_token);return {data:{}}};sb.auth.getSession=async()=>{window.order.push('get');return {data:{session:{user:{id:'worker-user'}}}}};teamCall=async()=>({role:'employee',username:'test.worker',employee:{id:'worker'}});workerPortal=async()=>{window.order.push('portal')};`);
+ await f.run('teamBoot()');assert.equal(f.run('window.order[0]'),'set:worker-token');assert.equal(f.run('window.order.at(-1)'),'portal');assert.equal(f.run("sessionStorage.getItem('suivi_employee_session')"),undefined);
+});
+test('employee invite never falls through to an empty owner dashboard',async()=>{
+ const f=fixture();await new Promise(resolve=>setTimeout(resolve,0));f.run(`sessionStorage.setItem('suivi_expected_employee','test.worker');sb.auth.getSession=async()=>({data:{session:{user:{id:'wrong-user'}}}});teamCall=async()=>({role:'owner'});startLegacy=async()=>{throw Error('owner dashboard must not open')};`);
+ await f.run('teamBoot()');assert(f.document.getElementById('app').classList.contains('hidden'));assert(!f.document.getElementById('loginCard').classList.contains('hidden'));
+});

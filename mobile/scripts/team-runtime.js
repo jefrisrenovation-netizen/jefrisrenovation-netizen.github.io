@@ -198,13 +198,20 @@ async function requestPasswordReset(){
  const button=$('passwordResetButton');button.disabled=true;try{if(identifier.includes('@'))await sb.auth.resetPasswordForEmail(identifier,{redirectTo:'https://jefrisrenovation-netizen.github.io/preview/'});else await teamCall('recover',{username:identifier});setLogin(tt('recoverySent'),true)}catch{setLogin(tt('failed'))}finally{button.disabled=false}
 }
 async function teamBoot(){
- const {data}=await sb.auth.getSession();if(!data.session)return;if(teamState.booting)return;teamState.booting=true;
+ await Promise.resolve();
+ if(teamState.booting)return;teamState.booting=true;
  try{
+  const incoming=sessionStorage.getItem('suivi_employee_session');
+  if(incoming){const saved=await sb.auth.setSession(JSON.parse(incoming));if(saved.error)throw saved.error;sessionStorage.removeItem('suivi_employee_session');}
+  const {data}=await sb.auth.getSession();if(!data.session)return;
   user=data.session.user;
   const token=sessionStorage.getItem('suivi_invite');const recovery=sessionStorage.getItem('suivi_recovery');
   // Existing users prove possession of their verified email before linking an invitation.
   if(token&&!sessionStorage.getItem('suivi_new_invite')){await teamCall('claim_invite',{token});sessionStorage.removeItem('suivi_invite');}
-  const access=await teamCall('access');teamState.access=access;teamState.role=access.role;
+  const access=await teamCall('access');
+  const expected=sessionStorage.getItem('suivi_expected_employee');
+  if(expected&&(access.role!=='employee'||access.username!==expected))throw Error(tt('access_denied'));
+  teamState.access=access;teamState.role=access.role;
   const chosen=readAccessPreference('suivi_language')||access.language||'fr';$('languageCode').value=chosen;applyLanguage();
   if(recovery||access.role==='activation'){passwordSetup(access.role==='activation');return;}
   if(access.role==='blocked'){$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');setLogin(tt('blocked'));return;}
