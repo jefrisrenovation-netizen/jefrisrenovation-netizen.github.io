@@ -34,17 +34,18 @@ Deno.serve(async(req:Request)=>{
   }
   const token=typeof body.token==='string'?body.token:'';
   let invitation:any=null,invited:any=null;
-  if(['invite_info','resolve_invite','claim_invite','redeem_phone'].includes(action)){
+  if(['invite_info','resolve_invite','claim_invite','redeem_phone','accept_phone'].includes(action)){
    if(!/^[a-f0-9]{64}$/.test(token))return reply(400,{error:'invalid_invite'});
    const {data,error}=await admin.from('team_invites').select('*').eq('token_hash',await digest(token)).is('used_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();if(error)throw error;
    if(!data)return reply(410,{error:'expired_invite'});invitation=data;
    const member=await admin.from('team_accounts').select('*').eq('id',data.account_id).eq('enabled',true).maybeSingle();if(member.error)throw member.error;invited=member.data;
    if(!invited)return reply(403,{error:'access_blocked'});
   }
-  if(action==='redeem_phone'){
+  if(action==='redeem_phone'||action==='accept_phone'){
+   if(action==='accept_phone'&&(invitation.purpose==='reset'||invited.activated_at))return reply(403,{error:'access_denied'});
    if(invited.login_method!=='phone'||!invited.auth_email?.endsWith('@staff.suivi.invalid'))return reply(403,{error:'access_denied'});
    if((invitation.purpose==='reset'&&!invited.activated_at)||(invitation.purpose!=='reset'&&invited.activated_at))return reply(403,{error:'access_denied'});
-   const password=String(body.password||'');if(password.length<8||password.length>128)return reply(400,{error:'invalid_password'});
+   const password=action==='accept_phone'?crypto.randomUUID()+crypto.randomUUID():String(body.password||'');if(password.length<8||password.length>128)return reply(400,{error:'invalid_password'});
    const employee=await admin.from('employees').select('active').eq('id',invited.employee_id).eq('owner_id',invited.owner_id).single();if(employee.error||!employee.data?.active)return reply(403,{error:'access_blocked'});
    // Consume atomically BEFORE changing a password: concurrent replays cannot reset it twice.
    const used=await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('token_hash',invitation.token_hash).is('used_at',null).gt('expires_at',new Date().toISOString()).select('token_hash');
@@ -126,8 +127,8 @@ Deno.serve(async(req:Request)=>{
    }
    if(action==='my_days'){
     const range=monthRange(body.month);
-    const [days,sites]=await Promise.all([admin.from('work_days').select('id,work_date,entry_time,exit_time,break_minutes,workplace,notes,approval_status').eq('owner_id',account.owner_id).eq('employee_id',account.employee_id).gte('work_date',range.start).lte('work_date',range.end).order('work_date'),admin.from('work_sites').select('id,name,address').eq('owner_id',account.owner_id).eq('active',true).order('name')]);
-    if(days.error||sites.error)throw days.error||sites.error;return reply(200,{days:days.data,sites:sites.data});
+    const [days,sites,payment,company]=await Promise.all([admin.from('work_days').select('id,work_date,entry_time,exit_time,break_minutes,workplace,notes,approval_status').eq('owner_id',account.owner_id).eq('employee_id',account.employee_id).gte('work_date',range.start).lte('work_date',range.end).order('work_date'),admin.from('work_sites').select('id,name,address').eq('owner_id',account.owner_id).eq('active',true).order('name'),admin.from('monthly_payments').select('payment_mode,daily_rate,hourly_rate,fixed_salary,advance,currency_code').eq('owner_id',account.owner_id).eq('employee_id',account.employee_id).eq('month',range.start).maybeSingle(),admin.from('app_profiles').select('preferred_currency').eq('owner_id',account.owner_id).maybeSingle()]);
+    if(days.error||sites.error||payment.error||company.error)throw days.error||sites.error||payment.error||company.error;return reply(200,{days:days.data,sites:sites.data,payment:payment.data,currency:payment.data?.currency_code||company.data?.preferred_currency||'EUR'});
    }
    const payload={...dayInput(body),owner_id:account.owner_id,employee_id:account.employee_id,submitted_by:user.id,approval_status:'pending'};
    let result;
@@ -136,7 +137,7 @@ Deno.serve(async(req:Request)=>{
    if(result.error?.code==='23505')return reply(409,{error:'date_exists'});if(result.error)throw result.error;if(!result.data?.length)return reply(403,{error:'approved_day_locked'});
    return reply(200,{saved:true});
   }
-  // All remaining actions belong to owners. Staff never receive payroll or owner-level lists.
+  // All remaining actions belong to owners. Staff receive only their own monthly payment above, never owner-level lists.
   if(account)return reply(403,{error:'owner_required'});
   if(action==='invite'){
    const employee=await admin.from('employees').select('id').eq('id',String(body.employee_id)).eq('owner_id',user.id).eq('active',true).single();if(employee.error)return reply(403,{error:'access_denied'});

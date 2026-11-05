@@ -12,6 +12,7 @@ async function loginWithPassword(){
     if(email.includes('@'))({error}=await sb.auth.signInWithPassword({email,password}));
     else {try{const result=await teamCall('login',{username:email,password});({error}=await sb.auth.setSession(result.session));}catch{error={message:'invalid_credentials'};}}
     if(error){setLogin(tr('Connexion impossible. Vérifiez vos identifiants.'));return;}
+    if(typeof saveAccessPreference==='function')saveAccessPreference('suivi_identifier',email);
     $('loginPassword').value='';
     await start();
   }catch{setLogin(tr('Connexion impossible. Vérifiez votre connexion Internet et réessayez.'));}
@@ -34,7 +35,7 @@ passwordButton.dataset.text='Se connecter';passwordButton.textContent=tr(passwor
 passwordForm.append(passwordLabel,passwordInput,passwordButton);
 passwordForm.onsubmit=event=>{event.preventDefault();loginWithPassword();};
 passwordAccess.append(passwordSummary,passwordForm);
-$('loginCard').append(passwordAccess);
+$('loginCard').insertBefore(passwordAccess,$('loginCard').querySelector('button'));
 async function registerWithPassword(){
   const button=$('passwordSignupButton');
   if(button.disabled)return;

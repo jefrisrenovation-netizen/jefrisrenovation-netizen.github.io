@@ -90,3 +90,23 @@ test('worker PDF is a real PDF containing only the selected workplace and uses t
  await f.run('workerPortal()');f.document.getElementById('workerReportPlace').value=JSON.stringify('Forest');await f.run('exportWorkerReport()');
  const file=f.context.window.sharedPDF?.files[0];assert(file,'PDF must reach file sharing');assert.equal(file.name,'suivi-individuel-2026-10.pdf');const content=await file.text();assert(content.startsWith('%PDF-'));assert(content.includes('Forest'));assert(!content.includes('Uccle'));assert(content.includes('9h00'));
 });
+
+test('worker payroll shows three approved days, rate, gross, advance and net in the shared PDF',async()=>{
+ const {jsPDF}=await import('jspdf');const {autoTable}=await import('jspdf-autotable');const {reportFilename}=await import('../src/helpers.mjs');
+ const f=fixture();Object.assign(f.context,{jsPDF,autoTable,File,reportFilename});f.context.navigator.canShare=()=>true;f.context.navigator.share=async data=>{f.context.window.sharedPDF=data};
+ const runtime=fs.readFileSync('scripts/mobile-runtime.js','utf8');f.run(runtime.slice(runtime.indexOf('async function exportMobileReport'),runtime.indexOf('async function requestAccountDeletion')));
+ f.run(`teamState.role='employee';teamState.access={company:'Company',employee:{id:'worker',name:'Geraldo'}};teamCall=async()=>({days:[3,4,5].map(i=>({id:String(i),work_date:'2026-11-0'+i,entry_time:'08:00',exit_time:'17:30',break_minutes:30,approval_status:'approved'})),sites:[],payment:{payment_mode:'daily',daily_rate:100,advance:50,currency_code:'EUR'},currency:'EUR'});`);
+ await f.run('workerPortal()');await f.run('exportWorkerReport()');const stats=[...f.document.querySelectorAll('#workerReport .stat')].map(e=>e.textContent);
+ assert(stats.some(s=>s==='3Dias aprovados'));assert(stats.some(s=>s.includes('300,00')&&s.includes('Valor bruto')));assert(stats.some(s=>s.includes('250,00')&&s.includes('Saldo a receber')));
+ const pdf=await f.context.window.sharedPDF.files[0].text();for(const value of ['27h00','300,00','250,00','Dias aprovados'])assert(pdf.includes(value),value);
+});
+test('worker pay excludes pending days, counts half days and never allocates advances to filtered places',async()=>{
+ const f=fixture();f.run(`teamState.role='employee';teamState.access={company:'Company',employee:{id:'worker',name:'Worker'}};teamCall=async()=>({days:[{work_date:'2026-11-01',entry_time:'08:00',exit_time:'12:00',break_minutes:0,workplace:'Forest',approval_status:'approved'},{work_date:'2026-11-02',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Forest',approval_status:'pending'}],sites:[],payment:{payment_mode:'hourly',hourly_rate:20,advance:10},currency:'EUR'});`);
+ await f.run('workerPortal()');f.run('showWorkerReport()');let stats=[...f.document.querySelectorAll('#workerReport .stat')].map(e=>e.textContent);assert(stats.includes('0,5Dias aprovados'));assert(stats.some(s=>s.includes('80,00')&&s.includes('Valor bruto')));assert(stats.some(s=>s.includes('70,00')&&s.includes('Saldo a receber')));
+ f.document.getElementById('workerReportPlace').value=JSON.stringify('Forest');f.run('showWorkerReport()');assert(!f.document.querySelector('#workerReport .summary').textContent.includes('Adiantamentos'));assert(!f.document.querySelector('#workerReport .summary').textContent.includes('Saldo a receber'));
+ f.run("teamState.payment={payment_mode:'fixed',fixed_salary:2500,advance:10};showWorkerReport()");assert(!f.document.querySelector('#workerReport .summary').textContent.includes('Valor bruto'));
+});
+test('worker language is reachable without owner settings and translates the report after changing',async()=>{
+ const f=fixture();f.run(`teamState.role='employee';teamState.access={company:'Company',employee:{id:'worker',name:'Worker'}};teamCall=async()=>({days:[],sites:[],payment:{payment_mode:'hourly',hourly_rate:20},currency:'EUR'});`);await f.run('workerPortal()');
+ const selector=f.document.getElementById('accessLanguage');assert(selector.closest('header'));selector.value='en';selector.onchange();await new Promise(resolve=>setTimeout(resolve,0));f.run('showWorkerReport()');assert.equal(f.document.documentElement.lang,'en');assert(f.document.getElementById('workerReport').textContent.includes('Approved days'));assert(!f.document.getElementById('workerReport').textContent.includes('Dias aprovados'));assert(f.document.getElementById('workerDays').textContent.includes('No days recorded'));
+});

@@ -123,7 +123,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 <header>
   <div class="brand">
     <img id="brandLogo" src="assets/suivi-logo.png" alt="Logo da empresa">
-    <div><h1 id="brandName">Suivi des heures</h1><small id="brandSubtitle">Gestion des heures de travail</small></div>
+    <div><h1 id="brandName">Suivi des heures</h1><small id="brandSubtitle">Gestion des heures de travail</small><small class="app-version">v1.0.3</small></div>
   </div>
 </header>
 
@@ -260,7 +260,7 @@ const selected=$("month").value;[...$("month").options].forEach((o,i)=>o.textCon
 if($("month").value&&$("year").value){$("monthLabel").textContent=monthName();renderHistory();const emp=employees.find(e=>e.id===$("employee").value);$("title").textContent=(emp?.name||tr("Funcionário"))+" — "+monthName();}
 closeIndividualReport();closeCompanyReport();$("cloudStatus").textContent="";updateAccountMode();}
 function updateBrand(){const name=$("companyName").value.trim();$("brandName").textContent="Suivi des heures";const logo=$("companyLogo").value.trim();$("brandLogo").src=/^https:\/\//i.test(logo)?logo:"assets/suivi-logo.png";$("brandLogo").alt=name||"Logo";}
-async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus(tr("Erro ao carregar perfil: ")+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"individual",company_name:"",language_code:"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
+async function loadProfile(){const {data,error}=await sb.from("app_profiles").select("*").eq("owner_id",user.id).maybeSingle();if(error){setStatus(tr("Erro ao carregar perfil: ")+error.message,false);return}profile=data||{};for(const [field,id] of Object.entries(PROFILE_FIELDS))$(id).value=profile[field]??({account_type:"individual",company_name:"",language_code:(typeof readAccessPreference==="function"?readAccessPreference("suivi_language"):null)||"fr",preferred_currency:"EUR"}[field]||"");applyLanguage();updateBrand();}
 async function saveProfile(){
   const button=document.querySelector('[onclick="saveProfile()"]');
   const previousLabel=button?.textContent;

@@ -15,3 +15,7 @@
 #dayTable .day-hours{display:inline!important;min-height:0;font-size:13px}
 
 .default-schedule{margin:12px 0 24px}.default-schedule h2{background:#e5e7eb;border-radius:12px;padding:14px;font-size:20px}.schedule-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 4px;border-bottom:1px solid #e5e7eb}.schedule-row label{margin:0;font-weight:600}.schedule-row input{width:132px;min-width:0;margin:0;text-align:center}.default-schedule .status:empty{display:none}
+
+.access-language{display:flex;align-items:center;gap:12px;max-width:420px;margin-top:14px}.access-language label{color:white;white-space:nowrap}.access-language select{padding:9px;font-size:14px}#workerSummary{margin-top:16px}.login details[open]>summary{margin-bottom:8px}
+
+.app-version{display:block;margin-top:4px;opacity:.7}
