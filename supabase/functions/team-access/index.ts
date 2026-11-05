@@ -34,12 +34,27 @@ Deno.serve(async(req:Request)=>{
   }
   const token=typeof body.token==='string'?body.token:'';
   let invitation:any=null,invited:any=null;
-  if(['invite_info','resolve_invite','claim_invite','redeem_phone','accept_phone'].includes(action)){
+  if(['invite_info','resolve_invite','claim_invite','redeem_phone','accept_phone','open_access'].includes(action)){
    if(!/^[a-f0-9]{64}$/.test(token))return reply(400,{error:'invalid_invite'});
    const {data,error}=await admin.from('team_invites').select('*').eq('token_hash',await digest(token)).is('used_at',null).gt('expires_at',new Date().toISOString()).maybeSingle();if(error)throw error;
    if(!data)return reply(410,{error:'expired_invite'});invitation=data;
    const member=await admin.from('team_accounts').select('*').eq('id',data.account_id).eq('enabled',true).maybeSingle();if(member.error)throw member.error;invited=member.data;
-   if(!invited)return reply(403,{error:'access_blocked'});
+   if(!invited||!invited.enabled)return reply(403,{error:'access_blocked'});
+  }
+  if(action==='open_access'){
+   if(invitation.expires_at!=='infinity'||invitation.purpose==='reset'||!invited.activated_at||!invited.user_id)return reply(403,{error:'access_denied'});
+   const employee=await admin.from('employees').select('active').eq('id',invited.employee_id).eq('owner_id',invited.owner_id).single();if(employee.error||!employee.data?.active)return reply(403,{error:'access_blocked'});
+   const identity=await admin.auth.admin.getUserById(invited.user_id);const email=invited.auth_email||invited.email;
+   if(identity.error||identity.data.user?.id!==invited.user_id||identity.data.user?.email!==email)return reply(403,{error:'account_conflict'});
+   const generated=await admin.auth.admin.generateLink({type:'magiclink',email});
+   if(generated.error||generated.data.user?.id!==invited.user_id||!generated.data.properties?.hashed_token)return reply(400,{error:'request_failed'});
+   const signed=await authClient().auth.verifyOtp({token_hash:generated.data.properties.hashed_token,type:'email'});
+   if(signed.error||signed.data.user?.id!==invited.user_id||!signed.data.session)return reply(403,{error:'access_denied'});
+   // Recheck revocation after authentication, before handing the session to the caller.
+   const check=await admin.from('team_invites').select('token_hash').eq('token_hash',invitation.token_hash).is('used_at',null).single();
+   const enabled=await admin.from('team_accounts').select('enabled').eq('id',invited.id).eq('enabled',true).single();
+   if(check.error||enabled.error||!enabled.data?.enabled)return reply(403,{error:'access_blocked'});
+   return reply(200,{session:signed.data.session});
   }
   if(action==='redeem_phone'||action==='accept_phone'){
    if(action==='accept_phone'&&(invitation.purpose==='reset'||invited.activated_at))return reply(403,{error:'access_denied'});
@@ -48,7 +63,7 @@ Deno.serve(async(req:Request)=>{
    const password=action==='accept_phone'?crypto.randomUUID()+crypto.randomUUID():String(body.password||'');if(password.length<8||password.length>128)return reply(400,{error:'invalid_password'});
    const employee=await admin.from('employees').select('active').eq('id',invited.employee_id).eq('owner_id',invited.owner_id).single();if(employee.error||!employee.data?.active)return reply(403,{error:'access_blocked'});
    // Consume atomically BEFORE changing a password: concurrent replays cannot reset it twice.
-   const used=await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('token_hash',invitation.token_hash).is('used_at',null).gt('expires_at',new Date().toISOString()).select('token_hash');
+   const used=invitation.expires_at==='infinity'?{data:[{token_hash:invitation.token_hash}],error:null}:await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('token_hash',invitation.token_hash).is('used_at',null).gt('expires_at',new Date().toISOString()).select('token_hash');
    if(used.error)throw used.error;if(!used.data?.length)return reply(410,{error:'expired_invite'});
    if(invited.user_id){
     const existing=await admin.auth.admin.getUserById(invited.user_id);
@@ -59,7 +74,7 @@ Deno.serve(async(req:Request)=>{
     invited.user_id=created.data.user.id;
    }
    const activated=await admin.from('team_accounts').update({user_id:invited.user_id,activated_at:new Date().toISOString()}).eq('id',invited.id).eq('enabled',true).select('id');if(activated.error)throw activated.error;if(!activated.data?.length)return reply(403,{error:'access_blocked'});
-   await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('account_id',invited.id).is('used_at',null);
+   await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('account_id',invited.id).is('used_at',null).neq('expires_at','infinity');
    const changed=await admin.auth.admin.updateUserById(invited.user_id,{password});if(changed.error)throw changed.error;
    const result=await authClient().auth.signInWithPassword({email:invited.auth_email,password});if(result.error||!result.data.session)return reply(400,{error:'request_failed'});
    return reply(200,{session:result.data.session});
@@ -80,7 +95,7 @@ Deno.serve(async(req:Request)=>{
      link=generated.data.properties.action_link;
     }
    }
-   return reply(200,{name:employee.data.name,company:company.data?.company_name||'Suivi des heures Pro',username:invited.username,login_method:invited.login_method||'email',purpose:invitation.purpose||'invite',activation_url:link});
+   return reply(200,{name:employee.data.name,company:company.data?.company_name||'Suivi des heures Pro',username:invited.username,login_method:invited.login_method||'email',purpose:invitation.purpose||'invite',reusable:invitation.expires_at==='infinity',activated:!!invited.activated_at,activation_url:link});
   }
   const bearer=req.headers.get('Authorization')?.match(/^Bearer (.+)$/i)?.[1];
   if(!bearer)return reply(401,{error:'authentication_required'});
@@ -95,7 +110,7 @@ Deno.serve(async(req:Request)=>{
    if(invited.user_id&&invited.user_id!==user.id)return reply(409,{error:'account_conflict'});
    const result=await admin.from('team_accounts').update({user_id:user.id,activated_at:new Date().toISOString()}).eq('id',invited.id).eq('enabled',true).or('user_id.is.null,user_id.eq.'+user.id).select('id');
    if(result.error)throw result.error;if(!result.data?.length)return reply(409,{error:'account_conflict'});
-   const consumed=await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('token_hash',invitation.token_hash);if(consumed.error)throw consumed.error;
+   const consumed=await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('token_hash',invitation.token_hash).neq('expires_at','infinity');if(consumed.error)throw consumed.error;
    return reply(200,{active:true});
   }
   if(action==='access'){
@@ -111,7 +126,7 @@ Deno.serve(async(req:Request)=>{
   if(action==='activate'){
    if(!account||account.login_method==='phone'||!user.email_confirmed_at||user.email?.toLowerCase()!==account.email)return reply(403,{error:'authentication_required'});
    const result=await admin.from('team_accounts').update({activated_at:new Date().toISOString()}).eq('id',account.id).eq('enabled',true);if(result.error)throw result.error;
-   await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('account_id',account.id).is('used_at',null);
+   await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('account_id',account.id).is('used_at',null).neq('expires_at','infinity');
    return reply(200,{active:true});
   }
   // Employee requests cannot choose another employee or company: both IDs come from the verified membership.
@@ -150,10 +165,10 @@ Deno.serve(async(req:Request)=>{
    const values={owner_id:user.id,employee_id:employee.data.id,username:name,email,phone,login_method:method,auth_email:method==='phone'?(previous.data?.auth_email||crypto.randomUUID()+'@staff.suivi.invalid'):null};
    const member=previous.data?await admin.from('team_accounts').update(values).eq('id',previous.data.id).select('*').single():await admin.from('team_accounts').insert(values).select('*').single();
    if(member.error?.code==='23505')return reply(409,{error:'username_taken'});if(member.error)throw member.error;if(!member.data.enabled)return reply(403,{error:'access_blocked'});
-   if(member.data.activated_at&&method==='phone')return reply(409,{error:'use_reset'});
+
    await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('account_id',member.data.id).is('used_at',null);
    const bytes=crypto.getRandomValues(new Uint8Array(32)),token=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');
-   const saved=await admin.from('team_invites').insert({token_hash:await digest(token),account_id:member.data.id});if(saved.error)throw saved.error;
+   const saved=await admin.from('team_invites').insert({token_hash:await digest(token),account_id:member.data.id,expires_at:'infinity'});if(saved.error)throw saved.error;
    return reply(200,{url:BASE+'/invite/#invite='+token,username:name,email,phone:values.phone});
   }
   if(action==='reset_phone'){

@@ -241,6 +241,7 @@ async function handleTeamInvite(token){
  if(!/^[a-f0-9]{64}$/.test(token||'')){setLogin(tt('expired_invite'));return;}
  sessionStorage.setItem('suivi_invite',token);
  const result=await teamCall('resolve_invite',{token,native:true});
+ if(result.reusable&&result.activated){sessionStorage.removeItem('suivi_invite');const auth=await teamCall('open_access',{token});const saved=await sb.auth.setSession(auth.session);if(saved.error)throw saved.error;await start();return;}
  if(result.login_method==='phone'){
   sessionStorage.removeItem('suivi_invite');
   if(result.purpose==='reset'){passwordSetup(false,token);return;}

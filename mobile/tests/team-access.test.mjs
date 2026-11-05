@@ -11,7 +11,7 @@ function handler(options={}){
  const queries=[];let captured;
  class Query{
   constructor(table){this.table=table;this.operations=[];queries.push(this)}
-  select(...v){this.operations.push(['select',...v]);return this}eq(...v){this.operations.push(['eq',...v]);return this}is(...v){this.operations.push(['is',...v]);return this}gt(...v){this.operations.push(['gt',...v]);return this}gte(...v){this.operations.push(['gte',...v]);return this}lte(...v){this.operations.push(['lte',...v]);return this}order(...v){this.operations.push(['order',...v]);return this}in(...v){this.operations.push(['in',...v]);return this}or(...v){this.operations.push(['or',...v]);return this}insert(v){this.operations.push(['insert',v]);return this}update(v){this.operations.push(['update',v]);return this}
+  neq(...v){this.operations.push(['neq',...v]);return this}select(...v){this.operations.push(['select',...v]);return this}eq(...v){this.operations.push(['eq',...v]);return this}is(...v){this.operations.push(['is',...v]);return this}gt(...v){this.operations.push(['gt',...v]);return this}gte(...v){this.operations.push(['gte',...v]);return this}lte(...v){this.operations.push(['lte',...v]);return this}order(...v){this.operations.push(['order',...v]);return this}in(...v){this.operations.push(['in',...v]);return this}or(...v){this.operations.push(['or',...v]);return this}insert(v){this.operations.push(['insert',v]);return this}update(v){this.operations.push(['update',v]);return this}
   result(){let data=this.table==='team_accounts'?(options.member===undefined?member:options.member):this.table==='employees'?employee:this.table==='app_profiles'?{company_name:'Company A',language_code:'fr'}:this.table==='work_sites'?[]:this.table==='team_invites'?(options.invite||null):[];
    if(this.table==='team_accounts'&&this.operations.some(o=>o[0]==='update'))data=[{id:'member-a'}];
    if(this.table==='team_invites'&&this.operations.some(o=>o[0]==='update'))data=options.used?[]:[{token_hash:'test'}];
@@ -20,7 +20,8 @@ function handler(options={}){
   single(){return Promise.resolve(this.result())}maybeSingle(){return Promise.resolve(this.result())}then(ok,bad){return Promise.resolve(this.result()).then(ok,bad)}
  }
  const authChanges=[];
- const client={from:table=>new Query(table),rpc:async()=>({data:options.rate!==false,error:null}),auth:{getUser:async()=>options.unauthenticated?{data:{user:null},error:Error('denied')}:{data:{user:{id:options.userId||'staff-a',email:options.email||'staff@example.invalid',email_confirmed_at:'2026-11-01'}},error:null},admin:{getUserById:async()=>({data:{user:{email_confirmed_at:'2026-11-01'}}}),createUser:async()=>({data:{user:{id:'new-staff'}},error:null}),updateUserById:async(id,values)=>{authChanges.push({id,values});return {error:null}},generateLink:async()=>{throw Error('must not generate a link for existing accounts')}}}};
+ const client={from:table=>new Query(table),rpc:async()=>({data:options.rate!==false,error:null}),auth:{getUser:async()=>options.unauthenticated?{data:{user:null},error:Error('denied')}:{data:{user:{id:options.userId||'staff-a',email:options.email||'staff@example.invalid',email_confirmed_at:'2026-11-01'}},error:null},admin:{getUserById:async()=>({data:{user:{id:'staff-a',email:'staff@example.invalid',email_confirmed_at:'2026-11-01'}}}),createUser:async()=>({data:{user:{id:'new-staff'}},error:null}),updateUserById:async(id,values)=>{authChanges.push({id,values});return {error:null}},generateLink:async()=>{if(!options.reusable)throw Error('must not generate a link for existing accounts');return {data:{user:{id:'staff-a'},properties:{hashed_token:'test-hash'}},error:null}}}}};
+ client.auth.verifyOtp=async()=>({data:{user:{id:'staff-a'},session:{access_token:'reusable-access',refresh_token:'reusable-refresh'}},error:null});
  client.auth.signInWithPassword=async input=>({data:{session:{access_token:'test-access',refresh_token:'test-refresh'}},error:null});
  const context={createClient:()=>client,username,monthRange,dayInput,phoneNumber,Request,Response,TextEncoder,Uint8Array,crypto:webcrypto,URL,Date,Deno:{env:{get:()=> 'test'},serve:fn=>{captured=fn}}};
  let code=fs.readFileSync('../supabase/functions/team-access/index.ts','utf8').replace(/^import .*;\n/gm,'');code=stripTypeScriptTypes(code);vm.createContext(context);vm.runInContext(code,context);
@@ -108,3 +109,13 @@ test('passwordless acceptance cannot use a reset invite, activated identity or r
  const r=await api.call({action:'accept_phone',token:'a'.repeat(64)},false);assert.equal(r.status,200);assert.equal(r.data.session.access_token,'test-access');assert.equal(api.authChanges.length,1);assert(api.authChanges[0].values.password.length>=64);assert(!('password' in r.data));
  const consumed=api.queries.findIndex(q=>q.table==='team_invites'&&q.operations.some(o=>o[0]==='update'));assert(consumed>=0);
  });
+
+test('reusable employee link opens repeatedly without a password and ignores caller-selected identities',async()=>{
+ const api=handler({reusable:true,invite:{account_id:member.id,token_hash:'test',purpose:'invite',expires_at:'infinity'}});
+ for(let i=0;i<2;i++){const r=await api.call({action:'open_access',token:'a'.repeat(64),employee_id:'other',user_id:'other'},false);assert.equal(r.status,200);assert.equal(r.data.session.access_token,'reusable-access');}
+ assert.equal(api.authChanges.length,0);assert(!api.queries.some(q=>q.operations.some(o=>o[0]==='update')));
+});
+test('ordinary invitations, reset links and blocked employees cannot use reusable login',async()=>{
+ for(const invite of [{expires_at:'2026-11-12',purpose:'invite'},{expires_at:'infinity',purpose:'reset'}]){const api=handler({reusable:true,invite:{account_id:member.id,token_hash:'test',...invite}});assert.equal((await api.call({action:'open_access',token:'a'.repeat(64)},false)).status,403);}
+ const api=handler({member:{...member,enabled:false},invite:{expires_at:'infinity',purpose:'invite'}});assert.equal((await api.call({action:'open_access',token:'a'.repeat(64)},false)).status,403);
+});
