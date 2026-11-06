@@ -56,11 +56,30 @@ async function registerWithPassword(){
 const signup=document.createElement('details');signup.style.marginTop='16px';
 signup.innerHTML='<summary data-text="Créer un compte">Créer un compte</summary><form id="signupForm"><label for="signupPassword" data-text="Mot de passe">Mot de passe</label><input id="signupPassword" type="password" autocomplete="new-password" minlength="8" required><label for="signupConfirmation" data-text="Confirmer le mot de passe">Confirmer le mot de passe</label><input id="signupConfirmation" type="password" autocomplete="new-password" minlength="8" required><button id="passwordSignupButton" type="submit" data-text="Créer un compte">Créer un compte</button></form>';
 $('loginCard').append(signup);$('signupForm').onsubmit=e=>{e.preventDefault();registerWithPassword();};
+let inviteInProgress=false;
 async function handleAuthLink(url){
-  try{const incoming=new URL(url);if(incoming.protocol==='suiviheurespro:'&&incoming.hostname==='invite'){await handleTeamInvite(incoming.searchParams.get('token'));return;}
-  const params=new URLSearchParams(incoming.hash.slice(1));if(params.get('type')==='recovery')sessionStorage.setItem('suivi_recovery','1');if(params.get('type')==='invite')sessionStorage.setItem('suivi_new_invite','1');}catch{}
+  let incoming;
+  try{incoming=new URL(url);}catch{return;}
+  const isWebInvite=incoming.origin==='https://jefrisrenovation-netizen.github.io'&&incoming.pathname==='/invite/';
+  const isLegacyInvite=incoming.protocol==='suiviheurespro:'&&incoming.hostname==='invite';
+  const params=new URLSearchParams(incoming.hash.slice(1));
+  if(isWebInvite||isLegacyInvite){
+    if(inviteInProgress)return;
+    inviteInProgress=true;
+    try{
+      await handleTeamInvite(isWebInvite?params.get('invite'):incoming.searchParams.get('token'));
+    }catch(error){
+      $('loginCard').classList.remove('hidden');
+      setLogin(error.code?error.message:tt('failed'));
+    }finally{
+      inviteInProgress=false;
+    }
+    return;
+  }
   const tokens=authTokens(url);
   if(!tokens)return;
+  if(params.get('type')==='recovery')sessionStorage.setItem('suivi_recovery','1');
+  if(params.get('type')==='invite')sessionStorage.setItem('suivi_new_invite','1');
   const {error}=await sb.auth.setSession(tokens);
   if(error){setLogin(tr('Ce lien a expiré. Demandez un nouveau lien.'));return;}
   await start();
