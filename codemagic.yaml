@@ -8,6 +8,8 @@ workflows:
     environment:
       node: 22
       xcode: latest
+      groups:
+        - meta_ios
       ios_signing:
         provisioning_profiles:
           - suivi_heures_appstore
@@ -22,7 +24,7 @@ workflows:
           npm run prepare:web
           npm test
           npm run build
-          npm run prepare:native -- ios
+          npm run prepare:native -- ios --meta-events
       - name: Configurer la signature et le numéro de compilation
         script: |
           set -e
@@ -49,6 +51,8 @@ workflows:
     environment:
       node: 22
       xcode: latest
+      groups:
+        - meta_ios
     scripts:
       - name: Préparer et vérifier le code
         script: |
@@ -57,7 +61,7 @@ workflows:
           npm run prepare:web
           npm test
           npm run build
-          npm run prepare:native -- ios
+          npm run prepare:native -- ios --meta-events
       - name: Compiler pour le simulateur iPhone
         script: |
           cd mobile
