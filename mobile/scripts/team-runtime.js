@@ -28,9 +28,23 @@ async function teamCall(action,payload={}){
  const data=await response.json();if(!response.ok){const error=new Error(tt(data.error));error.code=data.error;throw error;}return data;
 }
 function teamNotice(error){const message=typeof error==='string'?error:error instanceof Error?error.message:tt('failed');const target=teamState.role==='employee'?$('workerNotice'):$('upgradeNotice');if(target){target.textContent=message;target.setAttribute('role','status');}else setLogin(message);}
+async function openTeamSheet(id){
+ if(!employees.some(employee=>employee.id===id&&employee.active!==false))return;
+ showPane('team');
+ $('employee').value=id;
+ const request=loadRecords();
+ const version=loadVersion;
+ await request;
+ if(teamState.pane==='team'&&version===loadVersion&&$('employee').value===id)showPane('team-sheet');
+}
+function renderTeamDirectory(){
+ $('teamDirectory').innerHTML=employees.filter(e=>e.active!==false).map(e=>`<button type="button" class="worker-tile secondary" data-employee="${esc(e.id)}"><strong>${esc(e.name)}</strong><span aria-hidden="true">›</span></button>`).join('')||`<p>${teamLabel('noTeam')}</p>`;
+ $('teamDirectory').querySelectorAll('[data-employee]').forEach(button=>button.onclick=()=>openTeamSheet(button.dataset.employee));
+}
 function showPane(pane){
- teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamPanel','team'],['timesheetPanel','team'],['accessPanel','team'],['sitesPanel','sites'],['reportActions','reports'],['reviewPanel','team'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
- closeCompanyReport();closeIndividualReport();document.querySelectorAll('[data-pane]').forEach(e=>e.classList.toggle('selected',e.dataset.pane===pane));
+ if(pane==='team')renderTeamDirectory();
+ teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamDirectoryPanel','team'],['teamPanel','team-sheet'],['timesheetPanel','team-sheet'],['sitesPanel','sites'],['reportActions','reports'],['reviewPanel','team'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
+ closeCompanyReport();closeIndividualReport();document.querySelectorAll('[data-pane]').forEach(e=>e.classList.toggle('selected',e.dataset.pane===(pane==='team-sheet'?'team':pane)));
  $('upgradeNotice').textContent='';$('mainNav')?.scrollIntoView({block:'start',behavior:'smooth'});
 }
 function teamField(key,id,type='text',value=''){return `<div><label for="${id}">${teamLabel(key)}</label><input id="${id}" type="${type}" value="${esc(value)}" ${type==='number'?'min="0" step="1"':''} required></div>`}
@@ -42,8 +56,25 @@ function setupOwnerUI(){
  const banner=$('app').firstElementChild;if(banner?.textContent.includes('VERSÃO DE TESTE')||banner?.textContent.includes('Version de test'))banner.remove();
  const shell=document.createElement('div');shell.id='upgradeShell';shell.className='no-print';shell.innerHTML=`<nav id="mainNav" class="app-nav" aria-label="Navigation">${['home','team','sites','reports','settings'].map((p,i)=>`<button class="secondary" data-pane="${p}" onclick="teamUI.pane('${p}')"><span aria-hidden="true">${['⌂','♙','▦','▤','⚙'][i]}</span>${teamLabel(p)}</button>`).join('')}</nav><p id="upgradeNotice" class="status" role="status"></p><section id="dashboard" class="card"><div class="dashboard-head"><div><small>${teamLabel('owner')}</small><h2 id="dashboardCompany"></h2></div><input id="dashboardMonth" type="month" aria-label="${esc(tt('month'))}" onchange="teamUI.month(this.value)"></div><h2>${teamLabel('month')}</h2><div id="dashboardStats" class="summary"></div><button class="register-button" onclick="teamUI.day()">＋ ${teamLabel('register')}</button><h2>${teamLabel('team')}</h2><div id="dashboardTeam"></div><p class="muted">${teamLabel('payrollApproved')}</p><p class="muted">✓ ${teamLabel('allSaved')}</p></section>`;
  $('app').prepend(shell);
- const access=document.createElement('section');access.id='accessPanel';access.className='card hidden no-print';access.innerHTML=`<h2>${teamLabel('invite')}</h2><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
- $('app').append(access);$('invitePhone').required=false;$('inviteEmail').required=false;const syncContact=()=>{$('invitePhone').required=!$('inviteEmail').value.trim();};$('inviteEmail').oninput=syncContact;syncContact();$('inviteUsername').pattern='[a-zA-Z0-9][a-zA-Z0-9._\\x2D]{2,39}';$('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
+ const directory=document.createElement('section');directory.id='teamDirectoryPanel';directory.className='card hidden no-print';
+ directory.innerHTML=`<h2>${teamLabel('team')}</h2><div id="teamDirectory"></div>`;
+ $('app').append(directory);
+ const management=document.createElement('details');management.className='project-tile';management.innerHTML=`<summary>${teamLabel('invite')}</summary>`;
+ $('settingsPanel').append(management);
+ const addWorker=$('newEmployee').parentElement;
+ const addButton=document.querySelector('[onclick="addEmployee()"]');
+ addButton.onclick=async()=>{await addEmployee();if(teamState.pane==='team')renderTeamDirectory();};
+ directory.append(addWorker,addButton);
+ const removeButton=document.querySelector('[onclick="deleteEmployee()"]');
+ removeButton.onclick=async()=>{
+  const id=$('employee').value;
+  await deleteEmployee();
+  if(employees.some(e=>e.id===id))return;
+  showPane('team');
+  await upgradeRefresh().catch(teamNotice);
+ };
+ const access=document.createElement('section');access.id='accessPanel';access.className='no-print';access.innerHTML=`<h2>${teamLabel('invite')}</h2><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
+ management.append(access);$('invitePhone').required=false;$('inviteEmail').required=false;const syncContact=()=>{$('invitePhone').required=!$('inviteEmail').value.trim();};$('inviteEmail').oninput=syncContact;syncContact();$('inviteUsername').pattern='[a-zA-Z0-9][a-zA-Z0-9._\\x2D]{2,39}';$('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
  $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
  const sites=document.createElement('section');sites.id='sitesPanel';sites.className='card hidden no-print';sites.innerHTML=`<h2>${teamLabel('sites')}</h2><form id="siteForm"><div class="grid">${teamField('siteName','siteName')}${teamField('address','siteAddress')}</div><button type="submit">＋ ${teamLabel('addSite')}</button></form><div id="siteList"></div>`;
  $('app').append(sites);$('siteAddress').required=false;$('siteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,async()=>{const {error}=await sb.from('work_sites').insert({owner_id:user.id,name:$('siteName').value.trim(),address:$('siteAddress').value.trim()});if(error)throw Error(tt('failed'));$('siteForm').reset();await upgradeRefresh();teamNotice(tt('saveOK'));});};
@@ -60,27 +91,32 @@ async function upgradeRefresh(){
  const stats=[[tt('hours'),fmt(days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes),0))],[tt('days'),report.rows.reduce((sum,r)=>sum+r.days,0)],[tt('advances'),currencies.length>1?'—':formatMoney(report.advance,currency)],[tt('due'),currencies.length>1?'—':formatMoney(report.due,currency)]];
  $('dashboardStats').innerHTML=stats.map(([label,value])=>`<div class="stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join('');$('dashboardCompany').textContent=profile.company_name||'Suivi des heures Pro';$('dashboardMonth').value=month;
  $('dashboardTeam').innerHTML=staff.filter(e=>e.active).map(e=>`<button class="worker-tile secondary" data-employee="${e.id}"><strong>${esc(e.name)}</strong><span>${fmt(days.filter(d=>d.employee_id===e.id).reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes),0))} ›</span></button>`).join('')||`<p>${esc(tt('noTeam'))}</p>`;
- $('dashboardTeam').querySelectorAll('[data-employee]').forEach(b=>b.onclick=async()=>{$('employee').value=b.dataset.employee;await loadRecords();showPane('team');});
+ $('dashboardTeam').querySelectorAll('[data-employee]').forEach(b=>b.onclick=()=>openTeamSheet(b.dataset.employee));
  const selected=$('inviteEmployee').value;$('inviteEmployee').innerHTML=staff.filter(e=>e.active).map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');if(selected)$('inviteEmployee').value=selected;
  $('siteList').innerHTML=sites.map(s=>`<article class="project-tile"><strong>${esc(s.name)}</strong><p>${esc(s.address)}</p></article>`).join('')||`<p>${esc(tt('noSites'))}</p>`;
- $('memberList').innerHTML=teamState.members.map(m=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===m.employee_id)?.name||m.username)}</strong><p>${esc(m.username)} · ${esc(m.activated_at?tt('active'):tt('pending'))}</p><button class="secondary" data-member="${m.id}" data-enabled="${!m.enabled}">${esc(tt(m.enabled?'block':'unblock'))}</button>${m.login_method==='phone'&&m.activated_at&&m.enabled?`<button class="secondary" data-reset-member="${m.id}">${esc(tt('resetMember'))}</button>`:''}</article>`).join('');
+ $('memberList').innerHTML=teamState.members.filter(m=>staff.some(e=>e.id===m.employee_id&&e.active!==false)).map(m=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===m.employee_id)?.name||m.username)}</strong><p>${esc(m.username)} · ${esc(m.activated_at?tt('active'):tt('pending'))}</p><button class="secondary" data-member="${m.id}" data-enabled="${!m.enabled}">${esc(tt(m.enabled?'block':'unblock'))}</button>${m.login_method==='phone'&&m.activated_at&&m.enabled?`<button class="secondary" data-reset-member="${m.id}">${esc(tt('resetMember'))}</button>`:''}</article>`).join('');
  $('memberList').querySelectorAll('[data-member]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('set_access',{id:b.dataset.member,enabled:b.dataset.enabled==='true'});await upgradeRefresh()}));
  $('memberList').querySelectorAll('[data-reset-member]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{showTeamInvitation({...await teamCall('reset_phone',{id:b.dataset.resetMember}),reset:true});}));
  $('reviewList').innerHTML=days.filter(d=>d.approval_status==='pending').map(d=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===d.employee_id)?.name||'')} · ${esc(d.work_date)}</strong><p>${esc(d.entry_time?.slice(0,5)||'')}–${esc(d.exit_time?.slice(0,5)||'')} · ${Number(d.break_minutes)} min · ${esc(d.workplace||'')}</p><div class="actions"><button class="green" data-review="${d.id}" data-status="approved">${esc(tt('approve'))}</button><button class="secondary" data-review="${d.id}" data-status="rejected">${esc(tt('reject'))}</button></div></article>`).join('')||`<p>${esc(tt('noPending'))}</p>`;
  $('reviewList').querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('review_day',{id:b.dataset.review,status:b.dataset.status});await upgradeRefresh();await loadRecords()}));
+ if(teamState.pane==='team')renderTeamDirectory();
  refreshPersonalReportFilters(days,staff);teamTranslate();
 }
 
 async function createTeamInvite(){
- const invitation=await teamCall('invite',{employee_id:$('inviteEmployee').value,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value});
- showTeamInvitation(invitation);await upgradeRefresh();
+ const employeeId=$('inviteEmployee').value;
+ const employeeName=employees.find(e=>e.id===employeeId)?.name;
+ const invitation=await teamCall('invite',{employee_id:employeeId,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value});
+ showTeamInvitation({...invitation,employeeName});await upgradeRefresh();
 }
 function showTeamInvitation(invitation){
  const result=$('inviteResult');result.classList.remove('hidden');result.innerHTML=`<p><strong>${esc(invitation.username)}</strong></p><input readonly aria-label="Invitation" value="${esc(invitation.url)}"><div class="actions"><a class="button green" id="shareWhatsApp" target="_blank" rel="noopener">WhatsApp</a><a class="button secondary" id="shareSMS">SMS</a><a class="button secondary" id="shareEmail">E-mail</a><button class="secondary" id="copyInvite">${esc(tt('copy'))}</button></div>`;
- const message=tt(invitation.reset?'resetShare':'invitation')+' — '+(profile.company_name||'Suivi des heures Pro')+'\n'+invitation.url;
+ const greeting={fr:'Bonjour','pt-BR':'Olá','pt-PT':'Olá',en:'Hello'}[$('languageCode').value]||'Bonjour';
+ const name=invitation.employeeName?.trim();
+ const message=(name?greeting+' '+name+'!\n\n':'')+tt(invitation.reset?'resetShare':'invitation')+' — '+(profile.company_name||'Suivi des heures Pro')+'\n'+invitation.url;
  const phone=invitation.phone.replace(/\D/g,'');$('shareWhatsApp').href='https://wa.me/'+phone+'?text='+encodeURIComponent(message);$('shareSMS').href='sms:'+phone+(/iPhone|iPad/.test(navigator.userAgent)?'&':'?')+'body='+encodeURIComponent(message);$('shareEmail').href='mailto:'+encodeURIComponent(invitation.email)+'?subject='+encodeURIComponent(tt('invitation'))+'&body='+encodeURIComponent(message);
  $('shareEmail').classList.toggle('hidden',!invitation.email);
- $('copyInvite').onclick=async()=>{try{await navigator.clipboard.writeText(invitation.url);$('copyInvite').textContent=tt('copied')}catch{result.querySelector('input').select()}};
+ $('copyInvite').onclick=async()=>{try{await navigator.clipboard.writeText(message);$('copyInvite').textContent=tt('copied')}catch{result.querySelector('input').select()}};
 }
 function selectSiteHtml(id){return `<select id="${id}" aria-label="${esc(tt('sites'))}"><option value="">—</option>${teamState.sites.map(s=>`<option value="${esc(s.name+(s.address?' — '+s.address:''))}">${esc(s.name)}</option>`).join('')}</select>`}
 function scheduleHTML(prefix){

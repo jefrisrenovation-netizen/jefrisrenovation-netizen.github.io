@@ -12,11 +12,18 @@ function fixture(){
  vm.runInContext('setupSelectors();$("year").value="2026";$("month").value="11";$("languageCode").value="pt-BR";user={id:"owner",email:"owner@example.invalid"};employees=[{id:"worker",name:"Test Employee",active:true}];profile={company_name:"Test Company"};teamState.role="owner";setupOwnerUI();',context);
  return {context,document,run:code=>vm.runInContext(code,context)};
 }
-test('owner navigation opens overview, team, sites and reports without losing existing timesheet',()=>{
- const f=fixture();assert(f.document.getElementById('dashboard'));assert.equal(f.document.getElementById('mainNav').querySelectorAll('button').length,5);
- f.run('showPane("team")');assert(!f.document.getElementById('timesheetPanel').classList.contains('hidden'));assert(!f.document.getElementById('accessPanel').classList.contains('hidden'));assert(f.document.getElementById('dashboard').classList.contains('hidden'));
- f.run('showPane("sites")');assert(!f.document.getElementById('sitesPanel').classList.contains('hidden'));assert(f.document.getElementById('accessPanel').classList.contains('hidden'));
- f.run('showPane("reports")');assert(!f.document.getElementById('reportActions').classList.contains('hidden'));assert(f.document.getElementById('timesheetPanel').classList.contains('hidden'));
+test('team opens with a directory and shows a sheet only after selecting a worker',async()=>{
+ const f=fixture();assert.equal(f.document.querySelectorAll('#mainNav button').length,5);
+ f.run(`employees.push({id:'another',name:'Another Worker',active:true});loadRecords=async()=>{};showPane('team');`);
+ const list=f.document.querySelectorAll('#teamDirectory [data-employee]');assert.equal(list.length,2);
+ assert(f.document.getElementById('timesheetPanel').classList.contains('hidden'));
+ assert(f.document.getElementById('settingsPanel').classList.contains('hidden'));
+ await list[1].onclick();assert.equal(f.document.getElementById('employee').value,'another');
+ assert(!f.document.getElementById('timesheetPanel').classList.contains('hidden'));
+ f.run("showPane('team')");assert(f.document.getElementById('timesheetPanel').classList.contains('hidden'));
+ f.run("showPane('settings')");assert(f.document.getElementById('accessPanel').closest('details'));assert(!f.document.getElementById('accessPanel').closest('details').hasAttribute('open'));
+ f.run("showPane('sites')");assert(!f.document.getElementById('sitesPanel').classList.contains('hidden'));
+ f.run("showPane('reports')");assert(!f.document.getElementById('reportActions').classList.contains('hidden'));
 });
 test('new day form contains worker, date, start, end, break and editable workplace together',()=>{
  const f=fixture();f.run('teamState.sites=[{id:"site",name:"Forest",address:"Bruxelles"}];ownerDayDialog()');
@@ -81,7 +88,7 @@ test('individual workplace report recomputes hours and hourly pay without alloca
 test('worker PDF is a real PDF containing only the selected workplace and uses the employee month',async()=>{
  const {jsPDF}=await import('jspdf');const {autoTable}=await import('jspdf-autotable');const {reportFilename}=await import('../src/helpers.mjs');
  const f=fixture();Object.assign(f.context,{jsPDF,autoTable,File,reportFilename});f.context.navigator.canShare=()=>true;f.context.navigator.share=async data=>{f.context.window.sharedPDF=data;};
- const mobile=fs.readFileSync('scripts/mobile-runtime.js','utf8');f.run(mobile.slice(mobile.indexOf('async function exportMobileReport'),mobile.indexOf('async function requestAccountDeletion')));
+ const mobile=fs.readFileSync('scripts/mobile-runtime.js','utf8');f.run(mobile.slice(mobile.indexOf('function pdfReportText'),mobile.indexOf('async function requestAccountDeletion')));
  f.run(`teamState.role='employee';teamState.month='2026-10';teamState.access={company:'Company',employee:{id:'worker',name:'Anderson'}};teamCall=async()=>({days:[{id:'a',work_date:'2026-10-01',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Forest',approval_status:'approved'},{id:'b',work_date:'2026-10-02',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Uccle',approval_status:'pending'}],sites:[]});`);
  await f.run('workerPortal()');f.document.getElementById('workerReportPlace').value=JSON.stringify('Forest');await f.run('exportWorkerReport()');
  const file=f.context.window.sharedPDF?.files[0];assert(file,'PDF must reach file sharing');assert.equal(file.name,'suivi-individuel-2026-10.pdf');const content=await file.text();assert(content.startsWith('%PDF-'));assert(content.includes('Forest'));assert(!content.includes('Uccle'));assert(content.includes('9h00'));
@@ -90,11 +97,11 @@ test('worker PDF is a real PDF containing only the selected workplace and uses t
 test('worker payroll shows three approved days, rate, gross, advance and net in the shared PDF',async()=>{
  const {jsPDF}=await import('jspdf');const {autoTable}=await import('jspdf-autotable');const {reportFilename}=await import('../src/helpers.mjs');
  const f=fixture();Object.assign(f.context,{jsPDF,autoTable,File,reportFilename});f.context.navigator.canShare=()=>true;f.context.navigator.share=async data=>{f.context.window.sharedPDF=data};
- const runtime=fs.readFileSync('scripts/mobile-runtime.js','utf8');f.run(runtime.slice(runtime.indexOf('async function exportMobileReport'),runtime.indexOf('async function requestAccountDeletion')));
- f.run(`teamState.role='employee';teamState.access={company:'Company',employee:{id:'worker',name:'Geraldo'}};teamCall=async()=>({days:[3,4,5].map(i=>({id:String(i),work_date:'2026-11-0'+i,entry_time:'08:00',exit_time:'17:30',break_minutes:30,approval_status:'approved'})),sites:[],payment:{payment_mode:'daily',daily_rate:100,advance:50,currency_code:'EUR'},currency:'EUR'});`);
+ const runtime=fs.readFileSync('scripts/mobile-runtime.js','utf8');f.run(runtime.slice(runtime.indexOf('function pdfReportText'),runtime.indexOf('async function requestAccountDeletion')));
+ f.run(`teamState.role='employee';teamState.access={company:'Company',employee:{id:'worker',name:'Geraldo'}};teamCall=async()=>({days:[3,4,5].map(i=>({id:String(i),work_date:'2026-11-0'+i,entry_time:'08:00',exit_time:'17:30',break_minutes:30,approval_status:'approved'})),sites:[],payment:{payment_mode:'daily',daily_rate:2450,advance:40,currency_code:'EUR'},currency:'EUR'});`);
  await f.run('workerPortal()');await f.run('exportWorkerReport()');const stats=[...f.document.querySelectorAll('#workerReport .stat')].map(e=>e.textContent);
- assert(stats.some(s=>s==='3Dias aprovados'));assert(stats.some(s=>s.includes('300,00')&&s.includes('Valor bruto')));assert(stats.some(s=>s.includes('250,00')&&s.includes('Saldo a receber')));
- const pdf=await f.context.window.sharedPDF.files[0].text();for(const value of ['27h00','300,00','250,00','Dias aprovados'])assert(pdf.includes(value),value);
+ assert(stats.some(s=>s==='3Dias aprovados'));assert(stats.some(s=>s.includes('7.350,00')&&s.includes('Valor bruto')));assert(stats.some(s=>s.includes('7.310,00')&&s.includes('Saldo a receber')));
+ const pdf=await f.context.window.sharedPDF.files[0].text();for(const value of ['27h00','7.350,00','7.310,00','Dias aprovados'])assert(pdf.includes(value),value);
 });
 test('worker pay excludes pending days, counts half days and never allocates advances to filtered places',async()=>{
  const f=fixture();f.run(`teamState.role='employee';teamState.access={company:'Company',employee:{id:'worker',name:'Worker'}};teamCall=async()=>({days:[{work_date:'2026-11-01',entry_time:'08:00',exit_time:'12:00',break_minutes:0,workplace:'Forest',approval_status:'approved'},{work_date:'2026-11-02',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Forest',approval_status:'pending'}],sites:[],payment:{payment_mode:'hourly',hourly_rate:20,advance:10},currency:'EUR'});`);
