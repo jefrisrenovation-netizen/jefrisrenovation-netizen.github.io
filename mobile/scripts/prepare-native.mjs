@@ -29,6 +29,63 @@ if(platform==='ios'){
   let plist=fs.readFileSync('ios/App/App/Info.plist','utf8');
   plist=plist.replace('</dict>\n</plist>','<key>ITSAppUsesNonExemptEncryption</key><false/>\n<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>suiviheurespro</string></array></dict></array>\n</dict>\n</plist>');
   fs.writeFileSync('ios/App/App/Info.plist',plist);
+
+  if (process.argv.includes('--meta-events')) {
+    const token = process.env.META_IOS_CLIENT_TOKEN?.trim();
+    if (!token) throw new Error('Set META_IOS_CLIENT_TOKEN in the Codemagic meta_ios group');
+    const replaceRequired = (source, marker, replacement) => {
+      if (!source.includes(marker)) throw new Error(`Missing iOS template marker: ${marker}`);
+      return source.replace(marker, replacement);
+    };
+
+    const packageID = 'A00000000000000000000003';
+    const productID = 'A00000000000000000000004';
+    const frameworkID = 'A00000000000000000000005';
+    pbx = replaceRequired(pbx, '/* Begin PBXBuildFile section */',
+      `/* Begin PBXBuildFile section */
+        ${frameworkID} /* FacebookCore in Frameworks */ = {isa = PBXBuildFile; productRef = ${productID}; };`);
+    pbx = replaceRequired(pbx, '4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,',
+      `4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+                ${frameworkID} /* FacebookCore in Frameworks */,`);
+    pbx = replaceRequired(pbx, 'packageProductDependencies = (',
+      `packageProductDependencies = (
+                ${productID} /* FacebookCore */,`);
+    pbx = replaceRequired(pbx, 'packageReferences = (',
+      `packageReferences = (
+                ${packageID} /* facebook-ios-sdk */,`);
+    pbx = replaceRequired(pbx, '/* Begin XCSwiftPackageProductDependency section */',
+      `/* Begin XCRemoteSwiftPackageReference section */
+        ${packageID} /* facebook-ios-sdk */ = {
+            isa = XCRemoteSwiftPackageReference;
+            repositoryURL = "https://github.com/meta/facebook-ios-sdk.git";
+            requirement = {kind = exactVersion; version = 18.0.3; };
+        };
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+        ${productID} /* FacebookCore */ = {
+            isa = XCSwiftPackageProductDependency;
+            package = ${packageID};
+            productName = FacebookCore;
+        };`);
+    fs.writeFileSync('ios/App/App.xcodeproj/project.pbxproj', pbx);
+
+    const escapedToken = token.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    plist = replaceRequired(plist, '</dict>\n</plist>', `<key>FacebookAppID</key><string>2101027710610805</string>
+<key>FacebookClientToken</key><string>${escapedToken}</string>
+<key>FacebookAutoLogAppEventsEnabled</key><true/>
+<key>FacebookAdvertiserIDCollectionEnabled</key><false/>
+</dict>
+</plist>`);
+    fs.writeFileSync('ios/App/App/Info.plist', plist);
+
+    const delegatePath = 'ios/App/App/AppDelegate.swift';
+    let delegate = fs.readFileSync(delegatePath, 'utf8');
+    delegate = replaceRequired(delegate, 'import Capacitor', 'import Capacitor\nimport FacebookCore');
+    delegate = replaceRequired(delegate, '        return true',
+      '        _ = ApplicationDelegate.shared.application(application, didFinishLaunchingWithOptions: launchOptions)\n        return true');
+    fs.writeFileSync(delegatePath, delegate);
+  }
 }else{
   let manifest=fs.readFileSync('android/app/src/main/AndroidManifest.xml','utf8');
   manifest=manifest.replace('</activity>','<intent-filter android:autoVerify="true"><action android:name="android.intent.action.VIEW"/><category android:name="android.intent.category.DEFAULT"/><category android:name="android.intent.category.BROWSABLE"/><data android:scheme="https" android:host="jefrisrenovation-netizen.github.io" android:path="/"/></intent-filter>\n<intent-filter><action android:name="android.intent.action.VIEW"/><category android:name="android.intent.category.DEFAULT"/><category android:name="android.intent.category.BROWSABLE"/><data android:scheme="suiviheurespro" android:host="login"/></intent-filter>\n</activity>');
