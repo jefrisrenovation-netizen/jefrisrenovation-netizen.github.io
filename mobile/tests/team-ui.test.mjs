@@ -200,3 +200,19 @@ test('team report combines payroll by month and filters by employee and job titl
  assert.equal([...filtered.rows].map(employee=>employee.id).join(','),'a,d');
  assert.equal(filtered.advance,40);
 });
+
+test('team report totals only the individually selected months',()=>{
+ const f=fixture();
+ const report=f.run(`buildCompanyPeriodReport([{id:'worker',active:true}],[
+  {employee_id:'worker',work_date:'2026-04-10',entry_time:'08:00',exit_time:'17:00'}
+ ],[
+  {employee_id:'worker',month:'2026-01-01',payment_mode:'fixed',fixed_salary:100},
+  {employee_id:'worker',month:'2026-04-01',payment_mode:'fixed',fixed_salary:900},
+  {employee_id:'worker',month:'2026-06-01',payment_mode:'fixed',fixed_salary:200},
+  {employee_id:'worker',month:'2026-08-01',payment_mode:'fixed',fixed_salary:300}
+ ],{workers:['worker'],job:'',months:['2026-01','2026-06','2026-08']})`);
+ assert.equal(report.gross,600);
+ assert.equal(report.rows[0].days,0);
+ assert.equal(f.run('companyReportMonthEnd("2024-02")'),'2024-02-29');
+ assert.equal(f.run('companyReportMonthEnd("2026-12")'),'2026-12-31');
+});
