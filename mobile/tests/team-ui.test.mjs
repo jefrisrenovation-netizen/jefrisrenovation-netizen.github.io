@@ -238,3 +238,20 @@ test('reports show one type at a time and require an explicit individual selecti
  assert.equal(el('reportType').value,'team');
  assert.equal(el('personalReportWorker').value,'');
 });
+
+test('employee invitations and account deletion are reachable only from owner settings',()=>{
+ const f=fixture();
+ const panel=f.document.getElementById('settingsPanel');
+ const invites=f.document.getElementById('inviteForm');
+ const deletion=panel.querySelector('[data-text="Supprimer mon compte et mes données"]');
+ assert(invites);
+ assert(deletion);
+ assert.equal(invites.closest('#settingsPanel'),panel);
+ assert(!invites.closest('details').hasAttribute('open'));
+ assert(!deletion.closest('details').hasAttribute('open'));
+ f.run("showPane('team')");
+ assert(panel.classList.contains('hidden'));
+ assert(!f.document.getElementById('teamDirectoryPanel').contains(deletion));
+ f.run("showPane('settings')");
+ assert(!panel.classList.contains('hidden'));
+});
