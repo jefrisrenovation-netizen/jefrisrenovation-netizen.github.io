@@ -149,3 +149,26 @@ test('a second period submits the same date and stays available after reopening 
  assert.equal(f.context.window.saved.length,2);assert.equal(f.context.window.saved[0].work_date,f.context.window.saved[1].work_date);assert.equal(f.context.window.saved[1].entry_time,'11:00');assert.equal(f.context.window.saved[1].break_minutes,0);
  f.run('workerDayDialog()');assert.equal(f.document.getElementById('workerDayDate').value,'2026-11-05');
 });
+test('project labor filters approved work and allocates a shared daily wage by hours',()=>{
+ const f=fixture();
+ f.run(`
+  const base={work_date:'2026-11-02',break_minutes:0};
+  const sample=[
+   {...base,employee_id:'worker',workplace:'Forest',entry_time:'08:00',exit_time:'10:00'},
+   {...base,employee_id:'worker',workplace:'Uccle',entry_time:'10:00',exit_time:'16:00'},
+   {...base,employee_id:'hourly',workplace:'Forest',entry_time:'08:00',exit_time:'09:00'},
+   {...base,employee_id:'hourly',workplace:'Forest',entry_time:'09:00',exit_time:'12:00',approval_status:'pending'}
+  ];
+  const rates=[
+   {employee_id:'worker',payment_mode:'daily',daily_rate:160,advance:50,currency_code:'EUR'},
+   {employee_id:'hourly',payment_mode:'hourly',hourly_rate:30,currency_code:'EUR'}
+  ];
+  showPane('sites');
+  refreshSiteLabor(sample,rates,[]);
+  $('siteLaborPlace').value='Forest';
+  $('siteLaborPlace').onchange();
+ `);
+ const summary=f.document.getElementById('siteLaborStats').textContent;
+ assert.match(summary,/3h00/);
+ assert.match(summary,/70,00/);
+});
