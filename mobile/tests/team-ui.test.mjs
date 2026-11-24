@@ -80,7 +80,7 @@ test('worker report exports only their selected workplace and month, including a
 });
 
 test('individual workplace report recomputes hours and hourly pay without allocating monthly advances',async()=>{
- const f=fixture();f.run(`$('employee').value='worker';$('reportWorkplace').value=JSON.stringify('Forest');
+ const f=fixture();f.run(`$('reportType').value='individual';$('reportType').onchange();$('personalReportWorker').value='worker';$('reportWorkplace').value=JSON.stringify('Forest');
  const reportDays=[{employee_id:'worker',id:'a',work_date:'2026-11-01',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Forest',approval_status:'approved'},{employee_id:'worker',id:'b',work_date:'2026-11-02',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Uccle',approval_status:'approved'},{employee_id:'worker',id:'c',work_date:'2026-11-03',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Forest',approval_status:'pending'}];
  sb.from=table=>{const q={select(){return q},eq(){return q},gte(){return q},lte(){return q},order(){return Promise.resolve({data:reportDays})},single(){return Promise.resolve({data:employees[0]})},maybeSingle(){return Promise.resolve({data:{employee_id:'worker',payment_mode:'hourly',hourly_rate:20,currency_code:'EUR',advance:500}})}};return q;};`);
  await f.run('showIndividualReport()');const source=f.document.getElementById('individualReport');assert(!source.classList.contains('hidden'));assert.equal(source.querySelectorAll('tbody tr').length,1);assert(source.textContent.includes('Forest'));assert(!source.textContent.includes('Uccle'));assert(source.textContent.includes('9h00'));const summary=f.document.getElementById('individualReportSummary');assert.equal(summary.querySelectorAll('.stat').length,4);assert(summary.textContent.includes('180,00'));assert(!summary.textContent.includes('500,00'));assert(summary.textContent.includes('não são divididos'));
@@ -215,4 +215,26 @@ test('team report totals only the individually selected months',()=>{
  assert.equal(report.rows[0].days,0);
  assert.equal(f.run('companyReportMonthEnd("2024-02")'),'2024-02-29');
  assert.equal(f.run('companyReportMonthEnd("2026-12")'),'2026-12-31');
+});
+
+test('reports show one type at a time and require an explicit individual selection',()=>{
+ const f=fixture();
+ f.run(`$('year').value='2026';$('month').value='11';$('employee').value='worker';
+ refreshCompanyReportFilters(employees);refreshPersonalReportFilters([],employees);showPane('reports');`);
+ const el=id=>f.document.getElementById(id);
+ assert.equal(el('reportType').value,'team');
+ assert.equal(el('companyReportWorkerMode').value,'all');
+ assert(el('companyReportWorkers').classList.contains('hidden'));
+ assert(!el('companyReportFilters').classList.contains('hidden'));
+ assert(el('personalReportFilters').classList.contains('hidden'));
+ f.run(`$('reportType').value='individual';$('reportType').onchange();`);
+ assert(el('companyReportFilters').classList.contains('hidden'));
+ assert(!el('personalReportFilters').classList.contains('hidden'));
+ assert.equal(el('personalReportWorker').value,'');
+ assert(el('individualReportButton').disabled);
+ f.run(`$('personalReportWorker').value='worker';$('personalReportWorker').onchange();`);
+ assert(!el('individualReportButton').disabled);
+ f.run(`showPane('home');showPane('reports');`);
+ assert.equal(el('reportType').value,'team');
+ assert.equal(el('personalReportWorker').value,'');
 });
