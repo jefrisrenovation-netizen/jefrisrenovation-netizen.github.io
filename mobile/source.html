@@ -632,7 +632,24 @@ function companyReportTotals(rows){
   const sum=key=>Math.round(rows.reduce((total,row)=>total+row[key],0)*100)/100;
   return {rows,gross:sum("gross"),advance:sum("advance"),balance:sum("balance"),due:Math.round(rows.reduce((total,row)=>total+row.due,0)*100)/100};
 }
+function formatCompanyReportMonth(month,language,includeYear=true){
+  return new Date(month+"-01T12:00:00").toLocaleDateString(language,
+    includeYear?{month:"long",year:"numeric"}:{month:"long"});
+}
+function companyReportMonthEnd(month){
+  const end=new Date(month+"-01T12:00:00");
+  end.setMonth(end.getMonth()+1,0);
+  return month+"-"+pad(end.getDate());
+}
+function formatCompanyReportMonths(months,language){
+  return months.map(month=>formatCompanyReportMonth(month,language)).join(", ");
+}
 function buildCompanyPeriodReport(staff,days,payments,selection){
+  if(selection.months){
+    const months=new Set(selection.months);
+    days=days.filter(row=>months.has(row.work_date.slice(0,7)));
+    payments=payments.filter(row=>months.has(row.month.slice(0,7)));
+  }
   const selected=new Set(selection.workers);
   const worked=new Set([...days,...payments].map(row=>row.employee_id));
   const people=staff.filter(employee=>
@@ -672,32 +689,45 @@ async function showCompanyReport(){
   const request=++companyReportRequest;
   const ownerId=user.id;
   const selection=companyReportSelection||{from:ym(),to:ym(),all:false,job:"",workers:[]};
-  const {from,to,all}=selection;
-  if(!all&&(!/^\d{4}-(0[1-9]|1[0-2])$/.test(from)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(to)||from>to)){
-    const message=tt("reportInvalidPeriod");
+  const {from,to,all,months}=selection;
+  const firstMonth=months?.[0]||from;
+  const lastMonth=months?.at(-1)||to;
+  const isMonth=value=>/^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+  const invalid=months
+    ? !months.length||!months.every(isMonth)
+    : !all&&(!isMonth(from)||!isMonth(to)||from>to);
+  if(invalid){
+    const message=tt(months&&!months.length?"reportSelectMonth":"reportInvalidPeriod");
     if($("companyReportFilterStatus"))$("companyReportFilterStatus").textContent=message;
     setStatus(message,false);return;
   }
   if($("companyReportFilterStatus"))$("companyReportFilterStatus").textContent="";
   setStatus(tr("Carregando relatório mensal..."));
   try{
-    const [year,month]=to.split("-").map(Number);
-    const lastDay=all?"":to+"-"+pad(new Date(year,month,0).getDate());
     const [staff,days,payments]=await Promise.all([
       fetchCompanyReportPages("employees","*","id"),
-      fetchCompanyReportPages("work_days","*","id",query=>all?query:query.gte("work_date",from+"-01").lte("work_date",lastDay)),
-      fetchCompanyReportPages("monthly_payments","*","employee_id",query=>(all?query:query.gte("month",from+"-01").lte("month",to+"-01")).order("month"))
+      fetchCompanyReportPages("work_days","*","id",query=>{
+        if(all)return query;
+        if(!months)return query.gte("work_date",firstMonth+"-01").lte("work_date",companyReportMonthEnd(lastMonth));
+        const ranges=months.map(value=>"and(work_date.gte."+value+"-01,work_date.lte."+companyReportMonthEnd(value)+")");
+        return query.or(ranges.join(","));
+      }),
+      fetchCompanyReportPages("monthly_payments","*","employee_id",query=>{
+        const filtered=all?query:months?query.in("month",months.map(value=>value+"-01")):query.gte("month",firstMonth+"-01").lte("month",lastMonth+"-01");
+        return filtered.order("month");
+      })
     ]);
     if(request!==companyReportRequest||user?.id!==ownerId)return;
     staff.sort((a,b)=>a.name.localeCompare(b.name));
     const report=buildCompanyPeriodReport(staff,days,payments,selection);
     const language=$("languageCode").value||"fr";
-    const periodLabel=month=>new Date(month+"-01T12:00:00").toLocaleDateString(language,{month:"long",year:"numeric"});
-    const period=all?tt("reportAllMonths"):from===to?periodLabel(from):periodLabel(from)+" – "+periodLabel(to);
+    const periodLabel=value=>formatCompanyReportMonth(value,language);
+    const period=all?tt("reportAllMonths"):months?formatCompanyReportMonths(months,language):
+      from===to?periodLabel(from):periodLabel(from)+" – "+periodLabel(to);
     const variableRate={fr:"Tarifs variables","pt-PT":"Valores variáveis","pt-BR":"Valores variáveis",en:"Variable rates"}[language]||"Tarifs variables";
     $("reportRows").innerHTML=report.rows.map(r=>`<tr><td>${esc(r.name)}${r.active===false?esc(tr(' (retirado da equipe)')):''}</td><td>${r.days.toLocaleString($("languageCode").value||"fr")}</td><td>${r.noActivity?"—":r.variableRate?esc(variableRate):esc(r.modeLabel)+": "+formatMoney(r.rate,r.currency)}</td><td>${formatMoney(r.gross,r.currency)}</td><td>${formatMoney(r.advance,r.currency)}</td><td>${formatMoney(r.balance,r.currency)}</td></tr>`).join("");
     $("reportMonth").textContent=[period,selection.job?selection.jobLabel:"",profile.company_name||"Suivi des heures"].filter(Boolean).join(" — ");
-    $("companyReport").dataset.reportMonth=all?"all":from===to?from:from+"_to_"+to;
+    $("companyReport").dataset.reportMonth=all?"all":months?months.length===1?months[0]:"selected":from===to?from:from+"_to_"+to;
     const currencies=[...new Set(report.rows.filter(r=>!r.noActivity).map(r=>r.currency))];
     const single=currencies.length<=1;
     const money=n=>single?formatMoney(n,currencies[0]||profile.preferred_currency||"EUR"):"—";
