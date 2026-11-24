@@ -701,6 +701,11 @@ async function showCompanyReport(){
     if($("companyReportFilterStatus"))$("companyReportFilterStatus").textContent=message;
     setStatus(message,false);return;
   }
+  if(selection.workerMode==="selected"&&!selection.workers.length){
+    const message=tt("reportSelectWorker");
+    $("companyReportFilterStatus").textContent=message;
+    setStatus(message,false);return;
+  }
   if($("companyReportFilterStatus"))$("companyReportFilterStatus").textContent="";
   setStatus(tr("Carregando relatório mensal..."));
   try{
