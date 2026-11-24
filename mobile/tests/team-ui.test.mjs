@@ -172,3 +172,31 @@ test('project labor filters approved work and allocates a shared daily wage by h
  assert.match(summary,/3h00/);
  assert.match(summary,/70,00/);
 });
+
+test('team report combines payroll by month and filters by employee and job title',()=>{
+ const f=fixture();
+ const report=f.run(`buildCompanyPeriodReport([
+  {id:'a',active:true,job_title:'Pintor'},{id:'b',active:true,job_title:'pintor'},
+  {id:'c',active:true,job_title:'Pedreiro'},{id:'d',active:false}
+ ],[
+  {employee_id:'a',work_date:'2026-09-01',entry_time:'08:00',exit_time:'17:00'},
+  {employee_id:'a',work_date:'2026-10-01',entry_time:'08:00',exit_time:'17:00'}
+ ],[
+  {employee_id:'a',month:'2026-09-01',daily_rate:100},
+  {employee_id:'a',month:'2026-10-01',daily_rate:200,advance:250},
+  {employee_id:'b',month:'2026-11-01',payment_mode:'fixed',fixed_salary:300}
+ ],{workers:[],job:''})`);
+ assert.equal(report.rows.length,3);
+ assert.equal(report.gross,600);
+ assert.equal(report.advance,250);
+ assert.equal(report.balance,350);
+ assert.equal(report.due,400);
+ assert(report.rows[0].variableRate);
+ assert(report.rows[2].noActivity);
+ const filtered=f.run(`buildCompanyPeriodReport([
+  {id:'a',active:true,job_title:'PINTOR'},{id:'b',active:true,job_title:'Pintor'},
+  {id:'c',active:true,job_title:'Pedreiro'},{id:'d',active:false,job_title:'pintor'}
+ ],[],[{employee_id:'d',month:'2026-09-01',advance:40}],{workers:['a','c','d'],job:'pintor'})`);
+ assert.equal([...filtered.rows].map(employee=>employee.id).join(','),'a,d');
+ assert.equal(filtered.advance,40);
+});
