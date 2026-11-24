@@ -1,6 +1,11 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
+ reportType:['Type de rapport','Tipo de relatório','Report type'],
+ reportCompany:['Équipe','Equipe','Team'],
+ reportIndividual:['Individuel','Individual','Individual'],
+ chooseReportWorker:['Choisir un employé','Escolher um funcionário','Choose an employee'],
+ showReport:['Afficher le rapport','Ver relatório','View report'],
  jobTitle:['Poste','Cargo','Job title'],
  saveJobTitle:['Enregistrer le poste','Salvar cargo','Save job title'],
  teamReportFilters:['Rapport d’équipe','Relatório de equipe','Team report'],
@@ -78,6 +83,7 @@ function renderTeamDirectory(){
 function showPane(pane){
  if(pane==='team')renderTeamDirectory();
  teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamDirectoryPanel','team'],['teamPanel','team-sheet'],['timesheetPanel','team-sheet'],['sitesPanel','sites'],['reportActions','reports'],['reviewPanel','team'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
+ if(pane==='reports'&&$('reportType'))resetReportType();
  closeCompanyReport();closeIndividualReport();document.querySelectorAll('[data-pane]').forEach(e=>e.classList.toggle('selected',e.dataset.pane===(pane==='team-sheet'?'team':pane)));
  $('upgradeNotice').textContent='';$('mainNav')?.scrollIntoView({block:'start',behavior:'smooth'});
 }
@@ -114,7 +120,7 @@ function setupOwnerUI(){
  $('app').append(sites);$('siteAddress').required=false;$('siteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,async()=>{const {error}=await sb.from('work_sites').insert({owner_id:user.id,name:$('siteName').value.trim(),address:$('siteAddress').value.trim()});if(error)throw Error(tt('failed'));$('siteForm').reset();await upgradeRefresh();teamNotice(tt('saveOK'));});};
  const review=document.createElement('section');review.id='reviewPanel';review.className='card hidden no-print';review.innerHTML=`<h2>${teamLabel('reviewTitle')}</h2><p class="muted">${teamLabel('reviewHelp')}</p><div id="reviewList"></div>`;$('app').append(review);
  $('siteLaborMonth').onchange=()=>window.teamUI.month($('siteLaborMonth').value).catch(teamNotice);
- setupCompanyReportFilters();setupEmployeeJobTitle();setupPersonalReportFilters();$('email').type='text';showPane('home');
+ setupCompanyReportFilters();setupEmployeeJobTitle();setupPersonalReportFilters();setupReportType();$('email').type='text';showPane('home');
 }
 async function withTeamButton(button,fn){if(button?.disabled)return;if(button)button.disabled=true;try{await fn()}catch(error){teamNotice(error)}finally{if(button)button.disabled=false}}
 async function upgradeRefresh(){
@@ -303,7 +309,9 @@ function setupEmployeeJobTitle(){
 }
 function setupCompanyReportFilters(){
  const filters=document.createElement('section');filters.id='companyReportFilters';
- filters.innerHTML=`<h2>${teamLabel('teamReportFilters')}</h2>
+ filters.innerHTML=` <label id="companyReportWorkerModeLabel" for="companyReportWorkerMode">${teamLabel('reportWorkers')}</label>
+ <select id="companyReportWorkerMode"><option value="all" data-team-text="reportAllWorkers">${esc(tt('reportAllWorkers'))}</option><option value="selected" data-team-text="reportChooseWorkers">${esc(tt('reportChooseWorkers'))}</option></select>
+ <div id="companyReportWorkers" class="hidden" role="group" aria-labelledby="companyReportWorkerModeLabel"></div>
  <label for="companyReportPeriod">${teamLabel('reportPeriod')}</label>
  <select id="companyReportPeriod"><option value="range" data-team-text="reportMonthRange">${esc(tt('reportMonthRange'))}</option><option value="months" data-team-text="reportPickMonths">${esc(tt('reportPickMonths'))}</option><option value="all" data-team-text="reportAllMonths">${esc(tt('reportAllMonths'))}</option></select>
  <div id="companyReportRange" class="grid">
@@ -318,11 +326,9 @@ function setupCompanyReportFilters(){
   <button type="button" class="secondary" id="companyReportClearMonths">${teamLabel('reportClearMonths')}</button>
  </div>
  <label for="companyReportJob">${teamLabel('jobTitle')}</label><select id="companyReportJob"></select>
- <label id="companyReportWorkerModeLabel" for="companyReportWorkerMode">${teamLabel('reportWorkers')}</label>
- <select id="companyReportWorkerMode"><option value="all" data-team-text="reportAllWorkers">${esc(tt('reportAllWorkers'))}</option><option value="selected" data-team-text="reportChooseWorkers">${esc(tt('reportChooseWorkers'))}</option></select>
- <div id="companyReportWorkers" class="hidden" role="group" aria-labelledby="companyReportWorkerModeLabel"></div><p id="companyReportFilterStatus" class="status" role="status"></p>`;
+<p id="companyReportFilterStatus" class="status" role="status"></p>`;
  const button=$('companyReportButton');filters.append(button);
- $('reportActions').prepend(filters);button.removeAttribute('data-i18n');button.innerHTML=teamLabel('teamReportFilters');
+ $('reportActions').prepend(filters);button.removeAttribute('data-i18n');button.innerHTML=teamLabel('showReport');
  $('companyReportClearMonths').onclick=()=>{
   companyReportMonths.clear();renderCompanyReportMonths();rememberCompanyReportSelection();closeCompanyReport();
   $('companyReportFilterStatus').textContent='';
@@ -345,7 +351,6 @@ function setupCompanyReportFilters(){
   closeCompanyReport();
  };
  $('companyReportFrom').dataset.previous=$('companyReportFrom').value;
- updateAccountMode();
 }
 const companyReportMonths=new Set();
 function updatePickedMonthsLabel(){
@@ -400,19 +405,71 @@ function personalReportSelection(){
 function selectReportDays(days,selection){
  return days.filter(d=>(!selection.workplace||JSON.stringify(d.workplace||'')===selection.workplace));
 }
+function setupReportType(){
+ const control=document.createElement('div');control.id='reportTypeControl';
+ control.innerHTML=`<label for="reportType">${teamLabel('reportType')}</label><select id="reportType"><option value="team" data-team-text="reportCompany">${esc(tt('reportCompany'))}</option><option value="individual" data-team-text="reportIndividual">${esc(tt('reportIndividual'))}</option></select>`;
+ $('reportActions').prepend(control);
+ $('reportType').onchange=()=>{
+  if($('reportType').value==='individual'){
+   $('personalReportWorker').value='';
+   refreshPersonalReportPlaces();
+  }
+  syncReportType();closeCompanyReport();closeIndividualReport();
+ };
+ syncReportType();
+}
+function resetReportType(){
+ $('reportType').value=$('accountType').value==='individual'?'individual':'team';
+ $('companyReportWorkerMode').value='all';
+ $('companyReportWorkers').classList.add('hidden');
+ $('companyReportJob').value='';
+ $('personalReportWorker').value='';
+ refreshPersonalReportPlaces();
+ rememberCompanyReportSelection();
+ syncReportType();
+}
+function syncReportType(){
+ if(!$('reportType'))return;
+ const individualAccount=$('accountType').value==='individual';
+ if(individualAccount)$('reportType').value='individual';
+ const individual=$('reportType').value==='individual';
+ $('reportTypeControl').classList.toggle('hidden',individualAccount);
+ $('companyReportFilters').classList.toggle('hidden',individual);
+ $('personalReportFilters').classList.toggle('hidden',!individual);
+ $('individualReportButton').disabled=!$('personalReportWorker').value;
+}
+let personalReportDays=[];
 function setupPersonalReportFilters(){
- const filters=document.createElement('div');filters.id='personalReportFilters';filters.innerHTML=`<h2>${teamLabel('personalFilters')}</h2><div class="grid"><div><label for="personalReportMonth">${teamLabel('month')}</label><input id="personalReportMonth" type="month"></div><div><label for="personalReportWorker">${teamLabel('worker')}</label><select id="personalReportWorker"></select></div><div><label for="reportWorkplace">${teamLabel('sites')}</label><select id="reportWorkplace"></select></div></div>`;
- $('reportActions').prepend(filters);$('personalReportMonth').onchange=()=>window.teamUI.month($('personalReportMonth').value).catch(teamNotice);
- $('personalReportWorker').onchange=async()=>{$('employee').value=$('personalReportWorker').value;closeIndividualReport();await loadRecords();};
- for(const id of ['reportWorkplace'])$(id).onchange=()=>{closeIndividualReport();closeCompanyReport();};
+ const filters=document.createElement('section');filters.id='personalReportFilters';
+ filters.innerHTML=`<div class="grid"><div><label for="personalReportWorker">${teamLabel('worker')}</label><select id="personalReportWorker"><option value="" data-team-text="chooseReportWorker">${esc(tt('chooseReportWorker'))}</option></select></div><div><label for="personalReportMonth">${teamLabel('siteLaborMonth')}</label><input id="personalReportMonth" type="month"></div><div><label for="reportWorkplace">${teamLabel('sites')}</label><select id="reportWorkplace"></select></div></div>`;
+ const button=$('individualReportButton');
+ button.removeAttribute('data-i18n');button.innerHTML=teamLabel('showReport');filters.append(button);
+ $('reportActions').prepend(filters);
+ $('personalReportMonth').onchange=()=>{
+  closeIndividualReport();window.teamUI.month($('personalReportMonth').value).catch(teamNotice);
+ };
+ $('personalReportWorker').onchange=()=>{
+  $('reportWorkplace').value='';refreshPersonalReportPlaces();syncReportType();closeIndividualReport();
+ };
+ $('reportWorkplace').onchange=closeIndividualReport;
 }
 function refreshPersonalReportFilters(days,staff){
- if(!$('personalReportFilters'))return;$('personalReportMonth').value=ym();
- $('personalReportWorker').innerHTML=staff.map(e=>`<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('');$('personalReportWorker').value=$('employee').value;
- const ownDays=days.filter(d=>d.employee_id===$('employee').value);
- for(const [id,key,all,empty] of [['reportWorkplace','workplace','reportPlaces','noWorkplace']]){
-  const el=$(id),value=el.value;el.innerHTML=`<option value="">${esc(tt(all))}</option>`+[...new Set(ownDays.map(d=>d[key]||''))].sort().map(v=>`<option value="${esc(JSON.stringify(v))}">${esc(v||tt(empty))}</option>`).join('');el.value=[...el.options].some(o=>o.value===value)?value:'';
- }
+ if(!$('personalReportFilters'))return;
+ $('personalReportMonth').value=ym();
+ const worker=$('personalReportWorker'),previous=worker.value;
+ worker.innerHTML=`<option value="" data-team-text="chooseReportWorker">${esc(tt('chooseReportWorker'))}</option>`+
+  staff.map(e=>`<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('');
+ worker.value=staff.some(e=>e.id===previous)?previous:'';
+ personalReportDays=days;
+ refreshPersonalReportPlaces();syncReportType();
+}
+function refreshPersonalReportPlaces(){
+ const worker=$('personalReportWorker').value,place=$('reportWorkplace'),previous=place.value;
+ const places=[...new Set(personalReportDays.filter(day=>day.employee_id===worker).map(day=>day.workplace||''))].sort();
+ place.innerHTML=`<option value="">${esc(tt('reportPlaces'))}</option>`+
+  places.map(value=>`<option value="${esc(JSON.stringify(value))}">${esc(value||tt('noWorkplace'))}</option>`).join('');
+ place.value=[...place.options].some(option=>option.value===previous)?previous:'';
+ place.disabled=!worker;
 }
 function personalReportCaption(selection){return [selection.workplace?tt('sites')+': '+(JSON.parse(selection.workplace)||tt('noWorkplace')):''].filter(Boolean).join(' · ');}
 function workerReportSummary(days,filtered=false){
