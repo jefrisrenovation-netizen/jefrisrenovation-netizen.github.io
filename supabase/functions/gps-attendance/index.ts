@@ -73,7 +73,7 @@ Deno.serve(async(req:Request)=>{
     if(!accountId)return reply(200,{records:[]});
    }
    if(action==='gps_history'){
-    const result=await admin.from('gps_attendance').select('kind,recorded_at,address,site_name,accuracy,needs_review').eq('account_id',accountId).order('recorded_at',{ascending:false}).limit(100);
+    const result=await admin.from('gps_attendance').select('kind,recorded_at,address,site_name,latitude,longitude,accuracy,needs_review').eq('account_id',accountId).order('recorded_at',{ascending:false}).limit(100);
     if(result.error)throw result.error;
     return reply(200,{records:result.data});
    }
@@ -82,9 +82,9 @@ Deno.serve(async(req:Request)=>{
     return reply(400,{error:'check'});
    }
    const position=body.position;
-   if(position!==null&&(!position||!Number.isFinite(position.lat)||Math.abs(position.lat)>90||
+   if(!position||!Number.isFinite(position.lat)||Math.abs(position.lat)>90||
       !Number.isFinite(position.lon)||Math.abs(position.lon)>180||
-      !Number.isFinite(position.accuracy)||position.accuracy<0))return reply(400,{error:'check'});
+      !Number.isFinite(position.accuracy)||position.accuracy<0)return reply(400,{error:'gpsLocationUnavailable'});
    let site=null;
    if(body.site_id){
     const result=await admin.from('work_sites').select('name,address').eq('id',String(body.site_id))
