@@ -29,7 +29,8 @@
 @media (max-width:600px){header{padding-top:calc(18px + max(env(safe-area-inset-top), var(--native-header-inset, 0px)))}}
 
 #companyReportFilters{margin-bottom:1rem}
-#companyReportFilters details{margin:.75rem 0}
+#reportTypeControl{margin-bottom:1rem}
+#reportActions input[type=month]{box-sizing:border-box;width:100%;min-width:0}
 #companyReportFilters .report-choice{display:flex;align-items:center;gap:.6rem;margin:.35rem 0;min-height:2.25rem}
 #companyReportFilters .report-choice input{width:1.125rem;min-width:1.125rem;height:1.125rem}
 #employeeJobTitleForm{margin-top:1rem}
