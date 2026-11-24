@@ -14,7 +14,9 @@ const teamWords={
  reportSelectMonth:['Sélectionnez au moins un mois.','Marque pelo menos um mês.','Select at least one month.'],
  reportAllMonths:['Tous les mois','Todos os meses','All months'],
  reportAllJobs:['Tous les postes','Todos os cargos','All job titles'],
- reportAllWorkers:['Toute l’équipe','Toda a equipe','Entire team'],
+ reportWorkers:['Employés','Funcionários','Employees'],
+ reportAllWorkers:['Tous les employés','Todos os funcionários','All employees'],
+ reportSelectWorker:['Sélectionnez au moins un employé.','Marque pelo menos um funcionário.','Select at least one employee.'],
  reportNoMatchingWorkers:['Aucun employé ne correspond aux filtres.','Nenhum funcionário corresponde aos filtros.','No employees match the filters.'],
  reportChooseWorkers:['Choisir des employés','Selecionar funcionários','Select employees'],
  reportInvalidPeriod:['Sélectionnez une période valide.','Selecione um período válido.','Select a valid period.'],
@@ -316,13 +318,11 @@ function setupCompanyReportFilters(){
   <button type="button" class="secondary" id="companyReportClearMonths">${teamLabel('reportClearMonths')}</button>
  </div>
  <label for="companyReportJob">${teamLabel('jobTitle')}</label><select id="companyReportJob"></select>
- <details><summary>${teamLabel('reportChooseWorkers')}</summary><button type="button" class="secondary" id="companyReportAllWorkers">${teamLabel('reportAllWorkers')}</button><div id="companyReportWorkers"></div></details><p id="companyReportFilterStatus" class="status" role="status"></p>`;
+ <label id="companyReportWorkerModeLabel" for="companyReportWorkerMode">${teamLabel('reportWorkers')}</label>
+ <select id="companyReportWorkerMode"><option value="all" data-team-text="reportAllWorkers">${esc(tt('reportAllWorkers'))}</option><option value="selected" data-team-text="reportChooseWorkers">${esc(tt('reportChooseWorkers'))}</option></select>
+ <div id="companyReportWorkers" class="hidden" role="group" aria-labelledby="companyReportWorkerModeLabel"></div><p id="companyReportFilterStatus" class="status" role="status"></p>`;
  const button=$('companyReportButton');filters.append(button);
  $('reportActions').prepend(filters);button.removeAttribute('data-i18n');button.innerHTML=teamLabel('teamReportFilters');
- $('companyReportAllWorkers').onclick=()=>{
-  $('companyReportWorkers').querySelectorAll('input').forEach(input=>input.checked=false);
-  rememberCompanyReportSelection();closeCompanyReport();
- };
  $('companyReportClearMonths').onclick=()=>{
   companyReportMonths.clear();renderCompanyReportMonths();rememberCompanyReportSelection();closeCompanyReport();
   $('companyReportFilterStatus').textContent='';
@@ -334,6 +334,7 @@ function setupCompanyReportFilters(){
   const mode=$('companyReportPeriod').value;
   $('companyReportRange').classList.toggle('hidden',mode!=='range');
   $('companyReportMonthPicker').classList.toggle('hidden',mode!=='months');
+  $('companyReportWorkers').classList.toggle('hidden',$('companyReportWorkerMode').value!=='selected');
   if(event.target.closest('#companyReportMonthChoices')){
    if(event.target.checked)companyReportMonths.add(event.target.value);
    else companyReportMonths.delete(event.target.value);
@@ -387,7 +388,10 @@ function rememberCompanyReportSelection(){
   months:mode==='months'?[...companyReportMonths].sort():null,
   job:$('companyReportJob').value,
   jobLabel:[...$('companyReportJob').querySelectorAll('option')].find(option=>option.value===$('companyReportJob').value)?.textContent||'',
-  workers:[...$('companyReportWorkers').querySelectorAll('input:checked')].map(input=>input.value)
+  workerMode:$('companyReportWorkerMode').value,
+  workers:$('companyReportWorkerMode').value==='selected'
+   ? [...$('companyReportWorkers').querySelectorAll('input:checked')].map(input=>input.value)
+   : []
  };
 }
 function personalReportSelection(){
