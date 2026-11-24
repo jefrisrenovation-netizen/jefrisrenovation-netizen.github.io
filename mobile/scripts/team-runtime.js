@@ -4,17 +4,10 @@ const teamWords={
  siteExpenses:['Dépenses','Despesas','Expenses'],
  siteTotal:['Coût total estimé','Custo total estimado','Estimated total cost'],
  addExpense:['Ajouter une dépense','Adicionar despesa','Add expense'],
- expenseCategory:['Catégorie','Categoria','Category'],
+ expenseName:['Nom de la dépense','Nome da despesa','Expense name'],
  expenseAmount:['Montant','Valor','Amount'],
  expenseDescription:['Description (facultative)','Descrição (opcional)','Description (optional)'],
  expenseCurrency:['Devise','Moeda','Currency'],
- expenseFuel:['Carburant','Combustível','Fuel'],
- expenseMaterials:['Matériaux','Materiais','Materials'],
- expenseParking:['Stationnement','Estacionamento','Parking'],
- expenseTools:['Outillage','Ferramentas','Tools'],
- expenseSubcontracting:['Sous-traitance','Terceirização','Subcontracting'],
- expenseOther:['Autres','Outros','Other'],
-
  siteLabor:['Main-d’œuvre par chantier','Mão de obra por obra','Labor by project'],
  siteLaborMonth:['Mois','Mês','Month'],
  chooseSite:['Choisir un chantier','Selecione uma obra','Choose a project'],
@@ -167,7 +160,6 @@ function wireSchedule(prefix,getEmployee,isWorker=false){
  };
  return fill;
 }
-const expenseCategories={fuel:'expenseFuel',materials:'expenseMaterials',parking:'expenseParking',tools:'expenseTools',subcontracting:'expenseSubcontracting',other:'expenseOther'};
 function refreshSiteLabor(days,payments,sites){
  const month=$('siteLaborMonth'), select=$('siteLaborPlace'), summary=$('siteLaborStats');
  if(!month||!select||!summary)return;
@@ -200,7 +192,7 @@ function renderSiteExpenses(site,labor,summary){
  panel.id='siteExpensePanel';
  panel.innerHTML=`<h3>${teamLabel('siteExpenses')}</h3><div class="summary" data-expense-totals></div><ul data-expense-list></ul><p role="status" data-expense-status></p><details><summary>${teamLabel('addExpense')}</summary><form><div class="grid">
   ${teamField('date','siteExpenseDate','date',monthStart())}
-  <div><label for="siteExpenseCategory">${teamLabel('expenseCategory')}</label><select id="siteExpenseCategory">${Object.entries(expenseCategories).map(([value,label])=>`<option value="${value}">${esc(tt(label))}</option>`).join('')}</select></div>
+  <div><label for="siteExpenseName">${teamLabel('expenseName')}</label><input id="siteExpenseName" maxlength="160" required></div>
   <div><label for="siteExpenseAmount">${teamLabel('expenseAmount')}</label><input id="siteExpenseAmount" type="number" min="0.01" max="9999999999.99" step="0.01" required></div>
   <div><label for="siteExpenseCurrency">${teamLabel('expenseCurrency')}</label><select id="siteExpenseCurrency"><option>EUR</option><option>BRL</option><option>USD</option></select></div>
   <div><label for="siteExpenseDescription">${teamLabel('expenseDescription')}</label><input id="siteExpenseDescription" maxlength="500"></div>
@@ -211,23 +203,25 @@ function renderSiteExpenses(site,labor,summary){
  const currency=$('siteExpenseCurrency');currency.value=['EUR','BRL','USD'].includes(profile.preferred_currency)?profile.preferred_currency:'EUR';
  const status=panel.querySelector('[data-expense-status]');
  const refresh=async()=>{
-  const {data,error}=await sb.from('work_site_expenses').select('expense_date,category,amount,currency_code,description').eq('site_id',site.id).gte('expense_date',from).lte('expense_date',to).order('expense_date');
+  const {data,error}=await sb.from('work_site_expenses').select('expense_date,name,amount,currency_code,description').eq('site_id',site.id).gte('expense_date',from).lte('expense_date',to).order('expense_date');
   if(error)throw Error(tt('failed'));
   const costs=new Map();
   for(const expense of data||[])costs.set(expense.currency_code,(costs.get(expense.currency_code)||0)+Math.round(Number(expense.amount)*100));
   const currencies=new Set([...labor.keys(),...costs.keys(),currency.value]);
   panel.querySelector('[data-expense-totals]').innerHTML=[...currencies].map(code=>`<div class="stat"><b>${esc(formatMoney((costs.get(code)||0)/100,code))}</b><span>${esc(tt('siteExpenses'))}</span></div><div class="stat"><b>${esc(formatMoney(((labor.get(code)||0)+(costs.get(code)||0))/100,code))}</b><span>${esc(tt('siteTotal'))}</span></div>`).join('');
-  panel.querySelector('[data-expense-list]').innerHTML=(data||[]).map(e=>`<li>${esc(e.expense_date)} · ${esc(tt(expenseCategories[e.category]))} · ${esc(formatMoney(e.amount,e.currency_code))}${e.description?' — '+esc(e.description):''}</li>`).join('');
+  panel.querySelector('[data-expense-list]').innerHTML=(data||[]).map(e=>`<li>${esc(e.expense_date)} · ${esc(e.name)} · ${esc(formatMoney(e.amount,e.currency_code))}${e.description?' — '+esc(e.description):''}</li>`).join('');
  };
  const form=panel.querySelector('form');
  form.onsubmit=e=>{
   e.preventDefault();
+  const name=panel.querySelector('#siteExpenseName');
   if(!form.reportValidity())return;
+  if(!name.value.trim()){status.textContent=tt('check');name.focus();return;}
   withTeamButton(e.submitter,async()=>{
    const amount=$('siteExpenseAmount'),description=$('siteExpenseDescription');
-   const {error}=await sb.from('work_site_expenses').insert({site_id:site.id,expense_date:date.value,category:$('siteExpenseCategory').value,amount:amount.value,currency_code:currency.value,description:description.value.trim()});
+   const {error}=await sb.from('work_site_expenses').insert({site_id:site.id,expense_date:date.value,name:name.value.trim(),amount:amount.value,currency_code:currency.value,description:description.value.trim()});
    if(error)throw Error(tt('failed'));
-   amount.value='';description.value='';status.textContent=tt('saveOK');
+   name.value='';amount.value='';description.value='';status.textContent=tt('saveOK');
    await refresh().catch(error=>{status.textContent=error.message;});
   });
  };
