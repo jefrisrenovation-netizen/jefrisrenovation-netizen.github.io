@@ -70,11 +70,12 @@ const teamWords={
 function tt(key){const lang=$('languageCode')?.value||document.documentElement.lang||'fr';const row=teamWords[key];return row?row[lang.startsWith('pt')?1:lang.startsWith('en')?2:0]:teamWords.failed[lang.startsWith('pt')?1:lang.startsWith('en')?2:0]}
 function teamLabel(key){return `<span data-team-text="${key}">${esc(tt(key))}</span>`}
 function teamTranslate(){document.querySelectorAll('[data-team-text]').forEach(e=>e.textContent=tt(e.dataset.teamText));$('email').placeholder=tt('usernameEmail');}
-async function teamCall(action,payload={}){
+async function teamCall(action,payload={},endpoint='team-access'){
  const {data:auth}=await sb.auth.getSession();
- const response=await fetch(SUPABASE_URL+'/functions/v1/team-access',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,...(auth.session?{Authorization:'Bearer '+auth.session.access_token}:{})},body:JSON.stringify({action,...payload})});
+ const response=await fetch(SUPABASE_URL+'/functions/v1/'+endpoint,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,...(auth.session?{Authorization:'Bearer '+auth.session.access_token}:{})},body:JSON.stringify({action,...payload})});
  const data=await response.json();if(!response.ok){const error=new Error(tt(data.error));error.code=data.error;throw error;}return data;
 }
+function gpsCall(action,payload={}){return teamCall(action,payload,'gps-attendance');}
 function teamNotice(error){const message=typeof error==='string'?error:error instanceof Error?error.message:tt('failed');const target=teamState.role==='employee'?$('workerNotice'):$('upgradeNotice');if(target){target.textContent=message;target.setAttribute('role','status');}else setLogin(message);}
 async function openTeamSheet(id){
  if(!employees.some(employee=>employee.id===id&&employee.active!==false))return;
@@ -168,9 +169,9 @@ function setupOwnerUI(){
 async function withTeamButton(button,fn){if(button?.disabled)return;if(button)button.disabled=true;try{await fn()}catch(error){teamNotice(error)}finally{if(button)button.disabled=false}}
 async function upgradeRefresh(){
  if(teamState.role!=='owner'||!$('dashboard'))return;const request=++teamState.refresh,month=ym();if(!/^\d{4}-\d{2}$/.test(month))return;
- const results=await Promise.all([sb.from('employees').select('*').eq('owner_id',user.id).order('name'),sb.from('work_days').select('*').eq('owner_id',user.id).gte('work_date',monthStart()).lte('work_date',monthEnd()),sb.from('monthly_payments').select('*').eq('owner_id',user.id).eq('month',monthStart()),sb.from('work_sites').select('id,name,address').eq('owner_id',user.id).eq('active',true).order('name'),teamCall('members')]);
+ const results=await Promise.all([sb.from('employees').select('*').eq('owner_id',user.id).order('name'),sb.from('work_days').select('*').eq('owner_id',user.id).gte('work_date',monthStart()).lte('work_date',monthEnd()),sb.from('monthly_payments').select('*').eq('owner_id',user.id).eq('month',monthStart()),sb.from('work_sites').select('id,name,address').eq('owner_id',user.id).eq('active',true).order('name'),teamCall('members'),gpsCall('gps_modes').catch(()=>({employees:[]}) )]);
  if(request!==teamState.refresh)return;for(const result of results.slice(0,4))if(result.error)throw Error(tt('failed'));
- const [staff,days,payments,sites]=results.slice(0,4).map(r=>r.data||[]),report=buildCompanyReport(staff,days,payments);teamState.sites=sites;teamState.members=results[4].members;
+ const [staff,days,payments,sites]=results.slice(0,4).map(r=>r.data||[]),report=buildCompanyReport(staff,days,payments);teamState.sites=sites;const gpsEmployees=new Set(results[5].employees||[]);teamState.members=results[4].members.map(member=>({...member,gps_attendance:gpsEmployees.has(member.employee_id)}));
  const currencies=[...new Set(report.rows.map(r=>r.currency))],currency=currencies[0]||profile.preferred_currency||'EUR';
  const stats=[[tt('hours'),fmt(days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes),0))],[tt('days'),report.rows.reduce((sum,r)=>sum+r.days,0)],[tt('advances'),currencies.length>1?'—':formatMoney(report.advance,currency)],[tt('due'),currencies.length>1?'—':formatMoney(report.due,currency)]];
  $('dashboardStats').innerHTML=stats.map(([label,value])=>`<div class="stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join('');$('dashboardCompany').textContent=profile.company_name||'Suivi des heures Pro';$('dashboardMonth').value=month;
@@ -206,8 +207,11 @@ function refreshInviteEmployees(staff){
 async function createTeamInvite(){
  const employeeId=$('inviteEmployee').value;
  const employeeName=employees.find(e=>e.id===employeeId)?.name;
- const invitation=await teamCall('invite',{employee_id:employeeId,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value,gps_attendance:$('inviteAttendance').value==='gps'});
- showTeamInvitation({...invitation,employeeName});await upgradeRefresh();
+ const gpsEnabled=$('inviteAttendance').value==='gps';
+ const previous=teamState.members.find(member=>member.employee_id===employeeId);
+ const invitation=await teamCall('invite',{employee_id:employeeId,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value});
+ if(gpsEnabled||previous?.gps_attendance)await gpsCall('gps_configure',{employee_id:employeeId,enabled:gpsEnabled});
+ showTeamInvitation({...invitation,employeeName,gps_attendance:gpsEnabled});await upgradeRefresh();
 }
 function showTeamInvitation(invitation){
  const result=$('inviteResult');
@@ -550,7 +554,7 @@ function ownerDayDialog(id){
  $('ownerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{const payload={...readDayForm('ownerDay'),owner_id:user.id,employee_id:$('ownerDayEmployee').value};const {error}=record?await sb.from('work_days').update(payload).eq('id',record.id).eq('owner_id',user.id):await sb.from('work_days').insert(payload);if(error)throw Error(error.code==='23505'?tt('date_exists'):tt('failed'));$('employee').value=$('ownerDayEmployee').value;await loadRecords();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('ownerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
 }
 async function loadAttendanceHistory(panel, employeeId){
- const {records}=await teamCall('gps_history',employeeId?{employee_id:employeeId}:{});
+ const {records}=await gpsCall('gps_history',employeeId?{employee_id:employeeId}:{});
  const clock=new Intl.DateTimeFormat($('languageCode').value||'fr',{
   dateStyle:'short',timeStyle:'medium',timeZone:'Europe/Brussels'
  });
@@ -587,7 +591,7 @@ async function setupWorkerAttendance(){
    pending={id:crypto.randomUUID(),kind,position,...(select.value?{site_id:select.value}:{})};
   }
   try{
-   await teamCall('gps_record',pending);
+   await gpsCall('gps_record',pending);
   }catch(error){
    if(error.code==='gps_retry'){
     pending=null;
@@ -655,7 +659,11 @@ async function teamBoot(){
   const chosen=readAccessPreference('suivi_language')||access.language||'fr';$('languageCode').value=chosen;applyLanguage();
   if(recovery||access.role==='activation'){passwordSetup(access.role==='activation');return;}
   if(access.role==='blocked'){$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');setLogin(tt('blocked'));return;}
-  if(access.role==='employee'){await workerPortal();return;}
+  if(access.role==='employee'){
+   const mode=await gpsCall('gps_mode').catch(()=>({enabled:false}));
+   access.gps_attendance=mode.enabled===true;
+   await workerPortal();return;
+  }
   $('workerPortal')?.classList.add('hidden');await startLegacy();setupOwnerUI();await upgradeRefresh();teamTranslate();
  }catch(error){$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');setLogin(error.message||tt('failed'));}
  finally{teamState.booting=false}
