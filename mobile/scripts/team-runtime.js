@@ -11,6 +11,8 @@ const teamWords={
  expenseFuel:['Carburant','Combustível','Fuel'],
  expenseMaterials:['Matériaux','Materiais','Materials'],
  expenseParking:['Stationnement','Estacionamento','Parking'],
+ expenseTools:['Outillage','Ferramentas','Tools'],
+ expenseSubcontracting:['Sous-traitance','Terceirização','Subcontracting'],
  expenseOther:['Autres','Outros','Other'],
 
  siteLabor:['Main-d’œuvre par chantier','Mão de obra por obra','Labor by project'],
@@ -165,7 +167,7 @@ function wireSchedule(prefix,getEmployee,isWorker=false){
  };
  return fill;
 }
-const expenseCategories={fuel:'expenseFuel',materials:'expenseMaterials',parking:'expenseParking',other:'expenseOther'};
+const expenseCategories={fuel:'expenseFuel',materials:'expenseMaterials',parking:'expenseParking',tools:'expenseTools',subcontracting:'expenseSubcontracting',other:'expenseOther'};
 function refreshSiteLabor(days,payments,sites){
  const month=$('siteLaborMonth'), select=$('siteLaborPlace'), summary=$('siteLaborStats');
  if(!month||!select||!summary)return;
