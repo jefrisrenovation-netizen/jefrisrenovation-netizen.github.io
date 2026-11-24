@@ -2,7 +2,7 @@ create table public.work_site_expenses (
   id uuid primary key default gen_random_uuid(),
   site_id uuid not null references public.work_sites(id) on delete cascade,
   expense_date date not null,
-  category text not null check (category in ('fuel', 'materials', 'parking', 'other')),
+  category text not null check (category in ('fuel', 'materials', 'parking', 'tools', 'subcontracting', 'other')),
   amount numeric(12,2) not null check (amount > 0),
   currency_code text not null check (currency_code in ('EUR', 'BRL', 'USD')),
   description text not null default '' check (length(description) <= 500)
