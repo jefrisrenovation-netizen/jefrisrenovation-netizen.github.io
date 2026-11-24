@@ -9,7 +9,7 @@ const teamWords={
  chooseReportWorker:['Choisir un employé','Escolher um funcionário','Choose an employee'],
  showReport:['Afficher le rapport','Ver relatório','View report'],
  jobTitle:['Poste','Cargo','Job title'],
- saveJobTitle:['Enregistrer le poste','Salvar cargo','Save job title'],
+ optionalJobTitle:['Poste (facultatif)','Cargo (opcional)','Job title (optional)'],
  teamReportFilters:['Rapport d’équipe','Relatório de equipe','Team report'],
  reportFrom:['Du mois','Do mês','From month'],
  reportTo:['Au mois','Até o mês','Through month'],
@@ -74,7 +74,7 @@ async function openTeamSheet(id){
  const version=loadVersion;
  await request;
  if(teamState.pane==='team'&&version===loadVersion&&$('employee').value===id){
-  if($('employeeJobTitle'))$('employeeJobTitle').value=employees.find(employee=>employee.id===id)?.job_title||'';
+
   showPane('team-sheet');
  }
 }
@@ -106,7 +106,9 @@ function setupOwnerUI(){
  const addWorker=$('newEmployee').parentElement;
  const addButton=document.querySelector('[onclick="addEmployee()"]');
  addButton.onclick=async()=>{await addEmployee();if(teamState.pane==='team')renderTeamDirectory();};
- directory.append(addWorker,addButton);
+ const jobTitleField=document.createElement('div');jobTitleField.id='newEmployeeJobTitleField';
+ jobTitleField.innerHTML=`<label for="newEmployeeJobTitle">${teamLabel('optionalJobTitle')}</label><input id="newEmployeeJobTitle" maxlength="100">`;
+ directory.append(addWorker,jobTitleField,addButton);
  const removeButton=document.querySelector('[onclick="deleteEmployee()"]');
  removeButton.onclick=async()=>{
   const id=$('employee').value;
@@ -147,7 +149,7 @@ function setupOwnerUI(){
  $('app').append(sites);$('siteAddress').required=false;$('siteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,async()=>{const {error}=await sb.from('work_sites').insert({owner_id:user.id,name:$('siteName').value.trim(),address:$('siteAddress').value.trim()});if(error)throw Error(tt('failed'));$('siteForm').reset();await upgradeRefresh();teamNotice(tt('saveOK'));});};
  const review=document.createElement('section');review.id='reviewPanel';review.className='card hidden no-print';review.innerHTML=`<h2>${teamLabel('reviewTitle')}</h2><p class="muted">${teamLabel('reviewHelp')}</p><div id="reviewList"></div>`;$('app').append(review);
  $('siteLaborMonth').onchange=()=>window.teamUI.month($('siteLaborMonth').value).catch(teamNotice);
- setupCompanyReportFilters();setupEmployeeJobTitle();setupPersonalReportFilters();setupReportType();$('email').type='text';showPane('home');
+ setupCompanyReportFilters();setupPersonalReportFilters();setupReportType();updateAccountMode();$('email').type='text';showPane('home');
 }
 async function withTeamButton(button,fn){if(button?.disabled)return;if(button)button.disabled=true;try{await fn()}catch(error){teamNotice(error)}finally{if(button)button.disabled=false}}
 async function upgradeRefresh(){
@@ -322,26 +324,6 @@ function calculateSiteLabor(days,payments,place){
   centsByCurrency.set(currency,(centsByCurrency.get(currency)||0)+Math.round(amount*100));
  }
  return {minutes:approvedMinutes,centsByCurrency,minutesByEmployee};
-}
-function setupEmployeeJobTitle(){
- const form=document.createElement('form');form.id='employeeJobTitleForm';
- form.innerHTML=`<label for="employeeJobTitle">${teamLabel('jobTitle')}</label><input id="employeeJobTitle" maxlength="100"><button type="submit" class="secondary">${teamLabel('saveJobTitle')}</button>`;
- $('teamPanel').append(form);
- $('employee').addEventListener('change',()=>{
-  $('employeeJobTitle').value=employees.find(employee=>employee.id===$('employee').value)?.job_title||'';
- });
- form.onsubmit=event=>{
-  event.preventDefault();const employee=employees.find(item=>item.id===$('employee').value);
-  if(!employee||$('accountType').value!=='business')return;
-  return withTeamButton(event.submitter,async()=>{
-   const job_title=$('employeeJobTitle').value.trim()||null;
-   const {error}=await sb.from('employees').update({job_title}).eq('owner_id',user.id).eq('id',employee.id).select('id').single();
-   if(error)throw error;
-   employee.job_title=job_title;
-   await upgradeRefresh();
-   teamNotice(tt('saveOK'));
-  });
- };
 }
 function setupCompanyReportFilters(){
  const filters=document.createElement('section');filters.id='companyReportFilters';
