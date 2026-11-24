@@ -1,6 +1,11 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
+ siteLabor:['Main-d’œuvre par chantier','Mão de obra por obra','Labor by project'],
+ siteLaborMonth:['Mois','Mês','Month'],
+ chooseSite:['Choisir un chantier','Selecione uma obra','Choose a project'],
+ siteLaborNote:['Journées approuvées. Les forfaits mensuels et les avances sont exclus. Si une journée couvre plusieurs chantiers, son tarif est réparti selon les heures.','Lançamentos aprovados. Salários fixos e adiantamentos ficam fora. Se houver mais de uma obra no dia, a diária é dividida pelas horas trabalhadas.','Approved entries. Fixed salaries and advances are excluded. Daily pay is split by hours when a day covers multiple projects.'],
+
  paymentMissing:['Tarif non renseigné par l’entreprise','Valor ainda não informado pela empresa','Rate not yet entered by the company'],gross:['Montant brut','Valor bruto','Gross amount'],net:['Solde à recevoir','Saldo a receber','Balance due'],approvedHours:['Heures approuvées','Horas aprovadas','Approved hours'],approvedDays:['Jours approuvés','Dias aprovados','Approved days'],language:['Langue','Idioma','Language'],accessLink:['Accès habituel','Acesso habitual','Regular access'],copyUser:['Copier mon identifiant','Copiar meu usuário','Copy my username'],
  reportPlaces:['Tous les lieux de travail','Todos os locais de trabalho','All workplaces'],noWorkplace:['Sans lieu de travail','Sem local de trabalho','No workplace'],personalFilters:['Rapport individuel : mois et lieu de travail','Relatório individual: mês e local de trabalho','Individual report: month and workplace'],exportPDF:['Exporter PDF / WhatsApp','Exportar PDF / WhatsApp','Export PDF / WhatsApp'],filterNotice:['Rapport filtré : les avances et le salaire mensuel ne sont pas répartis par lieu de travail.','Relatório filtrado: os adiantamentos e o salário mensal não são divididos por local de trabalho.','Filtered report: monthly advances and fixed salary are not allocated to workplaces.'], accountManagement:['Gestion du compte','Gestão da conta','Account management'],status:['Statut','Situação','Status'],schedule:['Horaire par défaut','Horário padrão','Default hours'],
  resetMember:['Créer un lien pour un nouveau mot de passe','Criar link para nova senha','Create password reset link'],resetShare:['Lien pour définir un nouveau mot de passe (1 heure)','Link para definir nova senha (1 hora)','Password reset link (1 hour)'],invalid_phone:['Téléphone avec indicatif du pays, ex. +32470123456.','Telefone com código do país, ex. +32470123456.','Phone with country code, e.g. +32470123456.'],passwordSaved:['Mot de passe enregistré. Connectez-vous avec votre identifiant ou téléphone.','Senha salva. Entre com seu usuário ou telefone.','Password saved. Sign in with your username or phone.'],deleteUsername:['Saisissez votre identifiant pour supprimer votre accès personnel. L’historique de l’entreprise sera conservé.','Digite seu usuário para apagar seu acesso pessoal. O histórico da empresa será preservado.','Enter your username to delete your personal access. Company history will be retained.'],
@@ -76,9 +81,10 @@ function setupOwnerUI(){
  const access=document.createElement('section');access.id='accessPanel';access.className='no-print';access.innerHTML=`<h2>${teamLabel('invite')}</h2><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
  management.append(access);$('invitePhone').required=false;$('inviteEmail').required=false;const syncContact=()=>{$('invitePhone').required=!$('inviteEmail').value.trim();};$('inviteEmail').oninput=syncContact;syncContact();$('inviteUsername').pattern='[a-zA-Z0-9][a-zA-Z0-9._\\x2D]{2,39}';$('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
  $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
- const sites=document.createElement('section');sites.id='sitesPanel';sites.className='card hidden no-print';sites.innerHTML=`<h2>${teamLabel('sites')}</h2><form id="siteForm"><div class="grid">${teamField('siteName','siteName')}${teamField('address','siteAddress')}</div><button type="submit">＋ ${teamLabel('addSite')}</button></form><div id="siteList"></div>`;
+ const sites=document.createElement('section');sites.id='sitesPanel';sites.className='card hidden no-print';sites.innerHTML=`<h2>${teamLabel('sites')}</h2><form id="siteForm"><div class="grid">${teamField('siteName','siteName')}${teamField('address','siteAddress')}</div><button type="submit">＋ ${teamLabel('addSite')}</button></form><h2>${teamLabel('siteLabor')}</h2><div class="grid"><div><label for="siteLaborMonth">${teamLabel('siteLaborMonth')}</label><input id="siteLaborMonth" type="month"></div><div><label for="siteLaborPlace">${teamLabel('workplace')}</label><select id="siteLaborPlace"></select></div></div><div id="siteLaborStats" class="summary" aria-live="polite"></div><p class="muted">${teamLabel('siteLaborNote')}</p><div id="siteList"></div>`;
  $('app').append(sites);$('siteAddress').required=false;$('siteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,async()=>{const {error}=await sb.from('work_sites').insert({owner_id:user.id,name:$('siteName').value.trim(),address:$('siteAddress').value.trim()});if(error)throw Error(tt('failed'));$('siteForm').reset();await upgradeRefresh();teamNotice(tt('saveOK'));});};
  const review=document.createElement('section');review.id='reviewPanel';review.className='card hidden no-print';review.innerHTML=`<h2>${teamLabel('reviewTitle')}</h2><p class="muted">${teamLabel('reviewHelp')}</p><div id="reviewList"></div>`;$('app').append(review);
+ $('siteLaborMonth').onchange=()=>window.teamUI.month($('siteLaborMonth').value).catch(teamNotice);
  setupPersonalReportFilters();$('email').type='text';showPane('home');
 }
 async function withTeamButton(button,fn){if(button?.disabled)return;if(button)button.disabled=true;try{await fn()}catch(error){teamNotice(error)}finally{if(button)button.disabled=false}}
@@ -100,7 +106,7 @@ async function upgradeRefresh(){
  $('reviewList').innerHTML=days.filter(d=>d.approval_status==='pending').map(d=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===d.employee_id)?.name||'')} · ${esc(d.work_date)}</strong><p>${esc(d.entry_time?.slice(0,5)||'')}–${esc(d.exit_time?.slice(0,5)||'')} · ${Number(d.break_minutes)} min · ${esc(d.workplace||'')}</p><div class="actions"><button class="green" data-review="${d.id}" data-status="approved">${esc(tt('approve'))}</button><button class="secondary" data-review="${d.id}" data-status="rejected">${esc(tt('reject'))}</button></div></article>`).join('')||`<p>${esc(tt('noPending'))}</p>`;
  $('reviewList').querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('review_day',{id:b.dataset.review,status:b.dataset.status});await upgradeRefresh();await loadRecords()}));
  if(teamState.pane==='team')renderTeamDirectory();
- refreshPersonalReportFilters(days,staff);teamTranslate();
+ refreshPersonalReportFilters(days,staff);refreshSiteLabor(days,payments,sites);teamTranslate();
 }
 
 async function createTeamInvite(){
@@ -140,6 +146,57 @@ function wireSchedule(prefix,getEmployee,isWorker=false){
   finally{saving=false;for(const key of ['Entry','Exit','Pause'])$(prefix+key).disabled=false;}
  };
  return fill;
+}
+function refreshSiteLabor(days,payments,sites){
+ const month=$('siteLaborMonth'), select=$('siteLaborPlace'), summary=$('siteLaborStats');
+ if(!month||!select||!summary)return;
+ month.value=ym();
+ const previous=select.value;
+ const places=[...new Set([
+  ...sites.map(site=>site.name+(site.address?' — '+site.address:'')),
+  ...days.map(day=>(day.workplace||'').trim()).filter(Boolean)
+ ])].sort((a,b)=>a.localeCompare(b));
+ select.innerHTML=`<option value="">${esc(tt('chooseSite'))}</option>`+places.map(place=>`<option value="${esc(place)}">${esc(place)}</option>`).join('');
+ select.value=places.includes(previous)?previous:'';
+ select.onchange=()=>{
+  if(!select.value){summary.replaceChildren();return;}
+  const result=calculateSiteLabor(days,payments,select.value);
+  const stats=[[tt('approvedHours'),fmt(result.minutes)],
+   ...[...result.centsByCurrency].map(([currency,cents])=>[tt('siteLabor'),formatMoney(cents/100,currency)])];
+  summary.innerHTML=stats.map(([label,value])=>`<div class="stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join('');
+ };
+ select.onchange();
+}
+function calculateSiteLabor(days,payments,place){
+ const workByEmployeeDate=new Map();
+ for(const day of days){
+  if(day.approval_status&&day.approval_status!=='approved')continue;
+  const key=JSON.stringify([day.employee_id,day.work_date]);
+  const entry=workByEmployeeDate.get(key)||{employee:day.employee_id,total:0,selected:0};
+  const duration=minutes(day.entry_time,day.exit_time,day.break_minutes??30);
+  entry.total+=duration;
+  if((day.workplace||'').trim()===place)entry.selected+=duration;
+  workByEmployeeDate.set(key,entry);
+ }
+ const paymentByEmployee=new Map(payments.map(payment=>[payment.employee_id,payment]));
+ const byEmployee=new Map();
+ let approvedMinutes=0;
+ for(const entry of workByEmployeeDate.values()){
+  if(!entry.selected)continue;
+  approvedMinutes+=entry.selected;
+  const payment=paymentByEmployee.get(entry.employee);
+  if(!payment||payment.payment_mode==='fixed')continue;
+  const amount=payment.payment_mode==='hourly'
+   ? entry.selected/60*(Number(payment.hourly_rate)||0)
+   : calculateGross(entry.total,entry.total>240?1:0.5,payment)*entry.selected/entry.total;
+  byEmployee.set(entry.employee,(byEmployee.get(entry.employee)||0)+amount);
+ }
+ const centsByCurrency=new Map();
+ for(const [employee,amount] of byEmployee){
+  const currency=paymentByEmployee.get(employee).currency_code||'EUR';
+  centsByCurrency.set(currency,(centsByCurrency.get(currency)||0)+Math.round(amount*100));
+ }
+ return {minutes:approvedMinutes,centsByCurrency};
 }
 function personalReportSelection(){
  return {workplace:$('reportWorkplace')?.value||''};
