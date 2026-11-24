@@ -239,16 +239,24 @@ test('reports show one type at a time and require an explicit individual selecti
  assert.equal(el('personalReportWorker').value,'');
 });
 
-test('employee invitations and account deletion are reachable only from owner settings',()=>{
+test('team invites start from the directory while account deletion stays in settings',()=>{
  const f=fixture();
  const panel=f.document.getElementById('settingsPanel');
  const invites=f.document.getElementById('inviteForm');
  const deletion=panel.querySelector('[data-text="Supprimer mon compte et mes données"]');
  assert(invites);
  assert(deletion);
- assert.equal(invites.closest('#settingsPanel'),panel);
+ assert.equal(invites.closest('#teamDirectoryPanel'),f.document.getElementById('teamDirectoryPanel'));
+ assert.equal(f.document.getElementById('inviteEmployee').value,'');
+ assert.equal(f.document.querySelectorAll('#inviteEmployee option').length,2);
+ assert.equal(f.document.getElementById('memberList').closest('#settingsPanel'),panel);
  assert(!invites.closest('details').hasAttribute('open'));
  assert(!deletion.closest('details').hasAttribute('open'));
+ panel.querySelector('#accessPanel').closest('details').open=true;
+ f.run(`showTeamInvitation({username:'worker.test',email:null,phone:'+32470123456',url:'https://example.invalid/invite/',reset:true})`);
+ assert.equal(f.document.getElementById('inviteResult').parentElement.id,'accessPanel');
+ f.run(`showTeamInvitation({username:'worker.test',email:null,phone:'+32470123456',url:'https://example.invalid/invite/'})`);
+ assert.equal(f.document.getElementById('inviteResult').parentElement.id,'teamInvitePanel');
  f.run("showPane('team')");
  assert(panel.classList.contains('hidden'));
  assert(!f.document.getElementById('teamDirectoryPanel').contains(deletion));
