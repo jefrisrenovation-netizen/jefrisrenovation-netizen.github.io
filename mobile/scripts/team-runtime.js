@@ -6,6 +6,12 @@ const teamWords={
  teamReportFilters:['Rapport d’équipe','Relatório de equipe','Team report'],
  reportFrom:['Du mois','Do mês','From month'],
  reportTo:['Au mois','Até o mês','Through month'],
+ reportYear:['Année','Ano','Year'],
+ reportPeriod:['Période','Período','Period'],
+ reportMonthRange:['Intervalle de mois','Intervalo de meses','Month range'],
+ reportPickMonths:['Mois au choix','Meses avulsos','Selected months'],
+ reportClearMonths:['Effacer la sélection','Limpar seleção','Clear selection'],
+ reportSelectMonth:['Sélectionnez au moins un mois.','Marque pelo menos um mês.','Select at least one month.'],
  reportAllMonths:['Tous les mois','Todos os meses','All months'],
  reportAllJobs:['Tous les postes','Todos os cargos','All job titles'],
  reportAllWorkers:['Toute l’équipe','Toda a equipe','Entire team'],
@@ -295,10 +301,20 @@ function setupEmployeeJobTitle(){
 }
 function setupCompanyReportFilters(){
  const filters=document.createElement('section');filters.id='companyReportFilters';
- filters.innerHTML=`<h2>${teamLabel('teamReportFilters')}</h2><div class="grid">
+ filters.innerHTML=`<h2>${teamLabel('teamReportFilters')}</h2>
+ <label for="companyReportPeriod">${teamLabel('reportPeriod')}</label>
+ <select id="companyReportPeriod"><option value="range" data-team-text="reportMonthRange">${esc(tt('reportMonthRange'))}</option><option value="months" data-team-text="reportPickMonths">${esc(tt('reportPickMonths'))}</option><option value="all" data-team-text="reportAllMonths">${esc(tt('reportAllMonths'))}</option></select>
+ <div id="companyReportRange" class="grid">
   ${teamField('reportFrom','companyReportFrom','month',ym())}
   ${teamField('reportTo','companyReportTo','month',ym())}
- </div><label class="report-choice"><input id="companyReportAllMonths" type="checkbox"> ${teamLabel('reportAllMonths')}</label>
+ </div>
+ <div id="companyReportMonthPicker" class="hidden">
+  <label for="companyReportYear">${teamLabel('reportYear')}</label>
+  <input id="companyReportYear" type="number" min="1" max="9999" step="1" value="${esc(ym().slice(0,4))}">
+  <div id="companyReportMonthChoices" class="grid"></div>
+  <p id="companyReportPickedMonths" class="muted" aria-live="polite"></p>
+  <button type="button" class="secondary" id="companyReportClearMonths">${teamLabel('reportClearMonths')}</button>
+ </div>
  <label for="companyReportJob">${teamLabel('jobTitle')}</label><select id="companyReportJob"></select>
  <details><summary>${teamLabel('reportChooseWorkers')}</summary><button type="button" class="secondary" id="companyReportAllWorkers">${teamLabel('reportAllWorkers')}</button><div id="companyReportWorkers"></div></details><p id="companyReportFilterStatus" class="status" role="status"></p>`;
  const button=$('companyReportButton');filters.append(button);
@@ -307,18 +323,44 @@ function setupCompanyReportFilters(){
   $('companyReportWorkers').querySelectorAll('input').forEach(input=>input.checked=false);
   rememberCompanyReportSelection();closeCompanyReport();
  };
+ $('companyReportClearMonths').onclick=()=>{
+  companyReportMonths.clear();renderCompanyReportMonths();rememberCompanyReportSelection();closeCompanyReport();
+  $('companyReportFilterStatus').textContent='';
+ };
  filters.onchange=event=>{
   const first=$('companyReportFrom'),last=$('companyReportTo');
   if(event.target===first&&first.dataset.previous===last.value)last.value=first.value;
   first.dataset.previous=first.value;
-  const all=$('companyReportAllMonths').checked;
-  first.disabled=all;last.disabled=all;
+  const mode=$('companyReportPeriod').value;
+  $('companyReportRange').classList.toggle('hidden',mode!=='range');
+  $('companyReportMonthPicker').classList.toggle('hidden',mode!=='months');
+  if(event.target.closest('#companyReportMonthChoices')){
+   if(event.target.checked)companyReportMonths.add(event.target.value);
+   else companyReportMonths.delete(event.target.value);
+   updatePickedMonthsLabel();
+  }else if(mode==='months')renderCompanyReportMonths();
   rememberCompanyReportSelection();
   $('companyReportFilterStatus').textContent='';
   closeCompanyReport();
  };
  $('companyReportFrom').dataset.previous=$('companyReportFrom').value;
  updateAccountMode();
+}
+const companyReportMonths=new Set();
+function updatePickedMonthsLabel(){
+ const language=$('languageCode').value||'fr';
+ $('companyReportPickedMonths').textContent=formatCompanyReportMonths([...companyReportMonths].sort(),language);
+}
+function renderCompanyReportMonths(){
+ const input=$('companyReportYear');
+ const year=Number(input.value),language=$('languageCode').value||'fr';
+ $('companyReportMonthChoices').innerHTML=Number.isInteger(year)&&year>=1&&year<=9999
+  ? Array.from({length:12},(_,index)=>{
+   const month=String(year).padStart(4,'0')+'-'+String(index+1).padStart(2,'0');
+   return `<label class="report-choice"><input type="checkbox" value="${month}" ${companyReportMonths.has(month)?'checked':''}> ${esc(formatCompanyReportMonth(month,language,false))}</label>`;
+  }).join('')
+  : '';
+ updatePickedMonthsLabel();
 }
 function refreshCompanyReportFilters(staff){
  const jobs=$('companyReportJob'),workers=$('companyReportWorkers');
@@ -332,14 +374,17 @@ function refreshCompanyReportFilters(staff){
  jobs.innerHTML=`<option value="">${esc(tt('reportAllJobs'))}</option>`+[...titles].sort((a,b)=>a[1].localeCompare(b[1])).map(([key,title])=>`<option value="${esc(key)}">${esc(title)}</option>`).join('');
  jobs.value=titles.has(selected)?selected:'';
  workers.innerHTML=staff.map(employee=>`<label class="report-choice"><input type="checkbox" value="${esc(employee.id)}" ${checked.has(employee.id)?'checked':''}> ${esc(employee.name)}${employee.active===false?esc(tr(' (retirado da equipe)')):''}</label>`).join('');
+ if($('companyReportPeriod').value==='months')renderCompanyReportMonths();
  rememberCompanyReportSelection();
 }
 function rememberCompanyReportSelection(){
- const all=$('companyReportAllMonths').checked;
+ const mode=$('companyReportPeriod').value;
+ const all=mode==='all';
  companyReportSelection={
   from:all?'':$('companyReportFrom').value,
   to:all?'':$('companyReportTo').value,
   all,
+  months:mode==='months'?[...companyReportMonths].sort():null,
   job:$('companyReportJob').value,
   jobLabel:[...$('companyReportJob').querySelectorAll('option')].find(option=>option.value===$('companyReportJob').value)?.textContent||'',
   workers:[...$('companyReportWorkers').querySelectorAll('input:checked')].map(input=>input.value)
