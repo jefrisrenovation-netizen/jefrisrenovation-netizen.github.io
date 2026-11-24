@@ -27,7 +27,7 @@ if(platform==='ios'){
   fs.copyFileSync('native/App.entitlements','ios/App/App/App.entitlements');
   fs.copyFileSync('native/icon-1024.png','ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png');
   let plist=fs.readFileSync('ios/App/App/Info.plist','utf8');
-  plist=plist.replace('</dict>\n</plist>','<key>ITSAppUsesNonExemptEncryption</key><false/>\n<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>suiviheurespro</string></array></dict></array>\n</dict>\n</plist>');
+  plist=plist.replace('</dict>\n</plist>','<key>NSLocationWhenInUseUsageDescription</key><string>Votre position est utilisée au moment de pointer votre arrivée ou votre départ.</string>\n<key>ITSAppUsesNonExemptEncryption</key><false/>\n<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>suiviheurespro</string></array></dict></array>\n</dict>\n</plist>');
   fs.writeFileSync('ios/App/App/Info.plist',plist);
 
   if (process.argv.includes('--meta-events')) {

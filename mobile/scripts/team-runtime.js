@@ -45,6 +45,16 @@ const teamWords={
 
  home:['Accueil','Início','Home'],team:['Équipe','Equipe','Team'],sites:['Chantiers','Obras','Projects'],reports:['Rapports','Relatórios','Reports'],settings:['Paramètres','Configurações','Settings'],
  register:['Enregistrer un nouvel horaire','Registrar novo horário','Record new hours'],month:['Résumé du mois','Resumo do mês','Monthly overview'],hours:['Heures','Horas','Hours'],days:['Jours','Dias','Days'],advances:['Avances','Adiantamentos','Advances'],due:['Total à payer','Total a pagar','Total due'],
+ attendanceMode:['Mode de pointage','Tipo de registro','Attendance mode'],
+ attendanceManual:['Saisie manuelle','Lançamento manual','Manual entry'],
+ attendanceGps:['Pointage GPS','Ponto com GPS','GPS clock-in'],
+ gpsEntry:['Pointer l’arrivée','Registrar entrada','Clock in'],
+ gpsExit:['Pointer le départ','Registrar saída','Clock out'],
+ gpsHelp:['La position est demandée à chaque pointage.','A localização é solicitada a cada batida.','Location is requested at each punch.'],
+ gpsNoAddress:['Adresse indisponible','Endereço indisponível','Address unavailable'],
+ gpsVerified:['Chantier confirmé','Obra confirmada','Site verified'],
+ gpsReview:['À vérifier','Pendente de revisão','Needs review'],
+ gps_retry:['Le pointage a changé. Actualisez et réessayez.','O ponto foi atualizado. Confira e tente novamente.','Attendance changed. Refresh and try again.'],
  invite:['Inviter un employé','Convidar funcionário','Invite employee'],username:['Identifiant','Usuário','Username'],email:['E-mail (facultatif)','E-mail (opcional)','Email (optional)'],phone:['Téléphone','Telefone','Phone'],createInvite:['Créer le lien d’invitation','Criar link de convite','Create invite link'],share:['Partager','Compartilhar','Share'],copy:['Copier le lien','Copiar link','Copy link'],copied:['Lien copié','Link copiado','Link copied'],
  pending:['À approuver','Aguardando aprovação','Pending approval'],approved:['Approuvé','Aprovado','Approved'],rejected:['À corriger','Precisa de correção','Needs correction'],approve:['Approuver','Aprovar','Approve'],reject:['Demander une correction','Pedir correção','Request correction'],
  block:['Bloquer','Bloquear','Block'],unblock:['Débloquer','Desbloquear','Unblock'],active:['Actif','Ativo','Active'],blocked:['Accès bloqué. Contactez votre responsable.','Acesso bloqueado. Fale com seu administrador.','Access blocked. Contact your administrator.'],
@@ -126,6 +136,10 @@ function setupOwnerUI(){
    <div class="grid">
     <div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>
     ${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}
+    <div><label for="inviteAttendance">${teamLabel('attendanceMode')}</label><select id="inviteAttendance">
+     <option value="manual" data-team-text="attendanceManual">${esc(tt('attendanceManual'))}</option>
+     <option value="gps" data-team-text="attendanceGps">${esc(tt('attendanceGps'))}</option>
+    </select></div>
    </div>
    <p class="muted">${teamLabel('inviteHelp')}</p>
    <button type="submit">${teamLabel('createInvite')}</button>
@@ -170,7 +184,10 @@ async function upgradeRefresh(){
   select.onchange();
   select.scrollIntoView({block:'start',behavior:'smooth'});
  });
- $('memberList').innerHTML=teamState.members.filter(m=>staff.some(e=>e.id===m.employee_id&&e.active!==false)).map(m=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===m.employee_id)?.name||m.username)}</strong><p>${esc(m.username)} · ${esc(m.activated_at?tt('active'):tt('pending'))}</p><button class="secondary" data-member="${m.id}" data-enabled="${!m.enabled}">${esc(tt(m.enabled?'block':'unblock'))}</button>${m.login_method==='phone'&&m.activated_at&&m.enabled?`<button class="secondary" data-reset-member="${m.id}">${esc(tt('resetMember'))}</button>`:''}</article>`).join('');
+ $('memberList').innerHTML=teamState.members.filter(m=>staff.some(e=>e.id===m.employee_id&&e.active!==false)).map(m=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===m.employee_id)?.name||m.username)}</strong><p>${esc(m.username)} · ${esc(m.activated_at?tt('active'):tt('pending'))}</p><button class="secondary" data-member="${m.id}" data-enabled="${!m.enabled}">${esc(tt(m.enabled?'block':'unblock'))}</button>${m.login_method==='phone'&&m.activated_at&&m.enabled?`<button class="secondary" data-reset-member="${m.id}">${esc(tt('resetMember'))}</button>`:''} ${m.gps_attendance?`<details data-gps-employee="${esc(m.employee_id)}"><summary>${teamLabel('attendanceGps')}</summary><div></div></details>`:''}</article>`).join('');
+ $('memberList').querySelectorAll('[data-gps-employee]').forEach(panel=>{
+  panel.ontoggle=()=>{if(panel.open)loadAttendanceHistory(panel, panel.dataset.gpsEmployee).catch(teamNotice);};
+ });
  $('memberList').querySelectorAll('[data-member]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('set_access',{id:b.dataset.member,enabled:b.dataset.enabled==='true'});await upgradeRefresh()}));
  $('memberList').querySelectorAll('[data-reset-member]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{showTeamInvitation({...await teamCall('reset_phone',{id:b.dataset.resetMember}),reset:true});}));
  $('reviewList').innerHTML=days.filter(d=>d.approval_status==='pending').map(d=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===d.employee_id)?.name||'')} · ${esc(d.work_date)}</strong><p>${esc(d.entry_time?.slice(0,5)||'')}–${esc(d.exit_time?.slice(0,5)||'')} · ${Number(d.break_minutes)} min · ${esc(d.workplace||'')}</p><div class="actions"><button class="green" data-review="${d.id}" data-status="approved">${esc(tt('approve'))}</button><button class="secondary" data-review="${d.id}" data-status="rejected">${esc(tt('reject'))}</button></div></article>`).join('')||`<p>${esc(tt('noPending'))}</p>`;
@@ -189,7 +206,7 @@ function refreshInviteEmployees(staff){
 async function createTeamInvite(){
  const employeeId=$('inviteEmployee').value;
  const employeeName=employees.find(e=>e.id===employeeId)?.name;
- const invitation=await teamCall('invite',{employee_id:employeeId,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value});
+ const invitation=await teamCall('invite',{employee_id:employeeId,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value,gps_attendance:$('inviteAttendance').value==='gps'});
  showTeamInvitation({...invitation,employeeName});await upgradeRefresh();
 }
 function showTeamInvitation(invitation){
@@ -198,7 +215,7 @@ function showTeamInvitation(invitation){
  result.classList.remove('hidden');result.innerHTML=`<p><strong>${esc(invitation.username)}</strong></p><input readonly aria-label="Invitation" value="${esc(invitation.url)}"><div class="actions"><a class="button green" id="shareWhatsApp" target="_blank" rel="noopener">WhatsApp</a><a class="button secondary" id="shareSMS">SMS</a><a class="button secondary" id="shareEmail">E-mail</a><button class="secondary" id="copyInvite">${esc(tt('copy'))}</button></div>`;
  const greeting={fr:'Bonjour','pt-BR':'Olá','pt-PT':'Olá',en:'Hello'}[$('languageCode').value]||'Bonjour';
  const name=invitation.employeeName?.trim();
- const message=(name?greeting+' '+name+'!\n\n':'')+tt(invitation.reset?'resetShare':'invitation')+' — '+(profile.company_name||'Suivi des heures Pro')+'\n'+invitation.url;
+ const message=(name?greeting+' '+name+'!\n\n':'')+tt(invitation.reset?'resetShare':'invitation')+' — '+(profile.company_name||'Suivi des heures Pro')+(invitation.gps_attendance?'\n'+tt('attendanceGps'):'')+'\n'+invitation.url;
  const phone=invitation.phone.replace(/\D/g,'');$('shareWhatsApp').href='https://wa.me/'+phone+'?text='+encodeURIComponent(message);$('shareSMS').href='sms:'+phone+(/iPhone|iPad/.test(navigator.userAgent)?'&':'?')+'body='+encodeURIComponent(message);$('shareEmail').href='mailto:'+encodeURIComponent(invitation.email)+'?subject='+encodeURIComponent(tt('invitation'))+'&body='+encodeURIComponent(message);
  $('shareEmail').classList.toggle('hidden',!invitation.email);
  $('copyInvite').onclick=async()=>{try{await navigator.clipboard.writeText(message);$('copyInvite').textContent=tt('copied')}catch{result.querySelector('input').select()}};
@@ -532,12 +549,65 @@ function ownerDayDialog(id){
  const fillSchedule=wireSchedule('ownerSchedule',()=>employees.find(e=>e.id===$('ownerDayEmployee').value));$('ownerDayEmployee').onchange=()=>{fillSchedule();if(!record){const emp=employees.find(e=>e.id===$('ownerDayEmployee').value);$('ownerDayEntry').value=(emp?.default_entry_time||'08:00').slice(0,5);$('ownerDayExit').value=(emp?.default_exit_time||'17:30').slice(0,5);$('ownerDayPause').value=emp?.default_break_minutes??30;$('ownerDayEntry').oninput();}};
  $('ownerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{const payload={...readDayForm('ownerDay'),owner_id:user.id,employee_id:$('ownerDayEmployee').value};const {error}=record?await sb.from('work_days').update(payload).eq('id',record.id).eq('owner_id',user.id):await sb.from('work_days').insert(payload);if(error)throw Error(error.code==='23505'?tt('date_exists'):tt('failed'));$('employee').value=$('ownerDayEmployee').value;await loadRecords();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('ownerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
 }
+async function loadAttendanceHistory(panel, employeeId){
+ const {records}=await teamCall('gps_history',employeeId?{employee_id:employeeId}:{});
+ const clock=new Intl.DateTimeFormat($('languageCode').value||'fr',{
+  dateStyle:'short',timeStyle:'medium',timeZone:'Europe/Brussels'
+ });
+ panel.querySelector('div').innerHTML=records.map(record=>`<p><strong>${esc(tt(record.kind==='entry'?'gpsEntry':'gpsExit'))} · ${esc(clock.format(new Date(record.recorded_at)))}</strong><br>${esc(record.address||tt('gpsNoAddress'))}<br>${record.site_name?esc(record.site_name)+' · ':''}${esc(tt(record.needs_review?'gpsReview':'gpsVerified'))}</p>`).join('');
+ return records[0]?.kind==='entry'?'exit':'entry';
+}
+async function setupWorkerAttendance(){
+ const panel=document.createElement('section');
+ panel.innerHTML=`<h2>${teamLabel('attendanceGps')}</h2><p>${teamLabel('gpsHelp')}</p><button type="button" disabled></button><div></div>`;
+ const sites=(teamState.sites||[]).filter(site=>site.address);
+ const select=document.createElement('select');
+ select.setAttribute('aria-label',tt('workplace'));
+ if(sites.length){
+  select.innerHTML=sites.map(site=>`<option value="${esc(site.id)}">${esc(site.name)}</option>`).join('');
+  panel.querySelector('button').before(select);
+ }
+ const manual=$('workerAddDay');
+ manual.classList.add('hidden');
+ manual.before(panel);
+ const button=panel.querySelector('button');
+ let kind=await loadAttendanceHistory(panel);
+ const refreshButton=()=>{button.textContent=tt(kind==='entry'?'gpsEntry':'gpsExit');};
+ refreshButton();
+ button.disabled=false;
+ let pending;
+ button.onclick=()=>withTeamButton(button,async()=>{
+  if(!pending){
+   const position=await new Promise(resolve=>{
+    if(!navigator.geolocation){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(({coords})=>resolve({
+     lat:coords.latitude,lon:coords.longitude,accuracy:coords.accuracy
+    }),()=>resolve(null),{enableHighAccuracy:true,timeout:7000,maximumAge:0});
+   });
+   pending={id:crypto.randomUUID(),kind,position,...(select.value?{site_id:select.value}:{})};
+  }
+  try{
+   await teamCall('gps_record',pending);
+  }catch(error){
+   if(error.code==='gps_retry'){
+    pending=null;
+    kind=await loadAttendanceHistory(panel);
+    refreshButton();
+   }
+   throw error;
+  }
+  pending=null;
+  kind=await loadAttendanceHistory(panel);
+  refreshButton();
+  teamNotice(tt('saveOK'));
+ });
+}
 async function workerPortal(){
  $('app').classList.add('hidden');$('loginCard').classList.add('hidden');
  let portal=$('workerPortal');if(!portal){portal=document.createElement('section');portal.id='workerPortal';portal.className='card';document.querySelector('main').append(portal);}
  portal.innerHTML=`<p class="muted">${esc(teamState.access.company)}</p><h2>${esc(teamState.access.employee.name)}</h2><label for="workerMonth">${teamLabel('month')}</label><input id="workerMonth" type="month" value="${esc(teamState.month)}"><p id="workerNotice" class="status" role="status"></p><p class="muted">${teamLabel('reviewHelp')}</p><label for="workerReportPlace">${teamLabel('workplace')}</label><select id="workerReportPlace"></select><button class="green" onclick="teamUI.workerReport()">${teamLabel('exportPDF')}</button><div id="workerSummary" class="summary"></div><h2>${teamLabel('ownDays')}</h2><div id="workerDays"></div><button id="workerAddDay" onclick="teamUI.workerDay()">＋ ${esc(({fr:"Ajouter un jour",pt:"Adicionar novo dia","pt-PT":"Adicionar novo dia","pt-BR":"Adicionar novo dia",en:"Add a new day"})[$('languageCode').value]||teamLabel('register'))}</button><section id="workerReport" class="hidden"></section>`;
 
- $('workerMonth').onchange=async()=>{teamState.month=$('workerMonth').value;teamState.lastWorkDate=null;try{await loadWorkerDays()}catch(e){teamNotice(e)}};portal.classList.remove('hidden');const settings=document.createElement('details');settings.className='project-tile';settings.innerHTML=`<summary>${teamLabel('accountManagement')}</summary><p>${teamLabel('username')}: <strong id="workerUsername">${esc(teamState.access.username||'')}</strong></p><button class="secondary" id="copyWorkerUsername">${teamLabel('copyUser')}</button><p><a href="https://jefrisrenovation-netizen.github.io/preview/">${teamLabel('accessLink')}</a></p><button id="workerLogout" class="secondary" style="display:block;width:100%;margin-top:16px" onclick="logout()">${teamLabel('signout')}</button><div style="border-top:1px solid #e5e7eb;margin-top:20px;padding-top:4px"><button id="workerDelete" class="secondary" style="margin-top:12px;color:#a52b24">${esc(tr('Supprimer mon compte et mes données'))}</button></div>`;portal.append(settings);$('copyWorkerUsername').onclick=()=>navigator.clipboard.writeText(teamState.access.username||'').catch(teamNotice);$('workerDelete').onclick=requestEmployeeDeletion;await loadWorkerDays();
+ $('workerMonth').onchange=async()=>{teamState.month=$('workerMonth').value;teamState.lastWorkDate=null;try{await loadWorkerDays()}catch(e){teamNotice(e)}};portal.classList.remove('hidden');const settings=document.createElement('details');settings.className='project-tile';settings.innerHTML=`<summary>${teamLabel('accountManagement')}</summary><p>${teamLabel('username')}: <strong id="workerUsername">${esc(teamState.access.username||'')}</strong></p><button class="secondary" id="copyWorkerUsername">${teamLabel('copyUser')}</button><p><a href="https://jefrisrenovation-netizen.github.io/preview/">${teamLabel('accessLink')}</a></p><button id="workerLogout" class="secondary" style="display:block;width:100%;margin-top:16px" onclick="logout()">${teamLabel('signout')}</button><div style="border-top:1px solid #e5e7eb;margin-top:20px;padding-top:4px"><button id="workerDelete" class="secondary" style="margin-top:12px;color:#a52b24">${esc(tr('Supprimer mon compte et mes données'))}</button></div>`;portal.append(settings);$('copyWorkerUsername').onclick=()=>navigator.clipboard.writeText(teamState.access.username||'').catch(teamNotice);$('workerDelete').onclick=requestEmployeeDeletion;await loadWorkerDays();if(teamState.access.gps_attendance)await setupWorkerAttendance();
 }
 function workerPeriodRows(days,editable=false){
  return groupWorkDays(days).map(group=>group.days.map((d,index)=>`<tr>
@@ -548,7 +618,7 @@ function workerPeriodRows(days,editable=false){
 async function loadWorkerDays(){
  const selectedMonth=teamState.month;const result=await teamCall('my_days',{month:selectedMonth});if(selectedMonth!==teamState.month)return;teamState.days=result.days;teamState.sites=result.sites;teamState.payment=result.payment||null;teamState.currency=result.currency||'EUR';$('workerReport')?.classList.add('hidden');const place=$('workerReportPlace'),previous=place.value;place.innerHTML=`<option value="">${esc(tt('reportPlaces'))}</option>`+[...new Set(result.days.map(d=>d.workplace||''))].sort().map(v=>`<option value="${esc(JSON.stringify(v))}">${esc(v||tt('noWorkplace'))}</option>`).join('');place.value=[...place.options].some(o=>o.value===previous)?previous:'';place.onchange=()=>$('workerReport').classList.add('hidden');
  $('workerSummary').innerHTML=workerReportSummary(result.days);
- $('workerDays').innerHTML=result.days.length?`<div class="compact-sheet-wrap"><table class="compact-sheet"><thead><tr>${['date','workplace','entry','exit','pause','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}<th></th></tr></thead><tbody>${workerPeriodRows(result.days,true)}</tbody></table></div>`:`<p>${esc(tt('noDays'))}</p>`;
+ $('workerDays').innerHTML=result.days.length?`<div class="compact-sheet-wrap"><table class="compact-sheet"><thead><tr>${['date','workplace','entry','exit','pause','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}${teamState.access.gps_attendance?'':'<th></th>'}</tr></thead><tbody>${workerPeriodRows(result.days,!teamState.access.gps_attendance)}</tbody></table></div>`:`<p>${esc(tt('noDays'))}</p>`;
  $('workerDays').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>workerDayDialog(b.dataset.day));
 }
 function workerDayDialog(id){

@@ -19,13 +19,13 @@ function handler(options={}){
    return {data,error:null};}
   single(){return Promise.resolve(this.result())}maybeSingle(){return Promise.resolve(this.result())}then(ok,bad){return Promise.resolve(this.result()).then(ok,bad)}
  }
- const authChanges=[];
- const client={from:table=>new Query(table),rpc:async()=>({data:options.rate!==false,error:null}),auth:{getUser:async()=>options.unauthenticated?{data:{user:null},error:Error('denied')}:{data:{user:{id:options.userId||'staff-a',email:options.email||'staff@example.invalid',email_confirmed_at:'2026-11-01'}},error:null},admin:{getUserById:async()=>({data:{user:{id:'staff-a',email:'staff@example.invalid',email_confirmed_at:'2026-11-01'}}}),createUser:async()=>({data:{user:{id:'new-staff'}},error:null}),updateUserById:async(id,values)=>{authChanges.push({id,values});return {error:null}},generateLink:async()=>{if(!options.reusable)throw Error('must not generate a link for existing accounts');return {data:{user:{id:'staff-a'},properties:{hashed_token:'test-hash'}},error:null}}}}};
+ const authChanges=[];const rpcCalls=[];
+ const client={from:table=>new Query(table),rpc:async(name,params)=>{rpcCalls.push({name,params});return {data:name==='record_gps_attendance'?{id:params.p_id}:options.rate!==false,error:null}},auth:{getUser:async()=>options.unauthenticated?{data:{user:null},error:Error('denied')}:{data:{user:{id:options.userId||'staff-a',email:options.email||'staff@example.invalid',email_confirmed_at:'2026-11-01'}},error:null},admin:{getUserById:async()=>({data:{user:{id:'staff-a',email:'staff@example.invalid',email_confirmed_at:'2026-11-01'}}}),createUser:async()=>({data:{user:{id:'new-staff'}},error:null}),updateUserById:async(id,values)=>{authChanges.push({id,values});return {error:null}},generateLink:async()=>{if(!options.reusable)throw Error('must not generate a link for existing accounts');return {data:{user:{id:'staff-a'},properties:{hashed_token:'test-hash'}},error:null}}}}};
  client.auth.verifyOtp=async()=>({data:{user:{id:'staff-a'},session:{access_token:'reusable-access',refresh_token:'reusable-refresh'}},error:null});
  client.auth.signInWithPassword=async input=>({data:{session:{access_token:'test-access',refresh_token:'test-refresh'}},error:null});
  const context={createClient:()=>client,username,monthRange,dayInput,phoneNumber,Request,Response,TextEncoder,Uint8Array,crypto:webcrypto,URL,Date,Deno:{env:{get:()=> 'test'},serve:fn=>{captured=fn}}};
  let code=fs.readFileSync('../supabase/functions/team-access/index.ts','utf8').replace(/^import .*;\n/gm,'');code=stripTypeScriptTypes(code);vm.createContext(context);vm.runInContext(code,context);
- return {queries,authChanges,call:async(body,authenticated=true)=>{const response=await captured(new Request('https://test.invalid/team-access',{method:'POST',headers:{'Content-Type':'application/json',...(authenticated?{Authorization:'Bearer test-token'}:{})},body:JSON.stringify(body)}));return {status:response.status,data:await response.json()};}};
+ return {queries,authChanges,rpcCalls,call:async(body,authenticated=true)=>{const response=await captured(new Request('https://test.invalid/team-access',{method:'POST',headers:{'Content-Type':'application/json',...(authenticated?{Authorization:'Bearer test-token'}:{})},body:JSON.stringify(body)}));return {status:response.status,data:await response.json()};}};
 }
 test('username and work day validation reject ambiguous identities and invalid dates',()=>{
  assert.equal(username(' Staff.Name '),'staff.name');for(const value of ['ab','../admin','with space','josé'])assert.throws(()=>username(value));
@@ -118,4 +118,26 @@ test('reusable employee link opens repeatedly without a password and ignores cal
 test('ordinary invitations, reset links and blocked employees cannot use reusable login',async()=>{
  for(const invite of [{expires_at:'2026-11-12',purpose:'invite'},{expires_at:'infinity',purpose:'reset'}]){const api=handler({reusable:true,invite:{account_id:member.id,token_hash:'test',...invite}});assert.equal((await api.call({action:'open_access',token:'a'.repeat(64)},false)).status,403);}
  const api=handler({member:{...member,enabled:false},invite:{expires_at:'infinity',purpose:'invite'}});assert.equal((await api.call({action:'open_access',token:'a'.repeat(64)},false)).status,403);
+});
+
+test('GPS attendance uses the verified identity, server time and one position per punch',async()=>{
+ const api=handler({member:{...member,gps_attendance:true}});
+ const id='23e45678-1234-4abc-8abc-123411111111';
+ const result=await api.call({action:'gps_record',id,kind:'entry',position:{lat:50.81,lon:4.32,accuracy:12},
+  user_id:'other',recorded_at:'2001-01-01T00:00:00Z'});
+ assert.equal(result.status,200);
+ const {params}=api.rpcCalls.find(call=>call.name==='record_gps_attendance');
+ assert.equal(params.p_user,member.user_id);
+ assert.equal(params.p_id,id);
+ assert.equal(params.p_lat,50.81);
+ assert.equal(params.p_lon,4.32);
+ assert.equal(params.p_verified,false);
+ assert.ok(Math.abs(Date.now()-Date.parse(params.p_time))<5000);
+});
+test('manual employee accounts retain their existing access and cannot post GPS punches',async()=>{
+ const api=handler();
+ const access=await api.call({action:'access'});
+ assert.equal(access.data.gps_attendance,undefined);
+ assert.equal((await api.call({action:'gps_record'})).status,403);
+ assert.ok(!api.rpcCalls.some(call=>call.name==='record_gps_attendance'));
 });

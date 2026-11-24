@@ -5,6 +5,7 @@ const headers={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':
 const reply=(status:number,data:unknown)=>new Response(JSON.stringify(data),{status,headers});
 const digest=async(s:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,'0')).join('');
 Deno.serve(async(req:Request)=>{
+ const receivedAt=new Date().toISOString();
  if(req.method==='OPTIONS')return new Response(null,{headers});
  if(req.method!=='POST')return reply(405,{error:'method_not_allowed'});
  const admin=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -120,7 +121,7 @@ Deno.serve(async(req:Request)=>{
    if(employee.error)return reply(503,{error:'employee_lookup_failed',code:employee.error.code});
    if(!employee.data?.active)return reply(200,{role:'blocked'});
    const company=await admin.from('app_profiles').select('company_name,language_code').eq('owner_id',account.owner_id).maybeSingle();
-   return reply(200,{role:account.activated_at?'employee':'activation',employee:employee.data,company:company.data?.company_name||'Suivi des heures Pro',language:company.data?.language_code||'fr',username:account.username});
+   return reply(200,{role:account.activated_at?'employee':'activation',employee:employee.data,company:company.data?.company_name||'Suivi des heures Pro',language:company.data?.language_code||'fr',username:account.username,...(account.gps_attendance?{gps_attendance:true}:{})});
   }
   if(account&&!account.enabled)return reply(403,{error:'access_blocked'});
   if(action==='activate'){
@@ -128,6 +129,85 @@ Deno.serve(async(req:Request)=>{
    const result=await admin.from('team_accounts').update({activated_at:new Date().toISOString()}).eq('id',account.id).eq('enabled',true);if(result.error)throw result.error;
    await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('account_id',account.id).is('used_at',null).neq('expires_at','infinity');
    return reply(200,{active:true});
+  }
+  if(action==='gps_history'||action==='gps_record'){
+   let accountId=account?.id;
+   if(account){
+    if(!account.activated_at||!account.enabled||!account.gps_attendance)return reply(403,{error:'access_denied'});
+    const employee=await admin.from('employees').select('active').eq('id',account.employee_id).eq('owner_id',account.owner_id).single();
+    if(employee.error||!employee.data?.active)return reply(403,{error:'access_blocked'});
+   }else{
+    if(action!=='gps_history')return reply(403,{error:'access_denied'});
+    const target=await admin.from('team_accounts').select('id').eq('owner_id',user.id).eq('employee_id',String(body.employee_id)).maybeSingle();
+    if(target.error)throw target.error;
+    accountId=target.data?.id;
+    if(!accountId)return reply(200,{records:[]});
+   }
+   if(action==='gps_history'){
+    const result=await admin.from('gps_attendance').select('kind,recorded_at,address,site_name,accuracy,needs_review').eq('account_id',accountId).order('recorded_at',{ascending:false}).limit(100);
+    if(result.error)throw result.error;
+    return reply(200,{records:result.data});
+   }
+
+   if(!['entry','exit'].includes(body.kind)||typeof body.id!=='string'||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(body.id)){
+    return reply(400,{error:'check'});
+   }
+   const position=body.position;
+   if(position!==null&&(!position||!Number.isFinite(position.lat)||Math.abs(position.lat)>90||
+      !Number.isFinite(position.lon)||Math.abs(position.lon)>180||
+      !Number.isFinite(position.accuracy)||position.accuracy<0))return reply(400,{error:'check'});
+   let site=null;
+   if(body.site_id){
+    const result=await admin.from('work_sites').select('name,address').eq('id',String(body.site_id))
+     .eq('owner_id',account.owner_id).eq('active',true).maybeSingle();
+    if(result.error)throw result.error;
+    if(!result.data)return reply(400,{error:'check'});
+    site=result.data;
+   }
+   let address=null;
+   let verified=false;
+   const endpoint=Deno.env.get('ATTENDANCE_REVERSE_GEOCODER');
+   if(position&&endpoint){
+    try{
+     const url=new URL(endpoint);
+     url.searchParams.set('lat',String(position.lat));
+     url.searchParams.set('lon',String(position.lon));
+     url.searchParams.set('format','jsonv2');
+     const result=await fetch(url,{signal:AbortSignal.timeout(3500)});
+     if(result.ok){
+      const data=await result.json();
+      if(typeof data.display_name==='string')address=data.display_name.trim().slice(0,400)||null;
+     }
+    }catch{/* The punch is saved for review when address lookup fails. */}
+   }
+   const searchEndpoint=Deno.env.get('ATTENDANCE_FORWARD_GEOCODER');
+   if(position&&position.accuracy<=100&&address&&site?.address&&searchEndpoint){
+    try{
+     const url=new URL(searchEndpoint);
+     url.searchParams.set('q',site.address);
+     url.searchParams.set('limit','1');
+     url.searchParams.set('format','jsonv2');
+     const result=await fetch(url,{signal:AbortSignal.timeout(3500)});
+     if(result.ok){
+      const [place]=await result.json();
+      if(place){
+       const radians=(degrees:number)=>degrees*Math.PI/180;
+       const dLat=radians(Number(place.lat)-position.lat);
+       const dLon=radians(Number(place.lon)-position.lon);
+       const a=Math.sin(dLat/2)**2+Math.cos(radians(position.lat))*
+        Math.cos(radians(Number(place.lat)))*Math.sin(dLon/2)**2;
+       verified=6371000*2*Math.asin(Math.min(1,Math.sqrt(a)))<=100;
+      }
+     }
+    }catch{/* An unverified site is shown for review. */}
+   }
+   const result=await admin.rpc('record_gps_attendance',{
+    p_user:user.id,p_id:body.id,p_kind:body.kind,p_time:receivedAt,
+    p_lat:position?.lat??null,p_lon:position?.lon??null,p_accuracy:position?.accuracy??null,p_address:address,p_site_name:site?.name??null,p_verified:verified
+   });
+   if(result.error)throw result.error;
+   if(!result.data?.id)return reply(409,{error:'gps_retry'});
+   return reply(200,{saved:true});
   }
   // Employee requests cannot choose another employee or company: both IDs come from the verified membership.
   if(['my_days','save_my_day','save_my_defaults'].includes(action)){
@@ -145,6 +225,7 @@ Deno.serve(async(req:Request)=>{
     const [days,sites,payment,company]=await Promise.all([admin.from('work_days').select('id,work_date,entry_time,exit_time,break_minutes,workplace,notes,approval_status').eq('owner_id',account.owner_id).eq('employee_id',account.employee_id).gte('work_date',range.start).lte('work_date',range.end).order('work_date'),admin.from('work_sites').select('id,name,address').eq('owner_id',account.owner_id).eq('active',true).order('name'),admin.from('monthly_payments').select('payment_mode,daily_rate,hourly_rate,fixed_salary,advance,currency_code').eq('owner_id',account.owner_id).eq('employee_id',account.employee_id).eq('month',range.start).maybeSingle(),admin.from('app_profiles').select('preferred_currency').eq('owner_id',account.owner_id).maybeSingle()]);
     if(days.error||sites.error||payment.error||company.error)throw days.error||sites.error||payment.error||company.error;return reply(200,{days:days.data,sites:sites.data,payment:payment.data,currency:payment.data?.currency_code||company.data?.preferred_currency||'EUR'});
    }
+   if(account.gps_attendance)return reply(403,{error:'access_denied'});
    const payload={...dayInput(body),owner_id:account.owner_id,employee_id:account.employee_id,submitted_by:user.id,approval_status:'pending'};
    let result;
    if(body.id){result=await admin.from('work_days').update(payload).eq('id',String(body.id)).eq('owner_id',account.owner_id).eq('employee_id',account.employee_id).in('approval_status',['pending','rejected']).select('id');}
@@ -162,14 +243,14 @@ Deno.serve(async(req:Request)=>{
    const previous=await admin.from('team_accounts').select('*').eq('employee_id',employee.data.id).maybeSingle();if(previous.error)throw previous.error;
    if(previous.data?.owner_id&&previous.data.owner_id!==user.id)return reply(403,{error:'access_denied'});
    if(previous.data?.user_id&&(previous.data.email!==email||(previous.data.login_method||'email')!==method||(method==='phone'&&previous.data.phone!==phone)))return reply(409,{error:'linked_email_locked'});
-   const values={owner_id:user.id,employee_id:employee.data.id,username:name,email,phone,login_method:method,auth_email:method==='phone'?(previous.data?.auth_email||crypto.randomUUID()+'@staff.suivi.invalid'):null};
+   const values={...(typeof body.gps_attendance==='boolean'?{gps_attendance:body.gps_attendance}:{}),owner_id:user.id,employee_id:employee.data.id,username:name,email,phone,login_method:method,auth_email:method==='phone'?(previous.data?.auth_email||crypto.randomUUID()+'@staff.suivi.invalid'):null};
    const member=previous.data?await admin.from('team_accounts').update(values).eq('id',previous.data.id).select('*').single():await admin.from('team_accounts').insert(values).select('*').single();
    if(member.error?.code==='23505')return reply(409,{error:'username_taken'});if(member.error)throw member.error;if(!member.data.enabled)return reply(403,{error:'access_blocked'});
 
    await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('account_id',member.data.id).is('used_at',null);
    const bytes=crypto.getRandomValues(new Uint8Array(32)),token=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');
    const saved=await admin.from('team_invites').insert({token_hash:await digest(token),account_id:member.data.id,expires_at:'infinity'});if(saved.error)throw saved.error;
-   return reply(200,{url:BASE+'/invite/#invite='+token,username:name,email,phone:values.phone});
+   return reply(200,{url:BASE+'/invite/#invite='+token,username:name,email,phone:values.phone,...(member.data.gps_attendance?{gps_attendance:true}:{})});
   }
   if(action==='reset_phone'){
    const result=await admin.from('team_accounts').select('*').eq('id',String(body.id)).eq('owner_id',user.id).eq('login_method','phone').eq('enabled',true).single();
@@ -180,7 +261,7 @@ Deno.serve(async(req:Request)=>{
    return reply(200,{url:BASE+'/invite/#invite='+token,username:result.data.username,email:null,phone:result.data.phone});
   }
   if(action==='members'){
-   const result=await admin.from('team_accounts').select('id,employee_id,username,email,phone,enabled,activated_at,login_method').eq('owner_id',user.id);if(result.error)throw result.error;return reply(200,{members:result.data});
+   const result=await admin.from('team_accounts').select('id,employee_id,username,email,phone,enabled,activated_at,login_method,gps_attendance').eq('owner_id',user.id);if(result.error)throw result.error;return reply(200,{members:result.data});
   }
   if(action==='set_access'){
    if(typeof body.enabled!=='boolean')return reply(400,{error:'invalid_request'});
