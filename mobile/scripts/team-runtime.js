@@ -1,6 +1,8 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
+ sendInviteLink:['Envoyer un lien','Enviar link','Send link'],
+ manageEmployeeAccess:['Accès des employés','Acessos dos funcionários','Employee access'],
  reportType:['Type de rapport','Tipo de relatório','Report type'],
  reportCompany:['Équipe','Equipe','Team'],
  reportIndividual:['Individuel','Individual','Individual'],
@@ -99,7 +101,7 @@ function setupOwnerUI(){
  const directory=document.createElement('section');directory.id='teamDirectoryPanel';directory.className='card hidden no-print';
  directory.innerHTML=`<h2>${teamLabel('team')}</h2><div id="teamDirectory"></div>`;
  $('app').append(directory);
- const management=document.createElement('details');management.className='project-tile';management.innerHTML=`<summary>${teamLabel('invite')}</summary>`;
+ const management=document.createElement('details');management.className='project-tile';management.innerHTML=`<summary>${teamLabel('manageEmployeeAccess')}</summary>`;
  $('settingsPanel').append(management);
  const addWorker=$('newEmployee').parentElement;
  const addButton=document.querySelector('[onclick="addEmployee()"]');
@@ -113,8 +115,31 @@ function setupOwnerUI(){
   showPane('team');
   await upgradeRefresh().catch(teamNotice);
  };
- const access=document.createElement('section');access.id='accessPanel';access.className='no-print';access.innerHTML=`<h2>${teamLabel('invite')}</h2><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
- management.append(access);$('invitePhone').required=false;$('inviteEmail').required=false;const syncContact=()=>{$('invitePhone').required=!$('inviteEmail').value.trim();};$('inviteEmail').oninput=syncContact;syncContact();$('inviteUsername').pattern='[a-zA-Z0-9][a-zA-Z0-9._\\x2D]{2,39}';$('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
+ const access=document.createElement('section');access.id='accessPanel';access.className='no-print';
+ access.innerHTML='<div id="memberList" class="access-list"></div>';
+ management.append(access);
+ const invite=document.createElement('details');invite.id='teamInvitePanel';invite.className='project-tile';
+ invite.innerHTML=`<summary>${teamLabel('sendInviteLink')}</summary>
+  <form id="inviteForm">
+   <div class="grid">
+    <div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>
+    ${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}
+   </div>
+   <p class="muted">${teamLabel('inviteHelp')}</p>
+   <button type="submit">${teamLabel('createInvite')}</button>
+  </form>
+  <div id="inviteResult" class="hidden"></div>`;
+ directory.prepend(invite);
+ refreshInviteEmployees(employees);
+ $('inviteEmployee').onchange=()=>{
+  const result=$('inviteResult');
+  if(invite.contains(result)){result.classList.add('hidden');result.replaceChildren();}
+ };
+ $('invitePhone').required=false;$('inviteEmail').required=false;
+ const syncContact=()=>{$('invitePhone').required=!$('inviteEmail').value.trim();};
+ $('inviteEmail').oninput=syncContact;syncContact();
+ $('inviteUsername').pattern='[a-zA-Z0-9][a-z0-9A-Z._\\x2D]{2,39}';
+ $('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
  $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
  $('settingsPanel').append(deletionDetails);
  deletionCard.remove();
@@ -135,7 +160,7 @@ async function upgradeRefresh(){
  $('dashboardStats').innerHTML=stats.map(([label,value])=>`<div class="stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join('');$('dashboardCompany').textContent=profile.company_name||'Suivi des heures Pro';$('dashboardMonth').value=month;
  $('dashboardTeam').innerHTML=staff.filter(e=>e.active).map(e=>`<button class="worker-tile secondary" data-employee="${e.id}"><strong>${esc(e.name)}</strong><span>${fmt(days.filter(d=>d.employee_id===e.id).reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes),0))} ›</span></button>`).join('')||`<p>${esc(tt('noTeam'))}</p>`;
  $('dashboardTeam').querySelectorAll('[data-employee]').forEach(b=>b.onclick=()=>openTeamSheet(b.dataset.employee));
- const selected=$('inviteEmployee').value;$('inviteEmployee').innerHTML=staff.filter(e=>e.active).map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');if(selected)$('inviteEmployee').value=selected;
+ refreshInviteEmployees(staff);
  $('siteList').innerHTML=sites.map((s,index)=>`<button type="button" class="project-tile secondary" data-site-index="${index}"><strong>${esc(s.name)}</strong><span>${esc(s.address)}</span></button>`).join('')||`<p>${esc(tt('noSites'))}</p>`;
  $('siteList').querySelectorAll('[data-site-index]').forEach(button=>button.onclick=()=>{
   const site=sites[Number(button.dataset.siteIndex)],select=$('siteLaborPlace');
@@ -152,6 +177,13 @@ async function upgradeRefresh(){
  refreshCompanyReportFilters(staff);refreshPersonalReportFilters(days,staff);refreshSiteLabor(days,payments,sites);teamTranslate();
 }
 
+function refreshInviteEmployees(staff){
+ const select=$('inviteEmployee'),previous=select.value;
+ const active=staff.filter(employee=>employee.active!==false);
+ select.innerHTML=`<option value="" data-team-text="chooseReportWorker">${esc(tt('chooseReportWorker'))}</option>`+
+  active.map(employee=>`<option value="${esc(employee.id)}">${esc(employee.name)}</option>`).join('');
+ select.value=active.some(employee=>employee.id===previous)?previous:'';
+}
 async function createTeamInvite(){
  const employeeId=$('inviteEmployee').value;
  const employeeName=employees.find(e=>e.id===employeeId)?.name;
@@ -159,7 +191,9 @@ async function createTeamInvite(){
  showTeamInvitation({...invitation,employeeName});await upgradeRefresh();
 }
 function showTeamInvitation(invitation){
- const result=$('inviteResult');result.classList.remove('hidden');result.innerHTML=`<p><strong>${esc(invitation.username)}</strong></p><input readonly aria-label="Invitation" value="${esc(invitation.url)}"><div class="actions"><a class="button green" id="shareWhatsApp" target="_blank" rel="noopener">WhatsApp</a><a class="button secondary" id="shareSMS">SMS</a><a class="button secondary" id="shareEmail">E-mail</a><button class="secondary" id="copyInvite">${esc(tt('copy'))}</button></div>`;
+ const result=$('inviteResult');
+ $(invitation.reset?'accessPanel':'teamInvitePanel').append(result);
+ result.classList.remove('hidden');result.innerHTML=`<p><strong>${esc(invitation.username)}</strong></p><input readonly aria-label="Invitation" value="${esc(invitation.url)}"><div class="actions"><a class="button green" id="shareWhatsApp" target="_blank" rel="noopener">WhatsApp</a><a class="button secondary" id="shareSMS">SMS</a><a class="button secondary" id="shareEmail">E-mail</a><button class="secondary" id="copyInvite">${esc(tt('copy'))}</button></div>`;
  const greeting={fr:'Bonjour','pt-BR':'Olá','pt-PT':'Olá',en:'Hello'}[$('languageCode').value]||'Bonjour';
  const name=invitation.employeeName?.trim();
  const message=(name?greeting+' '+name+'!\n\n':'')+tt(invitation.reset?'resetShare':'invitation')+' — '+(profile.company_name||'Suivi des heures Pro')+'\n'+invitation.url;
