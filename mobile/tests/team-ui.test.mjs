@@ -114,9 +114,49 @@ test('worker language is reachable without owner settings and translates the rep
  const selector=f.document.getElementById('accessLanguage');assert(selector.closest('header'));selector.value='en';selector.onchange();await new Promise(resolve=>setTimeout(resolve,0));f.run('showWorkerReport()');assert.equal(f.document.documentElement.lang,'en');assert(f.document.getElementById('workerReport').textContent.includes('Approved days'));assert(!f.document.getElementById('workerReport').textContent.includes('Dias aprovados'));assert(f.document.getElementById('workerDays').textContent.includes('No days recorded'));
 });
 
-test('approved first access chooses language and account type before welcome and login',()=>{
- const f=fixture();assert(f.document.getElementById('approvedIntro').textContent.includes('Escolha seu idioma'));
- f.document.querySelector('[data-intro-type="business"]').onclick();f.document.getElementById('introNext').onclick();assert(f.document.getElementById('approvedIntro').textContent.includes('Bem-vindo'));f.document.getElementById('introLogin').onclick();assert(!f.document.getElementById('loginCard').classList.contains('hidden'));assert.equal(f.document.getElementById('accountType').value,'business');assert(f.document.getElementById('signupForm').closest('details').classList.contains('hidden'));
+test('existing accounts enter directly and new accounts choose their type after authentication',async()=>{
+ const f=fixture();
+ assert(f.document.getElementById('accessLanguage').closest('header'));
+ assert(!f.document.querySelector('input[name="choice"]'));
+ f.document.getElementById('introLogin').onclick();
+ assert(!f.document.getElementById('loginCard').classList.contains('hidden'));
+ assert(f.document.getElementById('signupForm').closest('details').classList.contains('hidden'));
+ assert.equal(await f.run('beginOwnerOnboarding()'),false);
+ f.run("user.user_metadata={suivi_onboarding_version:1}");
+ assert.equal(await f.run('beginOwnerOnboarding()'),true);
+ assert(f.document.getElementById('approvedIntro').textContent.includes('Chefe de equipe'));
+ assert(f.document.getElementById('approvedIntro').textContent.includes('Trabalho por minha conta'));
+ f.run("introState.type='business'");
+ await f.run('advanceOnboarding(false)');
+ assert(f.document.getElementById('onboardingSkip'));
+ await f.run('advanceOnboarding(true)');
+ assert(f.document.getElementById('approvedIntro').textContent.includes('Facebook'));
+ assert(f.document.getElementById('approvedIntro').textContent.includes('Instagram'));
+ f.run(`sb.from=()=>({upsert:async (row,options)=>{window.profileWrite={row,options};return {}}});
+  sb.auth.updateUser=async ({data})=>{window.metadataWrite=data;return {data:{user:{id:'owner',user_metadata:data}}}};
+  start=async()=>{};introState.discovery='instagram';`);
+ await f.run('advanceOnboarding(false)');
+ assert.equal(f.run('window.profileWrite.row.account_type'),'business');
+ assert.equal(f.run('window.profileWrite.options.ignoreDuplicates'),true);
+ assert.equal(f.run('window.metadataWrite.suivi_sector'),null);
+ assert.equal(f.run('window.metadataWrite.suivi_discovery'),'instagram');
+});
+
+test('the staff editor preserves monthly advances and only changes the selected employee and month',async()=>{
+ const f=fixture();
+ f.run(`$('accountType').value='business';syncStaffEditorAccess();loadRecords=async()=>{};
+  sb.from=table=>{if(table!=='monthly_payments')throw Error('unexpected');const q={select(){return q},eq(){return q},update(values){window.payPatch=values;return q},match(key){window.payKey=key;return q},maybeSingle:async()=>({data:{payment_mode:'daily',daily_rate:100,advance:40}}),single:async()=>({data:{payment_mode:'hourly',hourly_rate:25,advance:40}})};return q;};`);
+ f.document.getElementById('manageStaffShortcut').onclick();
+ assert(!f.document.getElementById('teamDirectoryPanel').classList.contains('hidden'));
+ f.run("openStaffEditor('worker')");
+ await new Promise(resolve=>setTimeout(resolve,0));
+ f.document.getElementById('staffPayMode').value='hourly';
+ f.document.getElementById('staffPayAmount').value='25';
+ await f.document.getElementById('staffPay').onsubmit({preventDefault(){}});
+ assert.equal(f.run('window.payKey.employee_id'),'worker');
+ assert.equal(f.run('window.payKey.month'),f.document.getElementById('staffPayMonth').value+'-01');
+ assert.equal(f.run('window.payPatch.hourly_rate'),25);
+ assert.equal(f.run("'advance' in window.payPatch"),false);
 });
 
 test('employee invite replaces an existing session before resolving membership',async()=>{

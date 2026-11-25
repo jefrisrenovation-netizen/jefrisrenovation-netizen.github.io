@@ -45,7 +45,7 @@ async function registerWithPassword(){
   button.disabled=true;
   setLogin(tr('Création du compte…'),true);
   try{
-    const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:'https://jefrisrenovation-netizen.github.io/'}});
+    const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:'https://jefrisrenovation-netizen.github.io/',data:{suivi_onboarding_version:1}}});
     if(error){setLogin(error.message);return;}
     $('signupPassword').value='';$('signupConfirmation').value='';
     if(data?.session)await start();

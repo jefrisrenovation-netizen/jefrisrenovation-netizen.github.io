@@ -34,3 +34,23 @@
 #companyReportFilters .report-choice{display:flex;align-items:center;gap:.6rem;margin:.35rem 0;min-height:2.25rem}
 #companyReportFilters .report-choice input{width:1.125rem;min-width:1.125rem;height:1.125rem}
 #employeeJobTitleForm{margin-top:1rem}
+
+/* Keep the access screens in the same palette as the timesheets. */
+.intro-active{color:#262626}
+.intro-active header{background:#fff;color:#262626;padding:calc(16px + var(--native-header-inset, env(safe-area-inset-top))) 16px 12px;border-bottom:1px solid #ededed}
+.intro-active .brand{justify-content:flex-start}
+.intro-active .brand h1{color:#262626;font-size:20px}
+.intro-active .brand img,.intro-active .access-language{display:block}
+.intro-active .access-language{color:#262626}
+.intro-active .approved-intro h2,.intro-active #loginCard h2{text-align:left;font-size:clamp(26px,7vw,34px);line-height:1.12;letter-spacing:-.03em;margin:8px 0 16px}
+.intro-actions{display:grid;gap:10px;margin-top:24px}
+.intro-active .intro-actions button{min-height:48px;font-size:16px;margin:0;background:var(--red)}
+.intro-active .intro-actions .secondary,.intro-back{background:white!important;color:#262626!important;border:1px solid #d8d8d8}
+.approved-intro fieldset{margin:0;padding:0;border:0}
+.intro-option{display:flex;gap:12px;align-items:center;border:1px solid #ddd;border-radius:12px;margin:8px 0;padding:15px;font-size:16px;cursor:pointer}
+.intro-option:has(input:checked){border-color:var(--red);background:#fff7f7}
+.intro-option input{width:18px;height:18px;flex:none;margin:0;accent-color:var(--red)}
+.intro-option small{display:block;color:#515151;margin-top:4px;font-weight:400}
+#loginCard.registering button[onclick="login()"]{display:none}
+#loginCard.registering #email{margin-bottom:2px}
+#manageStaffShortcut,#editStaffShortcut{margin:12px 0}

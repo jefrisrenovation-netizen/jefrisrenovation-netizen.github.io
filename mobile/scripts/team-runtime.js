@@ -119,6 +119,8 @@ function setupOwnerUI(){
  const banner=$('app').firstElementChild;if(banner?.textContent.includes('VERSÃO DE TESTE')||banner?.textContent.includes('Version de test'))banner.remove();
  const shell=document.createElement('div');shell.id='upgradeShell';shell.className='no-print';shell.innerHTML=`<nav id="mainNav" class="app-nav" aria-label="Navigation">${['home','team','sites','reports','settings'].map((p,i)=>`<button class="secondary" data-pane="${p}" onclick="teamUI.pane('${p}')"><span aria-hidden="true">${['⌂','♙','▦','▤','⚙'][i]}</span>${teamLabel(p)}</button>`).join('')}</nav><p id="upgradeNotice" class="status" role="status"></p><section id="dashboard" class="card"><div class="dashboard-head"><div><small>${teamLabel('owner')}</small><h2 id="dashboardCompany"></h2></div><input id="dashboardMonth" type="month" aria-label="${esc(tt('month'))}" onchange="teamUI.month(this.value)"></div><h2>${teamLabel('month')}</h2><div id="dashboardStats" class="summary"></div><button class="register-button" onclick="teamUI.day()">＋ ${teamLabel('register')}</button><h2>${teamLabel('team')}</h2><div id="dashboardTeam"></div><p class="muted">${teamLabel('payrollApproved')}</p><p class="muted">✓ ${teamLabel('allSaved')}</p></section>`;
  $('app').prepend(shell);
+ const editStaff=document.createElement('button');editStaff.type='button';editStaff.id='editStaffShortcut';editStaff.className='secondary no-print';editStaff.innerHTML=teamLabel('editStaff');
+ editStaff.onclick=()=>openStaffEditor($('employee').value);$('teamPanel').append(editStaff);
  const directory=document.createElement('section');directory.id='teamDirectoryPanel';directory.className='card hidden no-print';
  directory.innerHTML=`<h2>${teamLabel('team')}</h2><div id="teamDirectory"></div>`;
  $('app').append(directory);
@@ -168,13 +170,16 @@ function setupOwnerUI(){
  $('inviteUsername').pattern='[a-zA-Z0-9][a-z0-9A-Z._\\x2D]{2,39}';
  $('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
  $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
- $('settingsPanel').append(deletionDetails);
+ const accountTitle=document.createElement('h2');accountTitle.innerHTML=teamLabel('myAccount');
+ const manageStaff=document.createElement('button');manageStaff.id='manageStaffShortcut';manageStaff.type='button';manageStaff.className='secondary';manageStaff.innerHTML=teamLabel('manageStaff');manageStaff.onclick=()=>showPane('team');
+ const privacy=document.createElement('a');privacy.className='button';privacy.href='https://jefrisrenovation-netizen.github.io/privacy.html';privacy.target='_blank';privacy.rel='noopener';privacy.innerHTML=teamLabel('privacy');
+ $('settingsPanel').prepend(accountTitle,manageStaff);$('settingsPanel').append(privacy,deletionDetails);
  deletionCard.remove();
  const sites=document.createElement('section');sites.id='sitesPanel';sites.className='card hidden no-print';sites.innerHTML=`<h2>${teamLabel('sites')}</h2><form id="siteForm"><div class="grid">${teamField('siteName','siteName')}${teamField('address','siteAddress')}</div><button type="submit">＋ ${teamLabel('addSite')}</button></form><h2>${teamLabel('siteLabor')}</h2><div class="grid"><div><label for="siteLaborMonth">${teamLabel('siteLaborMonth')}</label><input id="siteLaborMonth" type="month"></div><div><label for="siteLaborPlace">${teamLabel('workplace')}</label><select id="siteLaborPlace"></select></div></div><div id="siteLaborStats" class="summary" aria-live="polite"></div><p class="muted">${teamLabel('siteLaborNote')}</p><div id="siteList"></div>`;
  $('app').append(sites);$('siteAddress').required=false;$('siteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,async()=>{const {error}=await sb.from('work_sites').insert({owner_id:user.id,name:$('siteName').value.trim(),address:$('siteAddress').value.trim()});if(error)throw Error(tt('failed'));$('siteForm').reset();await upgradeRefresh();teamNotice(tt('saveOK'));});};
  const review=document.createElement('section');review.id='reviewPanel';review.className='card hidden no-print';review.innerHTML=`<h2>${teamLabel('reviewTitle')}</h2><p class="muted">${teamLabel('reviewHelp')}</p><div id="reviewList"></div>`;$('app').append(review);
  $('siteLaborMonth').onchange=()=>window.teamUI.month($('siteLaborMonth').value).catch(teamNotice);
- setupCompanyReportFilters();setupPersonalReportFilters();setupReportType();updateAccountMode();$('email').type='text';showPane('home');
+ setupCompanyReportFilters();setupPersonalReportFilters();setupReportType();updateAccountMode();syncStaffEditorAccess();$('email').type='text';showPane('home');
 }
 async function withTeamButton(button,fn){if(button?.disabled)return;if(button)button.disabled=true;try{await fn()}catch(error){teamNotice(error)}finally{if(button)button.disabled=false}}
 async function upgradeRefresh(){
@@ -697,7 +702,7 @@ async function teamBoot(){
    access.gps_attendance=mode.enabled===true;
    await workerPortal();return;
   }
-  $('workerPortal')?.classList.add('hidden');await startLegacy();setupOwnerUI();await upgradeRefresh();teamTranslate();
+  $('workerPortal')?.classList.add('hidden');if(await beginOwnerOnboarding())return;await startLegacy();setupOwnerUI();await upgradeRefresh();teamTranslate();
  }catch(error){$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');setLogin(error.message||tt('failed'));}
  finally{teamState.booting=false}
 }
@@ -747,13 +752,253 @@ async function requestEmployeeDeletion(){
  if(error){teamNotice(tt('failed'));return;}await sb.auth.signOut();location.reload();
 }
 
-const introWords={title:['Choisissez votre langue','Escolha seu idioma','Choose your language'],usage:['Comment allez-vous l’utiliser ?','Como você vai usar?','How will you use it?'],personal:['Particulier','Particular','Personal'],company:['Entreprise','Empresa','Company'],next:['Continuer','Continuar','Continue'],welcome:['Bienvenue','Bem-vindo','Welcome'],login:['Se connecter','Entrar','Sign in'],signup:['Créer un compte','Criar conta','Create account'],staff:['Employé ? Ouvrez l’invitation de votre entreprise.','Funcionário? Abra o convite da sua empresa.','Employee? Open your company invitation.']};
-function it(k){return introWords[k][$('languageCode').value.startsWith('pt')?1:$('languageCode').value.startsWith('en')?2:0]}
-$('brandName').textContent='Suivi des heures Pro';
-const calendarBrand=document.createElement('span');calendarBrand.className='intro-calendar';calendarBrand.setAttribute('aria-hidden','true');calendarBrand.innerHTML='<svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#e60023" stroke-width="3.5"><rect x="4" y="8" width="33" height="32" rx="5"/><path d="M4 18h33M13 3v11M28 3v11"/><circle cx="35" cy="34" r="11" fill="white"/><path d="M35 27v8h5"/></svg>';document.querySelector('.brand').prepend(calendarBrand);
-const intro=document.createElement('section');intro.id='approvedIntro';intro.className='card approved-intro';$('loginCard').before(intro);let introType=readAccessPreference('suivi_account_type')||'individual';
-function drawIntro(step=0){intro.innerHTML=step===0?`<h2>${it('title')}</h2>${[['pt-BR','🇧🇷 Português'],['fr','🇫🇷 Français'],['en','🇬🇧 English']].map(([v,t])=>`<button class="intro-choice ${$('languageCode').value.startsWith(v.slice(0,2))?'selected':''}" data-intro-language="${v}">${t}</button>`).join('')}<h3>${it('usage')}</h3><div class="intro-types">${[['individual','personal'],['business','company']].map(([v,k])=>`<button class="intro-choice ${introType===v?'selected':''}" data-intro-type="${v}">${it(k)}</button>`).join('')}</div><button id="introNext">${it('next')}</button>`:`<h2>${it('welcome')}</h2><button id="introLogin">↪　${it('login')}</button><button id="introSignup">♙　${it('signup')}</button><p class="intro-hint">${it('staff')}</p><button class="intro-back" id="introBack">‹</button>`;
-intro.querySelectorAll('[data-intro-language]').forEach(b=>b.onclick=()=>{$('languageCode').value=b.dataset.introLanguage;applyLanguage();drawIntro()});intro.querySelectorAll('[data-intro-type]').forEach(b=>b.onclick=()=>{introType=b.dataset.introType;drawIntro()});if($('introNext'))$('introNext').onclick=()=>{saveAccessPreference('suivi_account_type',introType);$('accountType').value=introType;drawIntro(1)};if($('introBack'))$('introBack').onclick=()=>drawIntro();for(const [id,mode] of [['introLogin','login'],['introSignup','signup']])if($(id))$(id).onclick=()=>{intro.classList.add('hidden');$('loginCard').classList.remove('hidden');passwordAccess.classList.toggle('hidden',mode!=='login');signup.classList.toggle('hidden',mode!=='signup');passwordAccess.open=true;signup.open=true;$('loginCard').querySelector('h2').textContent=it(mode);};}
-const introBack=document.createElement('button');introBack.textContent='‹';introBack.className='intro-back';introBack.onclick=()=>{$('loginCard').classList.add('hidden');intro.classList.remove('hidden');drawIntro(1)};$('loginCard').prepend(introBack);
-function syncIntro(){const active=!$('app').classList.contains('hidden')||!!$('workerPortal')&&!$('workerPortal').classList.contains('hidden');if(active&&!intro.classList.contains('hidden'))intro.classList.add('hidden');if(active&&document.body.classList.contains('intro-active'))document.body.classList.remove('intro-active')}
-new window.MutationObserver(syncIntro).observe(document.querySelector('main'),{subtree:true,attributes:true,attributeFilter:['class']});$('loginCard').classList.add('hidden');if(sessionStorage.getItem('suivi_expected_employee')){intro.classList.add('hidden');introBack.classList.add('hidden');signup.classList.add('hidden');}else{document.body.classList.add('intro-active');drawIntro();}
+Object.assign(teamWords,{
+ welcome:['Suivez vos heures de travail','Controle suas horas de trabalho','Track your work hours'],
+ welcomeHelp:['Pour vous ou pour votre équipe.','Para você ou para sua equipe.','For you or your team.'],
+ signIn:['Se connecter','Entrar','Sign in'],
+ signUp:['Créer un compte','Criar conta','Create account'],
+ usage:['Comment allez-vous utiliser Suivi ?','Como você vai usar o Suivi?','How will you use Suivi?'],
+ teamOwner:['Chef d’équipe','Chefe de equipe','Team leader'],
+ teamOwnerHelp:['Suivez les heures de votre équipe.','Acompanhe as horas da sua equipe.','Track your team’s hours.'],
+ soloOwner:['Je travaille à mon compte','Trabalho por minha conta','I work for myself'],
+ soloOwnerHelp:['Enregistrez vos propres heures.','Registre suas próprias horas.','Record your own hours.'],
+ sector:['Secteur d’activité','Área de atuação','Industry'],
+ discovery:['Comment avez-vous connu Suivi ?','Como conheceu o Suivi?','How did you hear about Suivi?'],
+ construction:['Construction','Construção','Construction'],cleaning:['Nettoyage','Limpeza','Cleaning'],
+ services:['Services','Serviços','Services'],other:['Autre','Outro','Other'],
+ referral:['Recommandation','Indicação','Referral'],webSearch:['Recherche en ligne','Busca na internet','Online search'],
+ facebook:['Facebook','Facebook','Facebook'],instagram:['Instagram','Instagram','Instagram'],
+ appStore:['App Store','App Store','App Store'],
+ continueOnboarding:['Continuer','Continuar','Continue'],skipOnboarding:['Passer','Pular','Skip'],
+ backToWelcome:['Retour','Voltar','Back'],
+ myAccount:['Mon compte','Minha conta','My account'],
+ manageStaff:['Gérer les employés','Gerenciar funcionários','Manage employees'],
+ privacy:['Confidentialité','Privacidade','Privacy'],
+ editStaff:['Modifier la fiche','Editar cadastro','Edit employee'],
+ staffPayment:['Rémunération du mois','Pagamento do mês','Monthly pay'],
+ staffPaymentHelp:['Le changement s’applique uniquement au mois sélectionné.','A alteração vale somente para o mês selecionado.','The change applies only to the selected month.'],
+ staffSaveIdentity:['Enregistrer la fiche','Salvar cadastro','Save employee'],
+ staffSavePay:['Enregistrer la rémunération','Salvar pagamento','Save pay']
+});
+
+const intro=document.createElement('section');
+intro.id='approvedIntro';
+intro.className='card approved-intro no-print';
+$('loginCard').before(intro);
+const introBack=document.createElement('button');
+introBack.type='button';
+introBack.className='intro-back secondary';
+introBack.innerHTML=teamLabel('backToWelcome');
+$('loginCard').prepend(introBack);
+const introState={step:'welcome',type:'',sector:null,discovery:null};
+let onboardingPending=false;
+let onboardingSaving=false;
+
+function drawIntro(){
+ const step=introState.step;
+ if(step==='welcome'){
+  intro.innerHTML=`<h2>${teamLabel('welcome')}</h2><p class="muted">${teamLabel('welcomeHelp')}</p><div class="intro-actions"><button id="introSignup">${teamLabel('signUp')}</button><button class="secondary" id="introLogin">${teamLabel('signIn')}</button></div>`;
+  $('introLogin').onclick=()=>openAccessForm(false);
+  $('introSignup').onclick=()=>openAccessForm(true);
+  return;
+ }
+ const choices=step==='type'
+  ? [['business','teamOwner','teamOwnerHelp'],['individual','soloOwner','soloOwnerHelp']]
+  : (step==='sector' ? ['construction','cleaning','services','other'] : ['referral','facebook','instagram','appStore','webSearch','other']).map(key=>[key,key]);
+ const heading=step==='type'?'usage':step;
+ intro.innerHTML=`<h2>${teamLabel(heading)}</h2><form><fieldset aria-label="${esc(tt(heading))}">${choices.map(([value,label,help])=>`<label class="intro-option"><input type="radio" name="choice" value="${value}" ${introState[step]===value?'checked':''}><span><strong>${teamLabel(label)}</strong>${help?`<small>${teamLabel(help)}</small>`:''}</span></label>`).join('')}</fieldset><div class="intro-actions"><button id="onboardingContinue" type="submit" ${introState[step]?'':'disabled'}>${teamLabel('continueOnboarding')}</button>${step==='type'?'':`<button id="onboardingSkip" class="secondary" type="button">${teamLabel('skipOnboarding')}</button>`}</div><p id="onboardingStatus" role="status" class="status"></p></form>`;
+ const form=intro.querySelector('form');
+ form.onchange=event=>{introState[step]=event.target.value;$('onboardingContinue').disabled=false;};
+ form.onsubmit=event=>{event.preventDefault();void advanceOnboarding(false);};
+ if($('onboardingSkip'))$('onboardingSkip').onclick=()=>advanceOnboarding(true);
+}
+
+function openAccessForm(registering){
+ intro.classList.add('hidden');
+ $('loginCard').classList.remove('hidden');
+ passwordAccess.classList.toggle('hidden',registering);
+ signup.classList.toggle('hidden',!registering);
+ $('passwordResetButton').classList.toggle('hidden',registering);
+ $('loginCard').classList.toggle('registering',registering);
+ $('accessTitle').dataset.teamText=registering?'signUp':'signIn';
+ teamTranslate();
+ setLogin('');
+}
+
+async function beginOwnerOnboarding(){
+ if(user.user_metadata?.suivi_onboarding_version!==1||user.user_metadata?.suivi_onboarding_complete===true)return false;
+ if(onboardingPending)return true;
+ onboardingPending=true;
+ introState.step='type';
+ $('loginCard').classList.add('hidden');
+ intro.classList.remove('hidden');
+ document.body.classList.add('intro-active');
+ drawIntro();
+ return true;
+}
+
+async function advanceOnboarding(skip){
+ const step=introState.step;
+ if(skip)introState[step]=null;
+ if(step!=='discovery'){
+  introState.step=step==='type'?'sector':'discovery';
+  drawIntro();
+  return;
+ }
+ const actions=intro.querySelectorAll('button');
+ if(onboardingSaving)return;
+ onboardingSaving=true;
+ actions.forEach(button=>button.disabled=true);
+ try{
+  const {error}=await sb.from('app_profiles').upsert({
+   owner_id:user.id,account_type:introState.type,company_name:'',language_code:$('languageCode').value
+  },{onConflict:'owner_id',ignoreDuplicates:true});
+  if(error)throw error;
+  const saved=await sb.auth.updateUser({data:{
+   suivi_onboarding_complete:true,
+   suivi_sector:introState.sector,
+   suivi_discovery:introState.discovery
+  }});
+  if(saved.error)throw saved.error;
+  user=saved.data.user;
+  onboardingPending=false;
+  await start();
+ }catch{
+  $('onboardingStatus').textContent=tt('failed');
+  actions.forEach(button=>button.disabled=false);
+  $('onboardingContinue').disabled=!introState.discovery;
+ }finally{onboardingSaving=false;}
+}
+
+$('loginCard').querySelector('h2').id='accessTitle';
+introBack.onclick=()=>{
+ $('loginCard').classList.add('hidden');
+ intro.classList.remove('hidden');
+ drawIntro();
+};
+function syncIntro(){
+ const active=!$('app').classList.contains('hidden')||!!$('workerPortal')&&!$('workerPortal').classList.contains('hidden');
+ if(active){intro.classList.add('hidden');document.body.classList.remove('intro-active');}
+}
+new window.MutationObserver(syncIntro).observe(document.querySelector('main'),{subtree:true,attributes:true,attributeFilter:['class']});
+$('loginCard').classList.add('hidden');
+if(sessionStorage.getItem('suivi_expected_employee')){
+ intro.classList.add('hidden');
+ introBack.classList.add('hidden');
+ signup.classList.add('hidden');
+}else{
+ document.body.classList.add('intro-active');
+ drawIntro();
+}
+teamTranslate();
+
+function syncStaffEditorAccess(){
+ const individual=$('accountType').value==='individual';
+ for(const id of ['manageStaffShortcut','editStaffShortcut'])$(id)?.classList.toggle('hidden',individual);
+}
+
+function paymentEditorMonth(){
+ const date=new Date();
+ return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0');
+}
+
+function openStaffEditor(id){
+ const employee=employees.find(person=>person.id===id&&person.active!==false);
+ if(!employee||teamState.role!=='owner'||$('accountType').value!=='business')return;
+ let dialog=$('employeeEditor');
+ if(!dialog){dialog=document.createElement('dialog');dialog.id='employeeEditor';document.body.append(dialog);}
+ const lang=TRANSLATIONS[$('languageCode').value]||TRANSLATIONS.fr;
+ const rates={daily:'daily_rate',hourly:'hourly_rate',fixed:'fixed_salary'};
+ dialog.innerHTML=`<h2>${teamLabel('editStaff')}</h2>
+  <form id="staffIdentity">
+   <label for="staffName">${teamLabel('fullName')}</label>
+   <input id="staffName" value="${esc(employee.name)}" maxlength="160" required>
+   <label for="staffJob">${teamLabel('optionalJobTitle')}</label>
+   <input id="staffJob" value="${esc(employee.job_title||'')}" maxlength="100">
+   <button type="submit">${teamLabel('staffSaveIdentity')}</button>
+   <p id="staffIdentityStatus" class="status" role="status"></p>
+  </form>
+  <form id="staffPay">
+   <h3>${teamLabel('staffPayment')}</h3>
+   <p class="muted">${teamLabel('staffPaymentHelp')}</p>
+   <label for="staffPayMonth">${teamLabel('month')}</label><input type="month" id="staffPayMonth" min="${paymentEditorMonth()}" required>
+   <label for="staffPayMode">${esc(lang.paymentMode)}</label><select id="staffPayMode">${Object.keys(rates).map(mode=>`<option value="${mode}">${esc(lang[mode])}</option>`).join('')}</select>
+   <label for="staffPayAmount" id="staffPayAmountLabel"></label><input type="number" min="0" step="0.01" id="staffPayAmount" required>
+   <button type="submit" disabled>${teamLabel('staffSavePay')}</button>
+   <p id="staffPayStatus" class="status" role="status"></p>
+  </form>
+  <form method="dialog"><button class="secondary">${teamLabel('backToWelcome')}</button></form>`;
+ const status=$('staffPayStatus');
+ const month=$('staffPayMonth');
+ const mode=$('staffPayMode');
+ const amount=$('staffPayAmount');
+ const payButton=$('staffPay').querySelector('button');
+ const rateLabels={daily:lang.dailyRate,hourly:lang.hourlyRate,fixed:lang.fixedSalary};
+ let paymentRow=null;
+ let loadedMonth='';
+ let request=0;
+ let draftRates={};
+ function updateRate(){
+  $('staffPayAmountLabel').textContent=rateLabels[mode.value]||lang[mode.value];
+  amount.value=draftRates[rates[mode.value]]??0;
+ }
+ async function readMonth(){
+  const version=++request;
+  const selected=month.value;
+  payButton.disabled=true;loadedMonth='';status.textContent='';
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(selected)||selected<paymentEditorMonth())return;
+  try{
+   const {data,error}=await sb.from('monthly_payments').select('*')
+    .eq('owner_id',user.id).eq('employee_id',id).eq('month',selected+'-01').maybeSingle();
+   if(version!==request)return;
+   if(error)throw error;
+   paymentRow=data;
+   loadedMonth=selected;
+   draftRates={...data};
+   mode.value=data?.payment_mode||'daily';
+   updateRate();
+   payButton.disabled=false;
+  }catch{if(version===request)status.textContent=tt('failed');}
+ }
+ $('staffIdentity').onsubmit=async event=>{
+  event.preventDefault();
+  const button=event.currentTarget.querySelector('button');
+  const notice=$('staffIdentityStatus');
+  const name=$('staffName').value.trim();
+  const job=$('staffJob').value.trim();
+  if(!name||button.disabled)return;
+  button.disabled=true;
+  try{
+   const {data,error}=await sb.from('employees').update({name,job_title:job||null})
+    .eq('owner_id',user.id).eq('id',id).eq('active',true).select('id').single();
+   if(error||!data)throw error||Error();
+   await loadEmployees();
+   notice.textContent=tt('saveOK');
+  }catch{notice.textContent=tt('failed');}
+  finally{button.disabled=false;}
+ };
+ $('staffPay').onsubmit=async event=>{
+  event.preventDefault();
+  const rate=Number(amount.value);
+  if(payButton.disabled||!loadedMonth||loadedMonth!==month.value||!Number.isFinite(rate)||rate<0||!rates[mode.value])return;
+  payButton.disabled=true;month.disabled=true;mode.disabled=true;amount.disabled=true;
+  try{
+   const patch={payment_mode:mode.value,[rates[mode.value]]:rate};
+   const key={owner_id:user.id,employee_id:id,month:loadedMonth+'-01'};
+   const result=paymentRow
+    ? await sb.from('monthly_payments').update(patch).match(key).select('*').single()
+    : await sb.from('monthly_payments').insert({...key,...patch,currency_code:profile.preferred_currency||'EUR'}).select('*').single();
+   if(result.error||!result.data)throw result.error||Error();
+   paymentRow=result.data;
+   draftRates={...paymentRow};
+   if(ym()===loadedMonth)await loadRecords();
+   status.textContent=tt('saveOK');
+  }catch{status.textContent=tt('failed');}
+  finally{month.disabled=false;mode.disabled=false;amount.disabled=false;payButton.disabled=false;}
+ };
+ month.value=ym()>=paymentEditorMonth()?ym():paymentEditorMonth();
+ month.onchange=readMonth;
+ mode.onchange=updateRate;
+ dialog.showModal();
+ void readMonth();
+}
