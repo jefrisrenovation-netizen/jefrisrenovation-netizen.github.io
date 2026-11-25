@@ -263,3 +263,15 @@ test('team invites start from the directory while account deletion stays in sett
  f.run("showPane('settings')");
  assert(!panel.classList.contains('hidden'));
 });
+
+test('employee sheet opens the invite form for the selected employee',async()=>{
+ const f=fixture();
+ f.run(`loadRecords=async()=>{};teamState.members=[{employee_id:'worker',username:'worker.test',phone:'+32470123456',gps_attendance:true}];`);
+ await f.run("openTeamSheet('worker')");
+ f.document.getElementById('inviteFromEmployeeSheet').onclick();
+ assert.equal(f.document.getElementById('inviteEmployee').value,'worker');
+ assert.equal(f.document.getElementById('inviteUsername').value,'worker.test');
+ assert.equal(f.document.getElementById('inviteAttendance').value,'gps');
+ assert(f.document.getElementById('teamInvitePanel').open);
+ assert(!f.document.getElementById('teamDirectoryPanel').classList.contains('hidden'));
+});

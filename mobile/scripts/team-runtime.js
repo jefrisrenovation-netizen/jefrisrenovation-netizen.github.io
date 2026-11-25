@@ -167,6 +167,28 @@ function setupOwnerUI(){
  $('inviteEmail').oninput=syncContact;syncContact();
  $('inviteUsername').pattern='[a-zA-Z0-9][a-z0-9A-Z._\\x2D]{2,39}';
  $('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
+ const inviteFromSheet=document.createElement('button');
+ inviteFromSheet.id='inviteFromEmployeeSheet';inviteFromSheet.type='button';inviteFromSheet.className='secondary no-print';
+ inviteFromSheet.innerHTML=teamLabel('sendInviteLink');
+ $('teamPanel').append(inviteFromSheet);
+ inviteFromSheet.onclick=()=>{
+  const employeeId=$('employee').value;
+  showPane('team');
+  refreshInviteEmployees(employees);
+  const select=$('inviteEmployee');
+  if(select.value!==employeeId){
+   select.value=employeeId;
+   select.onchange();
+   const member=teamState.members.find(account=>account.employee_id===employeeId);
+   $('inviteUsername').value=member?.username||'';
+   $('inviteEmail').value=member?.email||'';
+   $('invitePhone').value=member?.phone||'';
+   $('inviteAttendance').value=member?.gps_attendance?'gps':'manual';
+   syncContact();
+  }
+  invite.open=true;
+  invite.scrollIntoView({block:'start'});
+ };
  $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
  $('settingsPanel').append(deletionDetails);
  deletionCard.remove();
@@ -221,7 +243,9 @@ async function createTeamInvite(){
  const previous=teamState.members.find(member=>member.employee_id===employeeId);
  const invitation=await teamCall('invite',{employee_id:employeeId,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value});
  if(gpsEnabled||previous?.gps_attendance)await gpsCall('gps_configure',{employee_id:employeeId,enabled:gpsEnabled});
- showTeamInvitation({...invitation,employeeName,gps_attendance:gpsEnabled});await upgradeRefresh();
+ showTeamInvitation({...invitation,employeeName,gps_attendance:gpsEnabled});
+ $('inviteResult').scrollIntoView({block:'nearest'});
+ await upgradeRefresh();
 }
 function showTeamInvitation(invitation){
  const result=$('inviteResult');
