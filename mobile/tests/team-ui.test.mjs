@@ -118,6 +118,11 @@ test('existing accounts enter directly and new accounts choose their type after 
  const f=fixture();
  assert(f.document.getElementById('accessLanguage').closest('header'));
  assert(!f.document.querySelector('input[name="choice"]'));
+ f.document.getElementById('introSignup').onclick();
+ const signupDetails=f.document.getElementById('signupForm').closest('details');
+ assert(!signupDetails.classList.contains('hidden'));
+ assert.equal(signupDetails.open,true);
+ f.run('introBack.onclick()');
  f.document.getElementById('introLogin').onclick();
  assert(!f.document.getElementById('loginCard').classList.contains('hidden'));
  assert(f.document.getElementById('signupForm').closest('details').classList.contains('hidden'));
