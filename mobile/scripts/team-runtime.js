@@ -818,6 +818,7 @@ function openAccessForm(registering){
  $('loginCard').classList.remove('hidden');
  passwordAccess.classList.toggle('hidden',registering);
  signup.classList.toggle('hidden',!registering);
+ (registering ? signup : passwordAccess).open=true;
  $('passwordResetButton').classList.toggle('hidden',registering);
  $('loginCard').classList.toggle('registering',registering);
  $('accessTitle').dataset.teamText=registering?'signUp':'signIn';
@@ -878,7 +879,9 @@ introBack.onclick=()=>{
 };
 function syncIntro(){
  const active=!$('app').classList.contains('hidden')||!!$('workerPortal')&&!$('workerPortal').classList.contains('hidden');
- if(active){intro.classList.add('hidden');document.body.classList.remove('intro-active');}
+ if(!active)return;
+ if(!intro.classList.contains('hidden'))intro.classList.add('hidden');
+ if(document.body.classList.contains('intro-active'))document.body.classList.remove('intro-active');
 }
 new window.MutationObserver(syncIntro).observe(document.querySelector('main'),{subtree:true,attributes:true,attributeFilter:['class']});
 $('loginCard').classList.add('hidden');
