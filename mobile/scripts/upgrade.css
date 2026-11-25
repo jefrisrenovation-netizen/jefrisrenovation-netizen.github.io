@@ -42,15 +42,75 @@
 .intro-active .brand h1{color:#262626;font-size:20px}
 .intro-active .brand img,.intro-active .access-language{display:block}
 .intro-active .access-language{color:#262626}
-.intro-active .approved-intro h2,.intro-active #loginCard h2{text-align:left;font-size:clamp(26px,7vw,34px);line-height:1.12;letter-spacing:-.03em;margin:8px 0 16px}
+.intro-active .approved-intro h2,.intro-active #loginCard h2{text-align:left}
 .intro-actions{display:grid;gap:10px;margin-top:24px}
-.intro-active .intro-actions button{min-height:48px;font-size:16px;margin:0;background:var(--red)}
+.intro-active .intro-actions button{margin:0;background:var(--red)}
 .intro-active .intro-actions .secondary,.intro-back{background:white!important;color:#262626!important;border:1px solid #d8d8d8}
 .approved-intro fieldset{margin:0;padding:0;border:0}
-.intro-option{display:flex;gap:12px;align-items:center;border:1px solid #ddd;border-radius:12px;margin:8px 0;padding:15px;font-size:16px;cursor:pointer}
+.intro-option{display:flex;gap:12px;align-items:center;border:1px solid #ddd;border-radius:12px;margin:8px 0;padding:15px;cursor:pointer}
 .intro-option:has(input:checked){border-color:var(--red);background:#fff7f7}
 .intro-option input{width:18px;height:18px;flex:none;margin:0;accent-color:var(--red)}
 .intro-option small{display:block;color:#515151;margin-top:4px;font-weight:400}
 #loginCard.registering button[onclick="login()"]{display:none}
 #loginCard.registering #email{margin-bottom:2px}
 #manageStaffShortcut,#editStaffShortcut{margin:12px 0}
+
+
+/* Shared typography for account access, onboarding and account settings. */
+:is(.approved-intro, #loginCard, #settingsPanel), .intro-active .access-language {
+  font: 1rem system-ui, sans-serif;
+  font: -apple-system-body;
+  line-height: 1.5;
+}
+
+:is(.approved-intro, .intro-active #loginCard, #settingsPanel) > h2:first-of-type {
+  font-size: 1.95em;
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -.025em;
+  margin: .25em 0 .65em;
+  overflow-wrap: anywhere;
+}
+
+#settingsPanel #profileHeading {
+  font-size: 1.2em;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 1em 0 .4em;
+}
+
+:is(.approved-intro, #loginCard, #settingsPanel) :is(.muted, .status) {
+  font-size: .95em;
+  line-height: 1.55;
+}
+
+:is(#loginCard, #settingsPanel) label, .intro-active .access-language label {
+  font-size: .9em;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.intro-active .access-language label {color: inherit}
+
+:is(.approved-intro, #loginCard, #settingsPanel, .intro-active .access-language)
+  :is(button, select, input:not([type="radio"]):not([type="checkbox"])) {
+  font-family: inherit;
+  font-size: 1em;
+  line-height: 1.35;
+  min-height: 44px;
+  max-width: 100%;
+}
+
+:is(.approved-intro, #loginCard, #settingsPanel) button {
+  font-weight: 650;
+  white-space: normal;
+}
+
+.approved-intro .intro-option {
+  font-size: 1em;
+  line-height: 1.4;
+}
+
+.approved-intro .intro-option small {font-size: .92em}
+#settingsPanel .grid {row-gap: 1em}
+#settingsPanel .grid > div {min-width: 0}
