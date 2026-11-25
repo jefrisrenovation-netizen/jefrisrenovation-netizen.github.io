@@ -155,26 +155,21 @@ Deno.serve(async(req:Request)=>{
   // All remaining actions belong to owners. Staff receive only their own monthly payment above, never owner-level lists.
   if(account)return reply(403,{error:'owner_required'});
   if(action==='invite'){
-   const employee=await admin.from('employees').select('id').eq('id',String(body.employee_id)).eq('owner_id',user.id).eq('active',true).single();if(employee.error)return reply(403,{error:'access_denied'});
-   const name=username(body.username),email=String(body.email||'').trim().toLowerCase()||null,method=email?'email':'phone';
-   const phone=method==='phone'?phoneNumber(body.phone):String(body.phone||'').trim().slice(0,40);
+   const employeeId=String(body.employee_id||'');
+   if(!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(employeeId))return reply(400,{error:'invalid_request'});
+   const name=username(body.username),email=String(body.email||'').trim().toLowerCase()||null;
+   const phone=body.phone||!email?phoneNumber(body.phone):'';
    if(email&&(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254||email===user.email?.toLowerCase()))return reply(400,{error:'invalid_email'});
-   const previous=await admin.from('team_accounts').select('*').eq('employee_id',employee.data.id).maybeSingle();if(previous.error)throw previous.error;
-   if(previous.data?.owner_id&&previous.data.owner_id!==user.id)return reply(403,{error:'access_denied'});
-   if(previous.data?.user_id&&(previous.data.email!==email||(previous.data.login_method||'email')!==method||(method==='phone'&&previous.data.phone!==phone)))return reply(409,{error:'linked_email_locked'});
-   const values={owner_id:user.id,employee_id:employee.data.id,username:name,email,phone,login_method:method,auth_email:method==='phone'?(previous.data?.auth_email||crypto.randomUUID()+'@staff.suivi.invalid'):null};
-   const member=previous.data?await admin.from('team_accounts').update(values).eq('id',previous.data.id).select('*').single():await admin.from('team_accounts').insert(values).select('*').single();
-   if(member.error?.code==='23505'){
-    if(member.error.message.includes('"team_phone_login_unique"'))return reply(409,{error:'phone_taken'});
-    if(member.error.message.includes('"team_accounts_username_key"'))return reply(409,{error:'username_taken'});
-   }
-   if(member.error)throw member.error;
-   if(!member.data.enabled)return reply(403,{error:'access_blocked'});
-
-   await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('account_id',member.data.id).is('used_at',null);
-   const bytes=crypto.getRandomValues(new Uint8Array(32)),token=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');
-   const saved=await admin.from('team_invites').insert({token_hash:await digest(token),account_id:member.data.id,expires_at:'infinity'});if(saved.error)throw saved.error;
-   return reply(200,{url:BASE+'/invite/#invite='+token,username:name,email,phone:values.phone});
+   const token=[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');
+   const issued=await admin.rpc('issue_team_invite',{
+    p_owner:user.id,p_employee:employeeId,p_username:name,p_email:email,p_phone:phone,
+    p_token_hash:await digest(token),p_transfer:body.transfer_archived_phone===true,
+    p_gps:typeof body.gps_attendance==='boolean'?body.gps_attendance:null
+   });
+   if(issued.error)throw issued.error;
+   if(issued.data?.error)return reply(['access_denied','access_blocked'].includes(issued.data.error)?403:409,issued.data);
+   if(!issued.data?.created)throw Error('request_failed');
+   return reply(200,{url:BASE+'/invite/#invite='+token,username:name,email,phone});
   }
   if(action==='reset_phone'){
    const result=await admin.from('team_accounts').select('*').eq('id',String(body.id)).eq('owner_id',user.id).eq('login_method','phone').eq('enabled',true).single();
@@ -189,7 +184,7 @@ Deno.serve(async(req:Request)=>{
   }
   if(action==='set_access'){
    if(typeof body.enabled!=='boolean')return reply(400,{error:'invalid_request'});
-   const result=await admin.from('team_accounts').update({enabled:body.enabled}).eq('id',String(body.id)).eq('owner_id',user.id).select('id');if(result.error)throw result.error;if(!result.data?.length)return reply(403,{error:'access_denied'});return reply(200,{saved:true});
+   const result=await admin.from('team_accounts').update({enabled:body.enabled}).eq('id',String(body.id)).eq('owner_id',user.id).is('archived_phone',null).select('id');if(result.error)throw result.error;if(!result.data?.length)return reply(403,{error:'access_denied'});return reply(200,{saved:true});
   }
   if(action==='review_day'){
    if(!['approved','rejected'].includes(body.status))return reply(400,{error:'invalid_request'});

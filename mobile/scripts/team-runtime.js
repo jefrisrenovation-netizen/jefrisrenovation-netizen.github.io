@@ -2,8 +2,8 @@
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
  inactiveEmployees:['Employés inactifs','Funcionários inativos','Inactive employees'],
- reactivateEmployee:['Réactiver','Reativar','Reactivate'],
- employeeReactivated:['Employé réactivé.','Funcionário reativado.','Employee reactivated.'],
+ archivedPhoneTaken:['Ce téléphone appartient à un dossier inactif. Voulez-vous le transférer au nouveau dossier et conserver l’historique ?','Este telefone está em um cadastro inativo. Quer usá-lo no novo cadastro e manter o histórico antigo?','This phone belongs to an inactive employee record. Use it on the new record and keep the old history?'],
+ renewEmployeeInvite:['Créer un nouveau lien','Gerar novo link','Generate new link'],
  sendInviteLink:['Envoyer un lien','Enviar link','Send link'],
  manageEmployeeAccess:['Accès des employés','Acessos dos funcionários','Employee access'],
  reportType:['Type de rapport','Tipo de relatório','Report type'],
@@ -81,7 +81,7 @@ function teamTranslate(){document.querySelectorAll('[data-team-text]').forEach(e
 async function teamCall(action,payload={},endpoint='team-access'){
  const {data:auth}=await sb.auth.getSession();
  const response=await fetch(SUPABASE_URL+'/functions/v1/'+endpoint,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,...(auth.session?{Authorization:'Bearer '+auth.session.access_token}:{})},body:JSON.stringify({action,...payload})});
- const data=await response.json();if(!response.ok){const error=new Error(tt(data.error));error.code=data.error;throw error;}return data;
+ const data=await response.json();if(!response.ok){const error=new Error(tt(data.error));error.code=data.error;error.employeeId=data.employee_id;throw error;}return data;
 }
 function gpsCall(action,payload={}){return teamCall(action,payload,'gps-attendance');}
 function teamNotice(error){const message=typeof error==='string'?error:error instanceof Error?error.message:tt('failed');const target=teamState.role==='employee'?$('workerNotice'):$('upgradeNotice');if(target){target.textContent=message;target.setAttribute('role','status');}else setLogin(message);}
@@ -158,10 +158,11 @@ function setupOwnerUI(){
    <p class="muted">${teamLabel('inviteHelp')}</p>
    <button type="submit">${teamLabel('createInvite')}</button>
   </form>
-  <div id="inviteResult" class="hidden"></div>`;
+  <div id="inviteConflict" class="hidden" role="status"></div><div id="inviteResult" class="hidden"></div>`;
  directory.prepend(invite);
  refreshInviteEmployees(employees);
  $('inviteEmployee').onchange=()=>{
+  $('inviteConflict').classList.add('hidden');
   const result=$('inviteResult');
   if(invite.contains(result)){result.classList.add('hidden');result.replaceChildren();}
  };
@@ -174,8 +175,7 @@ function setupOwnerUI(){
  inviteFromSheet.id='inviteFromEmployeeSheet';inviteFromSheet.type='button';inviteFromSheet.className='secondary no-print';
  inviteFromSheet.innerHTML=teamLabel('sendInviteLink');
  $('teamPanel').append(inviteFromSheet);
- inviteFromSheet.onclick=()=>{
-  const employeeId=$('employee').value;
+ const openInviteFor=employeeId=>{
   showPane('team');
   refreshInviteEmployees(employees);
   const select=$('inviteEmployee');
@@ -192,7 +192,8 @@ function setupOwnerUI(){
   invite.open=true;
   invite.scrollIntoView({block:'start'});
  };
- $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
+ inviteFromSheet.onclick=()=>openInviteFor($('employee').value);
+ $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,()=>createTeamInvite(openInviteFor))};
  $('settingsPanel').append(deletionDetails);
  deletionCard.remove();
  const sites=document.createElement('section');sites.id='sitesPanel';sites.className='card hidden no-print';sites.innerHTML=`<h2>${teamLabel('sites')}</h2><form id="siteForm"><div class="grid">${teamField('siteName','siteName')}${teamField('address','siteAddress')}</div><button type="submit">＋ ${teamLabel('addSite')}</button></form><h2>${teamLabel('siteLabor')}</h2><div class="grid"><div><label for="siteLaborMonth">${teamLabel('siteLaborMonth')}</label><input id="siteLaborMonth" type="month"></div><div><label for="siteLaborPlace">${teamLabel('workplace')}</label><select id="siteLaborPlace"></select></div></div><div id="siteLaborStats" class="summary" aria-live="polite"></div><p class="muted">${teamLabel('siteLaborNote')}</p><div id="siteList"></div>`;
@@ -230,22 +231,14 @@ async function upgradeRefresh(){
  $('reviewList').innerHTML=days.filter(d=>d.approval_status==='pending').map(d=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===d.employee_id)?.name||'')} · ${esc(d.work_date)}</strong><p>${esc(d.entry_time?.slice(0,5)||'')}–${esc(d.exit_time?.slice(0,5)||'')} · ${Number(d.break_minutes)} min · ${esc(d.workplace||'')}</p><div class="actions"><button class="green" data-review="${d.id}" data-status="approved">${esc(tt('approve'))}</button><button class="secondary" data-review="${d.id}" data-status="rejected">${esc(tt('reject'))}</button></div></article>`).join('')||`<p>${esc(tt('noPending'))}</p>`;
  $('reviewList').querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('review_day',{id:b.dataset.review,status:b.dataset.status});await upgradeRefresh();await loadRecords()}));
  if(teamState.pane==='team')renderTeamDirectory();
- refreshCompanyReportFilters(staff);refreshPersonalReportFilters(days,staff);refreshSiteLabor(days,payments,sites);teamTranslate();
+ refreshCompanyReportFilters(staff);refreshPersonalReportFilters(days,staff);refreshSiteLabor(days,payments,sites,staff);teamTranslate();
 }
 
 function renderInactiveEmployees(staff){
  const inactive=staff.filter(employee=>employee.active===false);
  $('inactiveEmployeesPanel').classList.toggle('hidden',inactive.length===0);
  const list=$('inactiveEmployeesList');
- list.innerHTML=inactive.map(employee=>`<div class="project-tile"><strong>${esc(employee.name)}</strong> <button type="button" class="secondary" data-reactivate="${esc(employee.id)}">${teamLabel('reactivateEmployee')}</button></div>`).join('');
- list.querySelectorAll('[data-reactivate]').forEach(button=>button.onclick=()=>withTeamButton(button,async()=>{
-  const {data,error}=await sb.from('employees').update({active:true})
-   .eq('owner_id',user.id).eq('id',button.dataset.reactivate).eq('active',false).select('id');
-  if(error||!data?.length)throw Error(tt('failed'));
-  await loadEmployees();
-  renderTeamDirectory();
-  teamNotice(tt('employeeReactivated'));
- }));
+ list.innerHTML=inactive.map(employee=>`<p>${esc(employee.name)}</p>`).join('');
 }
 
 function refreshInviteEmployees(staff){
@@ -255,13 +248,27 @@ function refreshInviteEmployees(staff){
   active.map(employee=>`<option value="${esc(employee.id)}">${esc(employee.name)}</option>`).join('');
  select.value=active.some(employee=>employee.id===previous)?previous:'';
 }
-async function createTeamInvite(){
+async function createTeamInvite(openInviteFor){
  const employeeId=$('inviteEmployee').value;
- const employeeName=employees.find(e=>e.id===employeeId)?.name;
+ const employeeName=employees.find(employee=>employee.id===employeeId)?.name;
  const gpsEnabled=$('inviteAttendance').value==='gps';
- const previous=teamState.members.find(member=>member.employee_id===employeeId);
- const invitation=await teamCall('invite',{employee_id:employeeId,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value});
- if(gpsEnabled||previous?.gps_attendance)await gpsCall('gps_configure',{employee_id:employeeId,enabled:gpsEnabled});
+ const payload={employee_id:employeeId,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value,gps_attendance:gpsEnabled};
+ const conflict=$('inviteConflict');
+ conflict.classList.add('hidden');
+ let invitation;
+ try{
+  invitation=await teamCall('invite',payload);
+ }catch(error){
+  if(error.code==='archived_phone_taken'){
+   if(!confirm(tt('archivedPhoneTaken')))return;
+   invitation=await teamCall('invite',{...payload,transfer_archived_phone:true});
+  }else if(error.code==='phone_taken'&&employees.some(employee=>employee.id===error.employeeId)){
+   conflict.innerHTML=`<p>${teamLabel('phone_taken')}</p><button type="button" class="secondary">${teamLabel('renewEmployeeInvite')}</button>`;
+   conflict.querySelector('button').onclick=()=>openInviteFor(error.employeeId);
+   conflict.classList.remove('hidden');
+   return;
+  }else throw error;
+ }
  showTeamInvitation({...invitation,employeeName,gps_attendance:gpsEnabled});
  $('inviteResult').scrollIntoView({block:'nearest'});
  await upgradeRefresh();
@@ -300,7 +307,7 @@ function wireSchedule(prefix,getEmployee,isWorker=false){
  };
  return fill;
 }
-function refreshSiteLabor(days,payments,sites){
+function refreshSiteLabor(days,payments,sites,staff=employees){
  const month=$('siteLaborMonth'), select=$('siteLaborPlace'), summary=$('siteLaborStats');
  if(!month||!select||!summary)return;
  month.value=ym();
@@ -319,7 +326,7 @@ function refreshSiteLabor(days,payments,sites){
    ...[...result.centsByCurrency].map(([currency,cents])=>[tt('siteLabor'),formatMoney(cents/100,currency)])];
   summary.innerHTML=stats.map(([label,value])=>`<div class="stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join('');
   if(result.minutesByEmployee.size){
-   summary.insertAdjacentHTML('beforeend',`<details><summary>${teamLabel('worker')} · ${teamLabel('hours')}</summary><ul>${[...result.minutesByEmployee].map(([id,duration])=>`<li>${esc(employees.find(e=>e.id===id)?.name||tt('worker'))} · ${esc(fmt(duration))}</li>`).join('')}</ul></details>`);
+   summary.insertAdjacentHTML('beforeend',`<details><summary>${teamLabel('worker')} · ${teamLabel('hours')}</summary><ul>${[...result.minutesByEmployee].map(([id,duration])=>`<li>${esc(staff.find(e=>e.id===id)?.name||tt('worker'))} · ${esc(fmt(duration))}</li>`).join('')}</ul></details>`);
   }
   const site=sites.find(s=>s.name+(s.address?' — '+s.address:'')===select.value);
   if(site)renderSiteExpenses(site,result.centsByCurrency,summary);

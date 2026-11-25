@@ -13,9 +13,6 @@ function handler(options={}){
   constructor(table){this.table=table;this.operations=[];queries.push(this)}
   neq(...v){this.operations.push(['neq',...v]);return this}select(...v){this.operations.push(['select',...v]);return this}eq(...v){this.operations.push(['eq',...v]);return this}is(...v){this.operations.push(['is',...v]);return this}gt(...v){this.operations.push(['gt',...v]);return this}gte(...v){this.operations.push(['gte',...v]);return this}lte(...v){this.operations.push(['lte',...v]);return this}order(...v){this.operations.push(['order',...v]);return this}in(...v){this.operations.push(['in',...v]);return this}or(...v){this.operations.push(['or',...v]);return this}insert(v){this.operations.push(['insert',v]);return this}update(v){this.operations.push(['update',v]);return this}
   result(){let data=this.table==='team_accounts'?(options.member===undefined?member:options.member):this.table==='employees'?employee:this.table==='app_profiles'?{company_name:'Company A',language_code:'fr'}:this.table==='work_sites'?[]:this.table==='team_invites'?(options.invite||null):[];
-   if(this.table==='team_accounts'&&options.inviteConflict&&this.operations.some(o=>o[0]==='insert'))return {
-    data:null,error:{code:'23505',message:'duplicate key value violates unique constraint "'+options.inviteConflict+'"'}
-   };
    if(this.table==='team_accounts'&&this.operations.some(o=>o[0]==='update'))data=[{id:'member-a'}];
    if(this.table==='team_invites'&&this.operations.some(o=>o[0]==='update'))data=options.used?[]:[{token_hash:'test'}];
    if(this.table==='work_days'&&this.operations.some(o=>o[0]==='insert'||o[0]==='update'))data=options.locked?[]:[{id:'day-a'}];
@@ -23,7 +20,7 @@ function handler(options={}){
   single(){return Promise.resolve(this.result())}maybeSingle(){return Promise.resolve(this.result())}then(ok,bad){return Promise.resolve(this.result()).then(ok,bad)}
  }
  const authChanges=[];
- const client={from:table=>new Query(table),rpc:async()=>({data:options.rate!==false,error:null}),auth:{getUser:async()=>options.unauthenticated?{data:{user:null},error:Error('denied')}:{data:{user:{id:options.userId||'staff-a',email:options.email||'staff@example.invalid',email_confirmed_at:'2026-11-01'}},error:null},admin:{getUserById:async()=>({data:{user:{id:'staff-a',email:'staff@example.invalid',email_confirmed_at:'2026-11-01'}}}),createUser:async()=>({data:{user:{id:'new-staff'}},error:null}),updateUserById:async(id,values)=>{authChanges.push({id,values});return {error:null}},generateLink:async()=>{if(!options.reusable)throw Error('must not generate a link for existing accounts');return {data:{user:{id:'staff-a'},properties:{hashed_token:'test-hash'}},error:null}}}}};
+ const client={from:table=>new Query(table),rpc:async(name,values)=>name==='issue_team_invite'?options.issueInvite(values):({data:options.rate!==false,error:null}),auth:{getUser:async()=>options.unauthenticated?{data:{user:null},error:Error('denied')}:{data:{user:{id:options.userId||'staff-a',email:options.email||'staff@example.invalid',email_confirmed_at:'2026-11-01'}},error:null},admin:{getUserById:async()=>({data:{user:{id:'staff-a',email:'staff@example.invalid',email_confirmed_at:'2026-11-01'}}}),createUser:async()=>({data:{user:{id:'new-staff'}},error:null}),updateUserById:async(id,values)=>{authChanges.push({id,values});return {error:null}},generateLink:async()=>{if(!options.reusable)throw Error('must not generate a link for existing accounts');return {data:{user:{id:'staff-a'},properties:{hashed_token:'test-hash'}},error:null}}}}};
  client.auth.verifyOtp=async()=>({data:{user:{id:'staff-a'},session:{access_token:'reusable-access',refresh_token:'reusable-refresh'}},error:null});
  client.auth.signInWithPassword=async input=>({data:{session:{access_token:'test-access',refresh_token:'test-refresh'}},error:null});
  const context={createClient:()=>client,username,monthRange,dayInput,phoneNumber,Request,Response,TextEncoder,Uint8Array,crypto:webcrypto,URL,Date,Deno:{env:{get:()=> 'test'},serve:fn=>{captured=fn}}};
@@ -123,15 +120,19 @@ test('ordinary invitations, reset links and blocked employees cannot use reusabl
  const api=handler({member:{...member,enabled:false},invite:{expires_at:'infinity',purpose:'invite'}});assert.equal((await api.call({action:'open_access',token:'a'.repeat(64)},false)).status,403);
 });
 
-test('invite reports phone and username conflicts separately without changing links',async()=>{
- for(const [inviteConflict,error] of [
-  ['team_phone_login_unique','phone_taken'],
-  ['team_accounts_username_key','username_taken'],
-  ['team_accounts_employee_id_key','request_failed']
- ]){
-  const api=handler({member:null,userId:'company-a',inviteConflict});
-  const response=await api.call({action:'invite',employee_id:employee.id,username:'new.staff',phone:'+32470123456'});
-  assert.deepEqual(response,{status:error==='request_failed'?400:409,data:{error}});
-  assert(!api.queries.some(query=>query.table==='team_invites'));
- }
+test('owner invitation normalizes the phone and passes explicit transfer and GPS choices',async()=>{
+ const employeeId='12345678-1234-1234-1234-123456789012';
+ const api=handler({member:null,userId:'company-a',issueInvite:values=>{
+  assert.equal(values.p_owner,'company-a');
+  assert.equal(values.p_employee,employeeId);
+  assert.equal(values.p_phone,'+32470123456');
+  assert.equal(values.p_gps,true);
+  assert.match(values.p_token_hash,/^[a-f0-9]{64}$/);
+  return {data:values.p_transfer?{created:true}:{error:'archived_phone_taken'},error:null};
+ }});
+ const request={action:'invite',employee_id:employeeId,username:'new.staff',email:'test@example.invalid',phone:'+32 470 12 34 56',gps_attendance:true};
+ assert.deepEqual(await api.call(request),{status:409,data:{error:'archived_phone_taken'}});
+ const result=await api.call({...request,transfer_archived_phone:true});
+ assert.equal(result.status,200);
+ assert.match(result.data.url,/#invite=[a-f0-9]{64}$/);
 });

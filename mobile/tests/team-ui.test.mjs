@@ -276,26 +276,11 @@ test('employee sheet opens the invite form for the selected employee',async()=>{
  assert(!f.document.getElementById('teamDirectoryPanel').classList.contains('hidden'));
 });
 
-test('reactivating a returning employee keeps the original employee ID',async()=>{
+test('archived employees remain visible separately from the active directory',()=>{
  const f=fixture();
- f.run(`
-  const inactive={id:'returning',name:'Returning Employee',active:false};
-  const updates=[];
-  sb.from=table=>({
-   update(values){updates.push([table,values]);return this},
-   eq(key,value){updates.push([key,value]);return this},
-   async select(){return {data:[{id:inactive.id}],error:null}}
-  });
-  loadEmployees=async()=>{employees.push({...inactive,active:true});renderInactiveEmployees(employees)};
-  showPane('team');
-  renderInactiveEmployees([inactive]);
- `);
- const button=f.document.querySelector('[data-reactivate="returning"]');
- assert(button);
- await button.onclick();
- assert.equal(JSON.stringify(f.run('updates')),JSON.stringify([
-  ['employees',{active:true}],['owner_id','owner'],['id','returning'],['active',false]
- ]));
- assert(f.document.querySelector('#teamDirectory [data-employee="returning"]'));
- assert(f.document.getElementById('inactiveEmployeesPanel').classList.contains('hidden'));
+ f.run(`showPane('team');renderInactiveEmployees([{id:'old',name:'Archived Worker',active:false}]);`);
+ const panel=f.document.getElementById('inactiveEmployeesPanel');
+ assert(!panel.classList.contains('hidden'));
+ assert.match(panel.textContent,/Archived Worker/);
+ assert(!f.document.querySelector('#teamDirectory [data-employee="old"]'));
 });
