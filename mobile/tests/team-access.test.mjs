@@ -13,6 +13,9 @@ function handler(options={}){
   constructor(table){this.table=table;this.operations=[];queries.push(this)}
   neq(...v){this.operations.push(['neq',...v]);return this}select(...v){this.operations.push(['select',...v]);return this}eq(...v){this.operations.push(['eq',...v]);return this}is(...v){this.operations.push(['is',...v]);return this}gt(...v){this.operations.push(['gt',...v]);return this}gte(...v){this.operations.push(['gte',...v]);return this}lte(...v){this.operations.push(['lte',...v]);return this}order(...v){this.operations.push(['order',...v]);return this}in(...v){this.operations.push(['in',...v]);return this}or(...v){this.operations.push(['or',...v]);return this}insert(v){this.operations.push(['insert',v]);return this}update(v){this.operations.push(['update',v]);return this}
   result(){let data=this.table==='team_accounts'?(options.member===undefined?member:options.member):this.table==='employees'?employee:this.table==='app_profiles'?{company_name:'Company A',language_code:'fr'}:this.table==='work_sites'?[]:this.table==='team_invites'?(options.invite||null):[];
+   if(this.table==='team_accounts'&&options.inviteConflict&&this.operations.some(o=>o[0]==='insert'))return {
+    data:null,error:{code:'23505',message:'duplicate key value violates unique constraint "'+options.inviteConflict+'"'}
+   };
    if(this.table==='team_accounts'&&this.operations.some(o=>o[0]==='update'))data=[{id:'member-a'}];
    if(this.table==='team_invites'&&this.operations.some(o=>o[0]==='update'))data=options.used?[]:[{token_hash:'test'}];
    if(this.table==='work_days'&&this.operations.some(o=>o[0]==='insert'||o[0]==='update'))data=options.locked?[]:[{id:'day-a'}];
@@ -118,4 +121,17 @@ test('reusable employee link opens repeatedly without a password and ignores cal
 test('ordinary invitations, reset links and blocked employees cannot use reusable login',async()=>{
  for(const invite of [{expires_at:'2026-11-12',purpose:'invite'},{expires_at:'infinity',purpose:'reset'}]){const api=handler({reusable:true,invite:{account_id:member.id,token_hash:'test',...invite}});assert.equal((await api.call({action:'open_access',token:'a'.repeat(64)},false)).status,403);}
  const api=handler({member:{...member,enabled:false},invite:{expires_at:'infinity',purpose:'invite'}});assert.equal((await api.call({action:'open_access',token:'a'.repeat(64)},false)).status,403);
+});
+
+test('invite reports phone and username conflicts separately without changing links',async()=>{
+ for(const [inviteConflict,error] of [
+  ['team_phone_login_unique','phone_taken'],
+  ['team_accounts_username_key','username_taken'],
+  ['team_accounts_employee_id_key','request_failed']
+ ]){
+  const api=handler({member:null,userId:'company-a',inviteConflict});
+  const response=await api.call({action:'invite',employee_id:employee.id,username:'new.staff',phone:'+32470123456'});
+  assert.deepEqual(response,{status:error==='request_failed'?400:409,data:{error}});
+  assert(!api.queries.some(query=>query.table==='team_invites'));
+ }
 });

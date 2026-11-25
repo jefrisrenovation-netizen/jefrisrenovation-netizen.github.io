@@ -164,7 +164,12 @@ Deno.serve(async(req:Request)=>{
    if(previous.data?.user_id&&(previous.data.email!==email||(previous.data.login_method||'email')!==method||(method==='phone'&&previous.data.phone!==phone)))return reply(409,{error:'linked_email_locked'});
    const values={owner_id:user.id,employee_id:employee.data.id,username:name,email,phone,login_method:method,auth_email:method==='phone'?(previous.data?.auth_email||crypto.randomUUID()+'@staff.suivi.invalid'):null};
    const member=previous.data?await admin.from('team_accounts').update(values).eq('id',previous.data.id).select('*').single():await admin.from('team_accounts').insert(values).select('*').single();
-   if(member.error?.code==='23505')return reply(409,{error:'username_taken'});if(member.error)throw member.error;if(!member.data.enabled)return reply(403,{error:'access_blocked'});
+   if(member.error?.code==='23505'){
+    if(member.error.message.includes('"team_phone_login_unique"'))return reply(409,{error:'phone_taken'});
+    if(member.error.message.includes('"team_accounts_username_key"'))return reply(409,{error:'username_taken'});
+   }
+   if(member.error)throw member.error;
+   if(!member.data.enabled)return reply(403,{error:'access_blocked'});
 
    await admin.from('team_invites').update({used_at:new Date().toISOString()}).eq('account_id',member.data.id).is('used_at',null);
    const bytes=crypto.getRandomValues(new Uint8Array(32)),token=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');
