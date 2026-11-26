@@ -1,6 +1,13 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
+ gpsChooseSite:['Choisissez le chantier','Selecione a obra','Choose the work site'],
+ gpsChooseKind:['Entrée ou départ ?','Entrada ou saída?','Clock in or clock out?'],
+ gpsVerify:['Confirmer le pointage','Confirmar ponto','Confirm attendance'],
+ gpsConfirm:['Confirmer et envoyer la position ?','Confirmar e enviar a localização?','Confirm and send your location?'],
+ gpsWrongKind:['Prochain pointage attendu','Próxima batida esperada','Next expected punch'],
+ gpsNoSites:['Aucun chantier avec une adresse. Contactez votre responsable.','Nenhuma obra com endereço cadastrado. Fale com seu responsável.','No work site with an address. Contact your manager.'],
+ gpsNoRecords:['Aucun pointage GPS','Nenhuma batida com GPS','No GPS punches'],
  attendanceGps:['Pointage GPS','Ponto com GPS','GPS clock-in'],
  gpsEntry:['Pointer l’arrivée','Registrar entrada','Clock in'],
  gpsExit:['Pointer le départ','Registrar saída','Clock out'],
@@ -49,14 +56,17 @@ async function openTeamSheet(id){
  const request=loadRecords();
  const version=loadVersion;
  await request;
- if(teamState.pane==='team'&&version===loadVersion&&$('employee').value===id)showPane('team-sheet');
+ if(teamState.pane==='team'&&version===loadVersion&&$('employee').value===id){
+  showPane('team-sheet');
+  await showOwnerAttendance(id);
+ }
 }
 function renderTeamDirectory(){
  $('teamDirectory').innerHTML=employees.filter(e=>e.active!==false).map(e=>`<button type="button" class="worker-tile secondary" data-employee="${esc(e.id)}"><strong>${esc(e.name)}</strong><span aria-hidden="true">›</span></button>`).join('')||`<p>${teamLabel('noTeam')}</p>`;
  $('teamDirectory').querySelectorAll('[data-employee]').forEach(button=>button.onclick=()=>openTeamSheet(button.dataset.employee));
 }
 function showPane(pane){
- if(pane==='team')renderTeamDirectory();
+ if(pane==='team'){$('ownerAttendance')?.remove();renderTeamDirectory();}
  teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamDirectoryPanel','team'],['teamPanel','team-sheet'],['timesheetPanel','team-sheet'],['sitesPanel','sites'],['reportActions','reports'],['reviewPanel','team'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
  closeCompanyReport();closeIndividualReport();document.querySelectorAll('[data-pane]').forEach(e=>e.classList.toggle('selected',e.dataset.pane===(pane==='team-sheet'?'team':pane)));
  $('upgradeNotice').textContent='';$('mainNav')?.scrollIntoView({block:'start',behavior:'smooth'});
@@ -234,27 +244,44 @@ async function loadAttendanceHistory(panel, employeeId){
  renderAttendanceHistory(panel,records);
  return records[0]?.kind==='entry'?'exit':'entry';
 }
+async function showOwnerAttendance(employeeId){
+ if(!teamState.members.some(member=>member.employee_id===employeeId))return;
+ const panel=document.createElement('section');
+ panel.id='ownerAttendance';
+ panel.innerHTML=`<h2>${teamLabel('attendanceGps')}</h2><div>${teamLabel('loading')}</div>`;
+ $('timesheetPanel').append(panel);
+ try{
+  const {records}=await gpsCall('gps_history',{employee_id:employeeId});
+  renderAttendanceHistory(panel,records);
+  if(!records.length)panel.querySelector('div').innerHTML=teamLabel('gpsNoRecords');
+ }catch(error){panel.querySelector('div').textContent=error.message;}
+}
 async function setupWorkerAttendance(){
  const panel=document.createElement('section');
- panel.innerHTML=`<h2>${teamLabel('attendanceGps')}</h2><p>${teamLabel('gpsHelp')}</p><button type="button" disabled></button><div></div>`;
  const sites=(teamState.sites||[]).filter(site=>site.address);
- const select=document.createElement('select');
- select.setAttribute('aria-label',tt('workplace'));
- if(sites.length){
-  select.innerHTML=sites.map(site=>`<option value="${esc(site.id)}">${esc(site.name)}</option>`).join('');
-  panel.querySelector('button').before(select);
- }
+ panel.innerHTML=`<h2>${teamLabel('attendanceGps')}</h2><p>${teamLabel(sites.length?'gpsHelp':'gpsNoSites')}</p>
+ <label for="gpsSite">${teamLabel('workplace')}</label>
+ <select id="gpsSite"><option value="" data-team-text="gpsChooseSite">${esc(tt('gpsChooseSite'))}</option>${sites.map(site=>`<option value="${esc(site.id)}">${esc(site.name)}</option>`).join('')}</select>
+ <label for="gpsKind">${teamLabel('gpsChooseKind')}</label>
+ <select id="gpsKind"><option value="">—</option><option value="entry" data-team-text="gpsEntry">${esc(tt('gpsEntry'))}</option><option value="exit" data-team-text="gpsExit">${esc(tt('gpsExit'))}</option></select>
+ <button type="button" disabled>${teamLabel('gpsVerify')}</button><div></div>`;
+ const select=panel.querySelector('#gpsSite');
+ const kindSelect=panel.querySelector('#gpsKind');
  const manual=$('workerAddDay');
  manual.classList.add('hidden');
  manual.before(panel);
  const button=panel.querySelector('button');
  let kind=await loadAttendanceHistory(panel);
- const refreshButton=()=>{button.textContent=tt(kind==='entry'?'gpsSendEntry':'gpsSendExit');};
- refreshButton();
- button.disabled=false;
+ button.disabled=!sites.length;
  let pending;
  button.onclick=()=>withTeamButton(button,async()=>{
-  if(!pending){
+  const site=sites.find(item=>item.id===select.value);
+  if(!site)throw Error(tt('gpsChooseSite'));
+  if(!kindSelect.value)throw Error(tt('gpsChooseKind'));
+  const kindLabel=tt(kind==='entry'?'gpsEntry':'gpsExit');
+  if(kindSelect.value!==kind)throw Error(tt('gpsWrongKind')+' · '+kindLabel);
+  if(!confirm(kindLabel+' — '+site.name+'\n'+tt('gpsConfirm')))return;
+  if(!pending||pending.site_id!==site.id){
    const position=await new Promise(resolve=>{
     if(!navigator.geolocation){resolve(null);return;}
     navigator.geolocation.getCurrentPosition(({coords})=>resolve({
@@ -262,7 +289,7 @@ async function setupWorkerAttendance(){
     }),()=>resolve(null),{enableHighAccuracy:true,timeout:7000,maximumAge:0});
    });
    if(!position)throw Error(tt('gpsLocationUnavailable'));
-   pending={id:crypto.randomUUID(),kind,position,...(select.value?{site_id:select.value}:{})};
+   pending={id:crypto.randomUUID(),kind,position,site_id:site.id};
   }
   try{
    await gpsCall('gps_record',pending);
@@ -270,13 +297,14 @@ async function setupWorkerAttendance(){
    if(error.code==='gps_retry'){
     pending=null;
     kind=await loadAttendanceHistory(panel);
-    refreshButton();
+    kindSelect.value='';
    }
    throw error;
   }
   pending=null;
+  select.value='';
+  kindSelect.value='';
   kind=await loadAttendanceHistory(panel);
-  refreshButton();
   teamNotice(tt('saveOK'));
  });
 }
