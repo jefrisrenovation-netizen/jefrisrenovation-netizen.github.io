@@ -1001,7 +1001,20 @@ function renderAttendanceHistory(panel,records){
 async function loadAttendanceHistory(panel, employeeId){
  const {records}=await gpsCall('gps_history',employeeId?{employee_id:employeeId}:{});
  renderAttendanceHistory(panel,records);
- return records[0]?.kind==='entry'?'exit':'entry';
+ const open=records[0]?.kind==='entry'?records[0]:null;
+ const siteSelect=panel.querySelector('#gpsSite');
+ if(siteSelect){
+  let options=Array.from(siteSelect.querySelectorAll('option')).filter(option=>option.value);
+  if(open?.site_id&&!options.some(option=>option.value===open.site_id)){
+   const option=document.createElement('option');
+   option.value=open.site_id;option.textContent=open.site_name;
+   siteSelect.append(option);options.push(option);
+  }
+  for(const option of options)option.disabled=!!open&&(open.site_id?option.value!==open.site_id:!!open.site_name&&option.textContent!==open.site_name);
+  siteSelect.value='';
+  panel.querySelector('button').disabled=!options.some(option=>!option.disabled);
+ }
+ return open?'exit':'entry';
 }
 async function showOwnerAttendance(employeeId){
  $('ownerAttendance')?.remove();
@@ -1032,10 +1045,11 @@ async function setupWorkerAttendance(){
  manual.before(panel);
  const button=panel.querySelector('button');
  let kind=await loadAttendanceHistory(panel);
- button.disabled=!sites.length;
+
  let pending;
  button.onclick=()=>withTeamButton(button,async()=>{
-  const site=sites.find(item=>item.id===select.value);
+  const chosen=Array.from(select.querySelectorAll('option')).find(option=>option.value&&option.value===select.value&&!option.disabled);
+  const site=chosen&&{id:chosen.value,name:chosen.textContent};
   if(!site)throw Error(tt('gpsChooseSite'));
   if(!kindSelect.value)throw Error(tt('gpsChooseKind'));
   const kindLabel=tt(kind==='entry'?'gpsEntry':'gpsExit');
