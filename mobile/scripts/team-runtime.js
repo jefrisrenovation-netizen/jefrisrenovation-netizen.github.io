@@ -1,6 +1,19 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
+ attendanceGps:['Pointage GPS','Ponto com GPS','GPS clock-in'],
+ gpsEntry:['Pointer l’arrivée','Registrar entrada','Clock in'],
+ gpsExit:['Pointer le départ','Registrar saída','Clock out'],
+ gpsLocation:['Position GPS enregistrée','Localização GPS registrada','Recorded GPS location'],
+ gpsLocationUnavailable:['Position indisponible. Autorisez la localisation précise et réessayez.','Localização indisponível. Permita a localização precisa e tente novamente.','Location unavailable. Allow precise location and try again.'],
+ gpsSendEntry:['Envoyer la position et pointer l’arrivée','Enviar localização e registrar entrada','Send location and clock in'],
+ gpsSendExit:['Envoyer la position et pointer le départ','Enviar localização e registrar saída','Send location and clock out'],
+ gpsAccuracy:['Précision estimée','Precisão estimada','Estimated accuracy'],
+ gpsHelp:['La position est demandée à chaque pointage.','A localização é solicitada a cada batida.','Location is requested at each punch.'],
+ gpsNoAddress:['Adresse indisponible','Endereço indisponível','Address unavailable'],
+ gpsVerified:['Chantier confirmé','Obra confirmada','Site verified'],
+ gpsReview:['À vérifier','Pendente de revisão','Needs review'],
+ gps_retry:['Le pointage a changé. Actualisez et réessayez.','O ponto foi atualizado. Confira e tente novamente.','Attendance changed. Refresh and try again.'],
  paymentMissing:['Tarif non renseigné par l’entreprise','Valor ainda não informado pela empresa','Rate not yet entered by the company'],gross:['Montant brut','Valor bruto','Gross amount'],net:['Solde à recevoir','Saldo a receber','Balance due'],approvedHours:['Heures approuvées','Horas aprovadas','Approved hours'],approvedDays:['Jours approuvés','Dias aprovados','Approved days'],language:['Langue','Idioma','Language'],accessLink:['Accès habituel','Acesso habitual','Regular access'],copyUser:['Copier mon identifiant','Copiar meu usuário','Copy my username'],
  reportPlaces:['Tous les lieux de travail','Todos os locais de trabalho','All workplaces'],noWorkplace:['Sans lieu de travail','Sem local de trabalho','No workplace'],personalFilters:['Rapport individuel : mois et lieu de travail','Relatório individual: mês e local de trabalho','Individual report: month and workplace'],exportPDF:['Exporter PDF / WhatsApp','Exportar PDF / WhatsApp','Export PDF / WhatsApp'],filterNotice:['Rapport filtré : les avances et le salaire mensuel ne sont pas répartis par lieu de travail.','Relatório filtrado: os adiantamentos e o salário mensal não são divididos por local de trabalho.','Filtered report: monthly advances and fixed salary are not allocated to workplaces.'], accountManagement:['Gestion du compte','Gestão da conta','Account management'],status:['Statut','Situação','Status'],schedule:['Horaire par défaut','Horário padrão','Default hours'],
  resetMember:['Créer un lien pour un nouveau mot de passe','Criar link para nova senha','Create password reset link'],resetShare:['Lien pour définir un nouveau mot de passe (1 heure)','Link para definir nova senha (1 hora)','Password reset link (1 hour)'],invalid_phone:['Téléphone avec indicatif du pays, ex. +32470123456.','Telefone com código do país, ex. +32470123456.','Phone with country code, e.g. +32470123456.'],passwordSaved:['Mot de passe enregistré. Connectez-vous avec votre identifiant ou téléphone.','Senha salva. Entre com seu usuário ou telefone.','Password saved. Sign in with your username or phone.'],deleteUsername:['Saisissez votre identifiant pour supprimer votre accès personnel. L’historique de l’entreprise sera conservé.','Digite seu usuário para apagar seu acesso pessoal. O histórico da empresa será preservado.','Enter your username to delete your personal access. Company history will be retained.'],
@@ -22,11 +35,12 @@ const teamWords={
 function tt(key){const lang=$('languageCode')?.value||document.documentElement.lang||'fr';const row=teamWords[key];return row?row[lang.startsWith('pt')?1:lang.startsWith('en')?2:0]:teamWords.failed[lang.startsWith('pt')?1:lang.startsWith('en')?2:0]}
 function teamLabel(key){return `<span data-team-text="${key}">${esc(tt(key))}</span>`}
 function teamTranslate(){document.querySelectorAll('[data-team-text]').forEach(e=>e.textContent=tt(e.dataset.teamText));$('email').placeholder=tt('usernameEmail');}
-async function teamCall(action,payload={}){
+async function teamCall(action,payload={},endpoint='team-access'){
  const {data:auth}=await sb.auth.getSession();
- const response=await fetch(SUPABASE_URL+'/functions/v1/team-access',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,...(auth.session?{Authorization:'Bearer '+auth.session.access_token}:{})},body:JSON.stringify({action,...payload})});
+ const response=await fetch(SUPABASE_URL+'/functions/v1/'+endpoint,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,...(auth.session?{Authorization:'Bearer '+auth.session.access_token}:{})},body:JSON.stringify({action,...payload})});
  const data=await response.json();if(!response.ok){const error=new Error(tt(data.error));error.code=data.error;throw error;}return data;
 }
+function gpsCall(action,payload={}){return teamCall(action,payload,'gps-attendance');}
 function teamNotice(error){const message=typeof error==='string'?error:error instanceof Error?error.message:tt('failed');const target=teamState.role==='employee'?$('workerNotice'):$('upgradeNotice');if(target){target.textContent=message;target.setAttribute('role','status');}else setLogin(message);}
 async function openTeamSheet(id){
  if(!employees.some(employee=>employee.id===id&&employee.active!==false))return;
@@ -204,12 +218,75 @@ function ownerDayDialog(id){
  const fillSchedule=wireSchedule('ownerSchedule',()=>employees.find(e=>e.id===$('ownerDayEmployee').value));$('ownerDayEmployee').onchange=()=>{fillSchedule();if(!record){const emp=employees.find(e=>e.id===$('ownerDayEmployee').value);$('ownerDayEntry').value=(emp?.default_entry_time||'08:00').slice(0,5);$('ownerDayExit').value=(emp?.default_exit_time||'17:30').slice(0,5);$('ownerDayPause').value=emp?.default_break_minutes??30;$('ownerDayEntry').oninput();}};
  $('ownerDayForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{const payload={...readDayForm('ownerDay'),owner_id:user.id,employee_id:$('ownerDayEmployee').value};const {error}=record?await sb.from('work_days').update(payload).eq('id',record.id).eq('owner_id',user.id):await sb.from('work_days').insert(payload);if(error)throw Error(error.code==='23505'?tt('date_exists'):tt('failed'));$('employee').value=$('ownerDayEmployee').value;await loadRecords();dialog.close();teamNotice(tt('saveOK'));}catch(error){$('ownerDayError').textContent=error.message}finally{button.disabled=false}};dialog.showModal();
 }
+function renderAttendanceHistory(panel,records){
+ const clock=new Intl.DateTimeFormat($('languageCode').value||'fr',{
+  dateStyle:'short',timeStyle:'medium',timeZone:'Europe/Brussels'
+ });
+ panel.querySelector('div').innerHTML=records.map(record=>{
+  const hasPosition=Number.isFinite(record.latitude)&&Number.isFinite(record.longitude);
+  const coordinates=hasPosition?record.latitude.toFixed(6)+', '+record.longitude.toFixed(6):'';
+  const accuracy=hasPosition&&Number.isFinite(record.accuracy)?' · '+tt('gpsAccuracy')+' ±'+Math.ceil(record.accuracy)+' m':'';
+  return `<p><strong>${esc(tt(record.kind==='entry'?'gpsEntry':'gpsExit'))} · ${esc(clock.format(new Date(record.recorded_at)))}</strong><br>${esc(record.address||tt('gpsNoAddress'))}${coordinates?`<br>${esc(coordinates+accuracy)}`:''}<br>${record.site_name?esc(record.site_name)+' · ':''}${esc(tt(record.needs_review?'gpsReview':'gpsVerified'))}</p>`;
+ }).join('');
+}
+async function loadAttendanceHistory(panel, employeeId){
+ const {records}=await gpsCall('gps_history',employeeId?{employee_id:employeeId}:{});
+ renderAttendanceHistory(panel,records);
+ return records[0]?.kind==='entry'?'exit':'entry';
+}
+async function setupWorkerAttendance(){
+ const panel=document.createElement('section');
+ panel.innerHTML=`<h2>${teamLabel('attendanceGps')}</h2><p>${teamLabel('gpsHelp')}</p><button type="button" disabled></button><div></div>`;
+ const sites=(teamState.sites||[]).filter(site=>site.address);
+ const select=document.createElement('select');
+ select.setAttribute('aria-label',tt('workplace'));
+ if(sites.length){
+  select.innerHTML=sites.map(site=>`<option value="${esc(site.id)}">${esc(site.name)}</option>`).join('');
+  panel.querySelector('button').before(select);
+ }
+ const manual=$('workerAddDay');
+ manual.classList.add('hidden');
+ manual.before(panel);
+ const button=panel.querySelector('button');
+ let kind=await loadAttendanceHistory(panel);
+ const refreshButton=()=>{button.textContent=tt(kind==='entry'?'gpsSendEntry':'gpsSendExit');};
+ refreshButton();
+ button.disabled=false;
+ let pending;
+ button.onclick=()=>withTeamButton(button,async()=>{
+  if(!pending){
+   const position=await new Promise(resolve=>{
+    if(!navigator.geolocation){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(({coords})=>resolve({
+     lat:coords.latitude,lon:coords.longitude,accuracy:coords.accuracy
+    }),()=>resolve(null),{enableHighAccuracy:true,timeout:7000,maximumAge:0});
+   });
+   if(!position)throw Error(tt('gpsLocationUnavailable'));
+   pending={id:crypto.randomUUID(),kind,position,...(select.value?{site_id:select.value}:{})};
+  }
+  try{
+   await gpsCall('gps_record',pending);
+  }catch(error){
+   if(error.code==='gps_retry'){
+    pending=null;
+    kind=await loadAttendanceHistory(panel);
+    refreshButton();
+   }
+   throw error;
+  }
+  pending=null;
+  kind=await loadAttendanceHistory(panel);
+  refreshButton();
+  teamNotice(tt('saveOK'));
+ });
+}
 async function workerPortal(){
  $('app').classList.add('hidden');$('loginCard').classList.add('hidden');
  let portal=$('workerPortal');if(!portal){portal=document.createElement('section');portal.id='workerPortal';portal.className='card';document.querySelector('main').append(portal);}
  portal.innerHTML=`<p class="muted">${esc(teamState.access.company)}</p><h2>${esc(teamState.access.employee.name)}</h2><label for="workerMonth">${teamLabel('month')}</label><input id="workerMonth" type="month" value="${esc(teamState.month)}"><p id="workerNotice" class="status" role="status"></p><p class="muted">${teamLabel('reviewHelp')}</p><label for="workerReportPlace">${teamLabel('workplace')}</label><select id="workerReportPlace"></select><button class="green" onclick="teamUI.workerReport()">${teamLabel('exportPDF')}</button><div id="workerSummary" class="summary"></div><h2>${teamLabel('ownDays')}</h2><div id="workerDays"></div><button id="workerAddDay" onclick="teamUI.workerDay()">＋ ${esc(({fr:"Ajouter un jour",pt:"Adicionar novo dia","pt-PT":"Adicionar novo dia","pt-BR":"Adicionar novo dia",en:"Add a new day"})[$('languageCode').value]||teamLabel('register'))}</button><section id="workerReport" class="hidden"></section>`;
 
  $('workerMonth').onchange=async()=>{teamState.month=$('workerMonth').value;teamState.lastWorkDate=null;try{await loadWorkerDays()}catch(e){teamNotice(e)}};portal.classList.remove('hidden');const settings=document.createElement('details');settings.className='project-tile';settings.innerHTML=`<summary>${teamLabel('accountManagement')}</summary><p>${teamLabel('username')}: <strong id="workerUsername">${esc(teamState.access.username||'')}</strong></p><button class="secondary" id="copyWorkerUsername">${teamLabel('copyUser')}</button><p><a href="https://jefrisrenovation-netizen.github.io/preview/">${teamLabel('accessLink')}</a></p><button id="workerLogout" class="secondary" style="display:block;width:100%;margin-top:16px" onclick="logout()">${teamLabel('signout')}</button><div style="border-top:1px solid #e5e7eb;margin-top:20px;padding-top:4px"><button id="workerDelete" class="secondary" style="margin-top:12px;color:#a52b24">${esc(tr('Supprimer mon compte et mes données'))}</button></div>`;portal.append(settings);$('copyWorkerUsername').onclick=()=>navigator.clipboard.writeText(teamState.access.username||'').catch(teamNotice);$('workerDelete').onclick=requestEmployeeDeletion;await loadWorkerDays();
+ if(teamState.access.gps_attendance)await setupWorkerAttendance().catch(teamNotice);
 }
 function workerPeriodRows(days,editable=false){
  return groupWorkDays(days).map(group=>group.days.map((d,index)=>`<tr>
@@ -220,7 +297,7 @@ function workerPeriodRows(days,editable=false){
 async function loadWorkerDays(){
  const selectedMonth=teamState.month;const result=await teamCall('my_days',{month:selectedMonth});if(selectedMonth!==teamState.month)return;teamState.days=result.days;teamState.sites=result.sites;teamState.payment=result.payment||null;teamState.currency=result.currency||'EUR';$('workerReport')?.classList.add('hidden');const place=$('workerReportPlace'),previous=place.value;place.innerHTML=`<option value="">${esc(tt('reportPlaces'))}</option>`+[...new Set(result.days.map(d=>d.workplace||''))].sort().map(v=>`<option value="${esc(JSON.stringify(v))}">${esc(v||tt('noWorkplace'))}</option>`).join('');place.value=[...place.options].some(o=>o.value===previous)?previous:'';place.onchange=()=>$('workerReport').classList.add('hidden');
  $('workerSummary').innerHTML=workerReportSummary(result.days);
- $('workerDays').innerHTML=result.days.length?`<div class="compact-sheet-wrap"><table class="compact-sheet"><thead><tr>${['date','workplace','entry','exit','pause','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}<th></th></tr></thead><tbody>${workerPeriodRows(result.days,true)}</tbody></table></div>`:`<p>${esc(tt('noDays'))}</p>`;
+ $('workerDays').innerHTML=result.days.length?`<div class="compact-sheet-wrap"><table class="compact-sheet"><thead><tr>${['date','workplace','entry','exit','pause','hours','status'].map(k=>`<th>${esc(tt(k))}</th>`).join('')}${teamState.access.gps_attendance?'':'<th></th>'}</tr></thead><tbody>${workerPeriodRows(result.days,!teamState.access.gps_attendance)}</tbody></table></div>`:`<p>${esc(tt('noDays'))}</p>`;
  $('workerDays').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>workerDayDialog(b.dataset.day));
 }
 function workerDayDialog(id){
@@ -257,7 +334,11 @@ async function teamBoot(){
   const chosen=readAccessPreference('suivi_language')||access.language||'fr';$('languageCode').value=chosen;applyLanguage();
   if(recovery||access.role==='activation'){passwordSetup(access.role==='activation');return;}
   if(access.role==='blocked'){$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');setLogin(tt('blocked'));return;}
-  if(access.role==='employee'){await workerPortal();return;}
+  if(access.role==='employee'){
+   const mode=await gpsCall('gps_mode').catch(()=>({enabled:false}));
+   access.gps_attendance=mode.enabled===true;
+   await workerPortal();return;
+  }
   $('workerPortal')?.classList.add('hidden');await startLegacy();setupOwnerUI();await upgradeRefresh();teamTranslate();
  }catch(error){$('app').classList.add('hidden');$('loginCard').classList.remove('hidden');setLogin(error.message||tt('failed'));}
  finally{teamState.booting=false}
