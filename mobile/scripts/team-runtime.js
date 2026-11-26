@@ -1,6 +1,7 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
+ employeePunches:['Pointages de','Pontos de','Time punches for'],
  inactiveEmployees:['Employés inactifs','Funcionários inativos','Inactive employees'],
  archivedPhoneTaken:['Ce téléphone appartient à un dossier inactif. Voulez-vous le transférer au nouveau dossier et conserver l’historique ?','Este telefone está em um cadastro inativo. Quer usá-lo no novo cadastro e manter o histórico antigo?','This phone belongs to an inactive employee record. Use it on the new record and keep the old history?'],
  renewEmployeeInvite:['Créer un nouveau lien','Gerar novo link','Generate new link'],
@@ -114,9 +115,9 @@ function setupOwnerUI(){
  if($('mainNav'))return;
  $('profileHeading').closest('section').id='settingsPanel';$('employee').closest('section').id='teamPanel';
  const defaults=$('employeeDefaults');if(defaults){const details=document.createElement('details');details.className='schedule-settings no-print';details.innerHTML=`<summary>${teamLabel('schedule')}</summary>`;details.append(defaults);$('settingsPanel').append(details);}$('title').closest('section').id='timesheetPanel';
- const locationHistory=document.createElement('section');
+ const locationHistory=document.createElement('details');
  locationHistory.id='employeeGpsHistory';locationHistory.className='hidden no-print';
- locationHistory.innerHTML=`<h2>${teamLabel('gpsLocation')}</h2><div></div>`;
+ locationHistory.innerHTML=`<summary></summary><div></div>`;
  $('timesheetPanel').append(locationHistory);
  // Remove inherited test banner from the released interface.
  const banner=$('app').firstElementChild;if(banner?.textContent.includes('VERSÃO DE TESTE')||banner?.textContent.includes('Version de test'))banner.remove();
@@ -616,6 +617,8 @@ function ownerDayDialog(id){
 async function showEmployeeGps(employeeId){
  const panel=$('employeeGpsHistory');
  if(!panel)return;
+ panel.open=false;
+ panel.querySelector('summary').innerHTML=teamLabel('employeePunches')+' '+esc(employees.find(e=>e.id===employeeId)?.name||'');
  panel.classList.add('hidden');
  panel.querySelector('div').replaceChildren();
  const member=teamState.members.find(item=>item.employee_id===employeeId);
