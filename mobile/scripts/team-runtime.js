@@ -1,6 +1,7 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
+ employeePunches:['Pointages de','Pontos de','Time punches for'],
  gpsChooseSite:['Choisissez le chantier','Selecione a obra','Choose the work site'],
  gpsChooseKind:['Entrée ou départ ?','Entrada ou saída?','Clock in or clock out?'],
  gpsVerify:['Confirmer le pointage','Confirmar ponto','Confirm attendance'],
@@ -259,9 +260,9 @@ async function loadAttendanceHistory(panel, employeeId){
 }
 async function showOwnerAttendance(employeeId){
  if(!teamState.members.some(member=>member.employee_id===employeeId))return;
- const panel=document.createElement('section');
+ const panel=document.createElement('details');
  panel.id='ownerAttendance';
- panel.innerHTML=`<h2>${teamLabel('attendanceGps')}</h2><div>${teamLabel('loading')}</div>`;
+ panel.innerHTML=`<summary>${teamLabel('employeePunches')} ${esc(employees.find(e=>e.id===employeeId)?.name||'')}</summary><div>${teamLabel('loading')}</div>`;
  $('timesheetPanel').append(panel);
  try{
   const {records}=await gpsCall('gps_history',{employee_id:employeeId});
