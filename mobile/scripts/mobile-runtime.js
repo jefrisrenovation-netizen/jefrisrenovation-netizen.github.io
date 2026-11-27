@@ -120,6 +120,86 @@ async function loadReportImage(url){
   }finally{bitmap.close();}
 }
 
+async function deliverReportPdf(doc,name,title){
+    if(typeof Capacitor!=='undefined'&&Capacitor.isNativePlatform()){
+      const base64=doc.output('datauristring').split(',')[1];
+      await Filesystem.writeFile({path:name,data:base64,directory:Directory.Cache});
+      const {uri}=await Filesystem.getUri({path:name,directory:Directory.Cache});
+      try{await Share.share({title:title,files:[uri],dialogTitle:tr('Partager le rapport PDF')});}
+      finally{await Filesystem.deleteFile({path:name,directory:Directory.Cache});}
+    }else {
+      const file=new File([doc.output('blob')],name,{type:'application/pdf'});
+      if(navigator.canShare?.({files:[file]})&&navigator.share){try{await navigator.share({files:[file],title:title});return;}catch(error){if(error.name==='AbortError')return;}}
+      doc.save(name);
+    }
+}
+
+async function exportAttendancePdf(sheets,period,preview){
+
+ const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+ const language=$('languageCode').value||'fr';
+ const dateFormat=new Intl.DateTimeFormat(language,{dateStyle:'short',timeZone:'Europe/Brussels'});
+ const clock=new Intl.DateTimeFormat(language,{dateStyle:'short',timeStyle:'medium',timeZone:'Europe/Brussels'});
+ const company=profile.company_name||'Suivi des heures Pro';
+ const periodLabel=new Intl.DateTimeFormat(language,{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(period+'-01T00:00:00Z'));
+ const tableOptions={styles:{fontSize:8,cellPadding:2,overflow:'linebreak'},headStyles:{fillColor:[183,25,32]},margin:{top:14,left:14,right:14},rowPageBreak:'avoid'};
+ const label=(key)=>tt(key);
+ const clockTime=value=>value?.slice(0,5)||'';
+ for(const [index,sheet] of sheets.entries()){
+  if(index)doc.addPage();
+  doc.setFontSize(16);
+  doc.text(doc.splitTextToSize(company,182),14,17);
+  const companyLines=doc.splitTextToSize(company,182).length;
+  doc.setFontSize(12);
+  const title=doc.splitTextToSize(label('attendanceSheet')+' — '+sheet.name,182);
+  const titleY=17+companyLines*7;
+  doc.text(title,14,titleY);
+  doc.setFontSize(10);
+  const periodY=titleY+title.length*6;
+  doc.text(periodLabel,14,periodY);
+  const days=sheet.days.map(day=>[
+   dateFormat.format(new Date(day.work_date+'T12:00:00Z')),
+   clockTime(day.entry_time),clockTime(day.exit_time),String(day.break_minutes??0),
+   fmt(minutes(day.entry_time,day.exit_time,day.break_minutes)),day.workplace||'',
+   day.approval_status?label(day.approval_status):''
+  ]);
+  let bottom=periodY;
+  if(days.length||!sheet.punches.length){
+   const total=sheet.days.reduce((sum,day)=>sum+minutes(day.entry_time,day.exit_time,day.break_minutes),0);
+   doc.text(label('attendanceManual'),14,periodY+8);
+   autoTable(doc,{...tableOptions,startY:periodY+11,
+    head:[['date','entry','exit','pause','hours','workplace','status'].map(label)],
+    body:days.length?days:[[{content:label('noDays'),colSpan:7}]],
+    foot:[[{content:label('attendanceTotal')+': '+fmt(total),colSpan:7}]],showFoot:'lastPage'
+   });
+   bottom=doc.lastAutoTable.finalY;
+  }
+  if(sheet.punches.length||sheet.gpsUnavailable){
+   let y=bottom+10;
+   if(y>268){doc.addPage();y=17;}
+   doc.text(label(sheet.gpsUnavailable?'attendanceGpsUnavailable':'attendancePunches'),14,y);
+   if(sheet.punches.length){
+    autoTable(doc,{...tableOptions,startY:y+3,
+     head:[['date','attendancePunch','workplace','address','status'].map(label)],
+     body:sheet.punches.map(punch=>[
+      clock.format(new Date(punch.recorded_at)),label(punch.kind==='entry'?'entry':'exit'),punch.site_name||'',
+      [punch.address||label('gpsNoAddress'),Number.isFinite(punch.latitude)&&Number.isFinite(punch.longitude)?punch.latitude.toFixed(6)+', '+punch.longitude.toFixed(6)+(Number.isFinite(punch.accuracy)?' (±'+Math.ceil(punch.accuracy)+' m)':''):''].filter(Boolean).join('\n'),
+      label(punch.needs_review?'gpsReview':'gpsVerified')
+     ])
+    });
+   }
+  }
+ }
+ const name='suivi-pointage-'+period+'.pdf';
+ if(preview&&!preview.closed){
+  const url=URL.createObjectURL(doc.output('blob'));
+  preview.location.replace(url);
+  setTimeout(()=>URL.revokeObjectURL(url),300000);
+  return;
+ }
+ await deliverReportPdf(doc,name,label('attendanceSheet'));
+}
+
 async function exportMobileReport(mode){
   if(saving){setStatus(tr('Attendez la fin de l’enregistrement.'),false);return;}
   const sourceId=mode==='print-company'?'companyReport':mode==='print-worker'?'workerReport':'individualReport';
@@ -163,17 +243,7 @@ async function exportMobileReport(mode){
     const note=source.querySelector('#personalReportNote,#reportNote')?.textContent;
     if(note){let y=(doc.lastAutoTable?.finalY||40)+10;const lines=doc.splitTextToSize(note,180);if(y+lines.length*4>282){doc.addPage();y=15}doc.setFontSize(9);doc.text(lines,14,y)}
     const name=reportFilename(mode,source.dataset.reportMonth||ym());
-    if(typeof Capacitor!=='undefined'&&Capacitor.isNativePlatform()){
-      const base64=doc.output('datauristring').split(',')[1];
-      await Filesystem.writeFile({path:name,data:base64,directory:Directory.Cache});
-      const {uri}=await Filesystem.getUri({path:name,directory:Directory.Cache});
-      try{await Share.share({title:source.querySelector('h2')?.textContent||'Rapport',files:[uri],dialogTitle:tr('Partager le rapport PDF')});}
-      finally{await Filesystem.deleteFile({path:name,directory:Directory.Cache});}
-    }else {
-      const file=new File([doc.output('blob')],name,{type:'application/pdf'});
-      if(navigator.canShare?.({files:[file]})&&navigator.share){try{await navigator.share({files:[file],title:source.querySelector('h2')?.textContent||'Rapport'});return;}catch(error){if(error.name==='AbortError')return;}}
-      doc.save(name);
-    }
+    await deliverReportPdf(doc,name,source.querySelector('h2')?.textContent||'Rapport');
   }catch(error){if(mode==='print-worker')teamNotice(tr('Export PDF impossible : ')+error.message);else setStatus(tr('Export PDF impossible : ')+error.message,false)}
 }
 printSelectedReport=exportMobileReport;

@@ -6,8 +6,13 @@ const teamWords={
  sendTeamLink:['Envoyer un lien','Enviar link','Send a link'],
  manageAccess:['Accès des employés','Acesso dos funcionários','Employee access'],
  attendanceChoose:['Sélectionnez un ou plusieurs employés','Selecione um ou mais funcionários','Select one or more employees'],
- attendanceView:['Voir les pointages','Ver registros de ponto','View time punches'],
- attendanceNoMembers:['Aucun employé lié à un accès équipe','Nenhum funcionário vinculado ao acesso da equipe','No employees linked to team access'],
+ attendanceView:['Ouvrir le PDF A4','Abrir PDF A4','Open A4 PDF'],
+ attendanceMonth:['Mois du rapport','Mês do relatório','Report month'],
+ attendanceManual:['Journées enregistrées','Dias registrados','Recorded workdays'],
+ attendancePunches:['Pointages GPS','Batidas com GPS','GPS punches'],
+ attendanceGpsUnavailable:['Pointages GPS indisponibles','Batidas GPS indisponíveis','GPS punches unavailable'],
+ attendancePunch:['Pointage','Batida','Punch'],
+ attendanceTotal:['Total des heures','Total de horas','Total hours'],
  attendanceClose:['Fermer','Fechar','Close'],
  attendanceContinue:['Continuer','Continuar','Continue'],
  gpsChooseSite:['Choisissez le chantier','Selecione a obra','Choose the work site'],
@@ -57,7 +62,7 @@ async function teamCall(action,payload={},endpoint='team-access'){
  const data=await response.json();if(!response.ok){const error=new Error(tt(data.error));error.code=data.error;throw error;}return data;
 }
 function gpsCall(action,payload={}){return teamCall(action,payload,'gps-attendance');}
-function teamNotice(error){const message=typeof error==='string'?error:error instanceof Error?error.message:tt('failed');const target=teamState.role==='employee'?$('workerNotice'):$('upgradeNotice');if(target){target.textContent=message;target.setAttribute('role','status');}else setLogin(message);}
+function teamNotice(error){const message=typeof error==='string'?error:error instanceof Error?error.message:tt('failed');const target=teamState.role==='employee'?$('workerNotice'):($('accessPanel')?.open?$('teamAccessNotice'):$('upgradeNotice'));if(target){target.textContent=message;target.setAttribute('role','status');}else setLogin(message);}
 async function openTeamSheet(id){
  if(!employees.some(employee=>employee.id===id&&employee.active!==false))return;
  showPane('team');
@@ -74,8 +79,9 @@ function renderTeamDirectory(){
  $('teamDirectory').querySelectorAll('[data-employee]').forEach(button=>button.onclick=()=>openTeamSheet(button.dataset.employee));
 }
 function showPane(pane){
+ if(pane!=='team'&&$('accessPanel')?.open)$('accessPanel').close();
  if(pane==='team')renderTeamDirectory();
- teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamDirectoryPanel','team'],['teamPanel','team-sheet'],['timesheetPanel','team-sheet'],['sitesPanel','sites'],['reportActions','reports'],['reviewPanel','team'],['teamAccess','team'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
+ teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamDirectoryPanel','team'],['teamPanel','team-sheet'],['timesheetPanel','team-sheet'],['sitesPanel','sites'],['reportActions','reports'],['reviewPanel','team'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
  closeCompanyReport();closeIndividualReport();document.querySelectorAll('[data-pane]').forEach(e=>e.classList.toggle('selected',e.dataset.pane===(pane==='team-sheet'?'team':pane)));
  $('upgradeNotice').textContent='';$('mainNav')?.scrollIntoView({block:'start',behavior:'smooth'});
 }
@@ -93,8 +99,6 @@ function setupOwnerUI(){
  directory.innerHTML=`<h2>${teamLabel('team')}</h2><div id="teamDirectory"></div>`;
  $('app').append(directory);
  setupOwnerAttendance(directory);
- const management=document.createElement('details');management.id='teamAccess';management.className='card hidden no-print';management.innerHTML=`<summary>${teamLabel('manageAccess')}</summary>`;
- $('app').append(management);
  const addWorker=$('newEmployee').parentElement;
  const addButton=document.querySelector('[onclick="addEmployee()"]');
  addButton.onclick=async()=>{await addEmployee();if(teamState.pane==='team')renderTeamDirectory();};
@@ -107,8 +111,8 @@ function setupOwnerUI(){
   showPane('team');
   await upgradeRefresh().catch(teamNotice);
  };
- const access=document.createElement('section');access.id='accessPanel';access.className='no-print';access.innerHTML=`<h2>${teamLabel('invite')}</h2><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
- management.append(access);$('invitePhone').required=false;$('inviteEmail').required=false;const syncContact=()=>{$('invitePhone').required=!$('inviteEmail').value.trim();};$('inviteEmail').oninput=syncContact;syncContact();$('inviteUsername').pattern='[a-zA-Z0-9][a-zA-Z0-9._\\x2D]{2,39}';$('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
+ const access=document.createElement('dialog');access.id='accessPanel';access.className='no-print';access.setAttribute('aria-labelledby','teamAccessTitle');access.innerHTML=`<h2 id="teamAccessTitle"></h2><div id="teamInviteFields"><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form></div><p id="teamAccessNotice" class="status" role="status"></p><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div><button type="button" class="secondary" id="closeTeamAccess">${teamLabel('attendanceClose')}</button>`;
+ $('app').append(access);$('closeTeamAccess').onclick=()=>access.close();$('invitePhone').required=false;$('inviteEmail').required=false;const syncContact=()=>{$('invitePhone').required=!$('inviteEmail').value.trim();};$('inviteEmail').oninput=syncContact;syncContact();$('inviteUsername').pattern='[a-zA-Z0-9][a-zA-Z0-9._\\x2D]{2,39}';$('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
  $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
  const sites=document.createElement('section');sites.id='sitesPanel';sites.className='card hidden no-print';sites.innerHTML=`<h2>${teamLabel('sites')}</h2><form id="siteForm"><div class="grid">${teamField('siteName','siteName')}${teamField('address','siteAddress')}</div><button type="submit">＋ ${teamLabel('addSite')}</button></form><div id="siteList"></div>`;
  $('app').append(sites);$('siteAddress').required=false;$('siteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,async()=>{const {error}=await sb.from('work_sites').insert({owner_id:user.id,name:$('siteName').value.trim(),address:$('siteAddress').value.trim()});if(error)throw Error(tt('failed'));$('siteForm').reset();await upgradeRefresh();teamNotice(tt('saveOK'));});};
@@ -150,6 +154,7 @@ function showTeamInvitation(invitation){
  const message=(name?greeting+' '+name+'!\n\n':'')+tt(invitation.reset?'resetShare':'invitation')+' — '+(profile.company_name||'Suivi des heures Pro')+'\n'+invitation.url;
  const phone=invitation.phone.replace(/\D/g,'');$('shareWhatsApp').href='https://wa.me/'+phone+'?text='+encodeURIComponent(message);$('shareSMS').href='sms:'+phone+(/iPhone|iPad/.test(navigator.userAgent)?'&':'?')+'body='+encodeURIComponent(message);$('shareEmail').href='mailto:'+encodeURIComponent(invitation.email)+'?subject='+encodeURIComponent(tt('invitation'))+'&body='+encodeURIComponent(message);
  $('shareEmail').classList.toggle('hidden',!invitation.email);
+ if($('accessPanel')?.open)result.scrollIntoView({block:'nearest'});
  $('copyInvite').onclick=async()=>{try{await navigator.clipboard.writeText(message);$('copyInvite').textContent=tt('copied')}catch{result.querySelector('input').select()}};
 }
 function selectSiteHtml(id){return `<select id="${id}" aria-label="${esc(tt('sites'))}"><option value="">—</option>${teamState.sites.map(s=>`<option value="${esc(s.name+(s.address?' — '+s.address:''))}">${esc(s.name)}</option>`).join('')}</select>`}
@@ -267,6 +272,18 @@ async function loadAttendanceHistory(panel, employeeId){
  }
  return open?'exit':'entry';
 }
+function openTeamAccess(invite){
+ const access=$('accessPanel');
+ $('teamAccessTitle').innerHTML=teamLabel(invite?'sendTeamLink':'manageAccess');
+ $('teamInviteFields').classList.toggle('hidden',!invite);
+ $('memberList').classList.toggle('hidden',invite);
+ $('teamAccessNotice').textContent='';
+ $('inviteResult').classList.add('hidden');
+ $('inviteResult').replaceChildren();
+ access.showModal();
+ access.scrollTop=0;
+}
+
 function scrollToTeamShortcut(target){
  target.classList.add('team-shortcuts-target');
  target.scrollIntoView({block:'start',behavior:'smooth'});
@@ -314,14 +331,8 @@ function setupOwnerAttendance(directory){
  directory.prepend(shortcuts);
  const button=$('openAttendance');
  $('openManageEmployees').onclick=()=>scrollToTeamShortcut($('teamDirectory'));
- $('openTeamLink').onclick=()=>{
-  $('teamAccess').open=true;
-  scrollToTeamShortcut($('inviteForm'));
- };
- $('openManageAccess').onclick=()=>{
-  $('teamAccess').open=true;
-  scrollToTeamShortcut($('memberList'));
- };
+ $('openTeamLink').onclick=()=>openTeamAccess(true);
+ $('openManageAccess').onclick=()=>openTeamAccess(false);
  $('openTeamSchedule').onclick=()=>chooseScheduleEmployee();
  $('openReviewDays').onclick=()=>scrollToTeamShortcut($('reviewPanel'));
 
@@ -329,7 +340,8 @@ function setupOwnerAttendance(directory){
  dialog.className='attendance-dialog';
  dialog.setAttribute('aria-labelledby','attendanceTitle');
  dialog.innerHTML=`<h2 id="attendanceTitle">${teamLabel('attendanceSheet')}</h2>
- <form id="attendanceForm"><fieldset><legend>${teamLabel('attendanceChoose')}</legend>
+ <form id="attendanceForm"><label for="attendanceMonth">${teamLabel('attendanceMonth')}</label>
+ <input type="month" id="attendanceMonth" required><fieldset><legend>${teamLabel('attendanceChoose')}</legend>
  <div id="attendanceChoices"></div></fieldset>
  <div class="actions"><button type="submit" id="attendanceView" disabled>${teamLabel('attendanceView')}</button>
  <button type="button" class="secondary" id="attendanceClose">${teamLabel('attendanceClose')}</button></div></form>
@@ -340,37 +352,68 @@ function setupOwnerAttendance(directory){
  const choices=$('attendanceChoices');
  const view=$('attendanceView');
  const results=$('attendanceResults');
+ const month=$('attendanceMonth');
+ let busy=false;
  button.onclick=()=>{
-  const memberIds=new Set(teamState.members.map(member=>member.employee_id));
-  const staff=employees.filter(employee=>memberIds.has(employee.id));
-  choices.innerHTML=staff.map(employee=>`<label class="attendance-option"><input type="checkbox" value="${esc(employee.id)}"> ${esc(employee.name)}</label>`).join('')
-   ||`<p>${teamLabel('attendanceNoMembers')}</p>`;
+  choices.innerHTML=employees.map(employee=>`<label class="attendance-option"><input type="checkbox" value="${esc(employee.id)}"> ${esc(employee.name)}</label>`).join('')
+   ||`<p>${teamLabel('noTeam')}</p>`;
+  month.value=ym();
   results.replaceChildren();
   view.disabled=true;
   dialog.showModal();
  };
- choices.onchange=()=>{
-  results.replaceChildren();
-  view.disabled=!choices.querySelector('input:checked');
- };
+ choices.onchange=()=>{view.disabled=busy||!choices.querySelector('input:checked');};
  $('attendanceClose').onclick=()=>dialog.close();
  form.onsubmit=async event=>{
   event.preventDefault();
-  const selected=Array.from(choices.querySelectorAll('input:checked'));
-  results.replaceChildren();
-  await Promise.all(selected.map(async input=>{
-   const employee=employees.find(person=>person.id===input.value);
-   if(!employee)return;
-   const panel=document.createElement('article');
-   panel.innerHTML=`<h3>${esc(employee.name)}</h3><div>${teamLabel('loading')}</div>`;
-   results.append(panel);
-   try{
-    const {records}=await gpsCall('gps_history',{employee_id:employee.id});
-    if(records.length)renderAttendanceHistory(panel,records);
-    else panel.querySelector('div').innerHTML=teamLabel('gpsNoRecords');
-   }catch(error){panel.querySelector('div').textContent=error.message;}
-  }));
+  const ids=Array.from(choices.querySelectorAll('input:checked'),input=>input.value);
+  const period=month.value;
+  if(busy||!ids.length||!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))return;
+  busy=true;
+  view.disabled=true;
+  results.textContent=tt('loading');
+  const preview=null;
+  try{
+   const sheets=await loadAttendanceSheets(ids,period);
+   await exportAttendancePdf(sheets,period,preview);
+   results.textContent='';
+  }catch(error){
+   preview?.close();
+   results.textContent=error.message||tt('failed');
+  }finally{
+   busy=false;
+   view.disabled=!choices.querySelector('input:checked');
+  }
  };
+}
+
+async function loadAttendanceSheets(ids,period){
+ const staff=employees.filter(employee=>ids.includes(employee.id));
+ const linked=new Set(teamState.members.map(member=>member.employee_id));
+ const [year,month]=period.split('-').map(Number);
+ const lastDay=new Date(year,month,0).getDate();
+ const dayFormat=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Brussels',year:'numeric',month:'2-digit',day:'2-digit'});
+ const {data,error}=await sb.from('work_days').select('employee_id,work_date,entry_time,exit_time,break_minutes,workplace,approval_status')
+  .eq('owner_id',user.id).in('employee_id',staff.map(employee=>employee.id))
+  .gte('work_date',period+'-01').lte('work_date',period+'-'+lastDay)
+  .order('work_date').order('entry_time');
+ if(error)throw Error(tt('failed'));
+ return Promise.all(staff.map(async employee=>{
+  const sheet={name:employee.name,days:(data||[]).filter(day=>day.employee_id===employee.id),punches:[],gpsUnavailable:false};
+  if(!linked.has(employee.id))return sheet;
+  try{
+   const {records}=await gpsCall('gps_history',{employee_id:employee.id});
+   sheet.punches=records.filter(record=>{
+    const date=new Date(record.recorded_at);
+    if(!Number.isFinite(date.getTime()))return false;
+    const parts=Object.fromEntries(dayFormat.formatToParts(date).map(({type,value})=>[type,value]));
+    return parts.year+'-'+parts.month===period;
+   }).sort((a,b)=>Date.parse(a.recorded_at)-Date.parse(b.recorded_at));
+  }catch{
+   sheet.gpsUnavailable=true;
+  }
+  return sheet;
+ }));
 }
 async function setupWorkerAttendance(){
  const panel=document.createElement('section');

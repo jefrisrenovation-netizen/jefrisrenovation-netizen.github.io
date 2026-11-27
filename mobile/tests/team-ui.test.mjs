@@ -24,11 +24,19 @@ test('team opens with a directory and shows a sheet only after selecting a worke
  const settings=f.document.getElementById('settingsPanel');
  const shortcuts=f.document.querySelectorAll('#teamDirectoryPanel .team-shortcuts button');
  assert.equal(shortcuts.length,6);
- assert(!f.document.getElementById('teamAccess').classList.contains('hidden'));
+ const access=f.document.getElementById('accessPanel');
+ assert(!access.hasAttribute('open'));
  f.document.getElementById('openTeamLink').onclick();
- assert(f.document.getElementById('teamAccess').open);
+ assert(access.hasAttribute('open'));
+ assert(f.document.getElementById('memberList').classList.contains('hidden'));
+ f.document.getElementById('closeTeamAccess').onclick();
+ f.document.getElementById('openManageAccess').onclick();
+ assert(access.hasAttribute('open'));
+ assert(f.document.getElementById('teamInviteFields').classList.contains('hidden'));
+ assert(!f.document.getElementById('memberList').classList.contains('hidden'));
+ f.document.getElementById('closeTeamAccess').onclick();
  f.run("showPane('settings')");
- assert(f.document.getElementById('teamAccess').classList.contains('hidden'));
+ assert(!access.hasAttribute('open'));
  assert(settings.firstElementChild.textContent.includes('Gestão da conta'));
  f.run("showPane('sites')");assert(!f.document.getElementById('sitesPanel').classList.contains('hidden'));
  f.run("showPane('reports')");assert(!f.document.getElementById('reportActions').classList.contains('hidden'));
@@ -156,4 +164,48 @@ test('a second period submits the same date and stays available after reopening 
  }
  assert.equal(f.context.window.saved.length,2);assert.equal(f.context.window.saved[0].work_date,f.context.window.saved[1].work_date);assert.equal(f.context.window.saved[1].entry_time,'11:00');assert.equal(f.context.window.saved[1].break_minutes,0);
  f.run('workerDayDialog()');assert.equal(f.document.getElementById('workerDayDate').value,'2026-11-05');
+});
+
+test('attendance PDF separates manual workdays and GPS location by employee',async()=>{
+ const {jsPDF}=await import('jspdf');
+ const {autoTable}=await import('jspdf-autotable');
+ const f=fixture();
+ Object.assign(f.context,{jsPDF,autoTable,File});
+ f.context.navigator.canShare=()=>true;
+ f.context.navigator.share=async payload=>{f.context.sharedAttendance=payload.files[0];};
+ const runtime=fs.readFileSync('scripts/mobile-runtime.js','utf8');
+ f.run(runtime.slice(runtime.indexOf('function pdfReportText'),runtime.indexOf('async function requestAccountDeletion')));
+ f.run(`employees=[{id:'manual',name:'Manual Worker'},{id:'gps',name:'GPS Worker'}];
+  teamState.members=[{employee_id:'gps'}];
+  const gpsRequests=[];
+  gpsCall=async(action,{employee_id})=>{
+   gpsRequests.push(employee_id);
+   return {records:[
+    {kind:'entry',recorded_at:'2026-11-30T22:55:00Z',site_name:'Brussels Site',address:'Rue Exemple 10',latitude:50.123456,longitude:4.123456,accuracy:11,needs_review:true},
+    {kind:'exit',recorded_at:'2026-11-30T23:05:00Z',site_name:'December Site'}
+   ]};
+  };
+  sb.from=()=>{const query={select(){return query},eq(){return query},in(){return query},gte(){return query},lte(){return query},order(){return query},
+   then(resolve){resolve({data:[{employee_id:'manual',work_date:'2026-11-15',entry_time:'08:00',exit_time:'17:30',break_minutes:30,workplace:'Manual Site',approval_status:'approved'}]});}
+  };return query;};
+ `);
+ f.document.getElementById('openAttendance').onclick();
+ assert.equal(f.document.querySelectorAll('#attendanceChoices input').length,2);
+ await f.run("(async()=>exportAttendancePdf(await loadAttendanceSheets(['manual','gps'],'2026-11'),'2026-11',null))()");
+ assert.equal(f.run('gpsRequests.join()'),'gps');
+ const file=f.context.sharedAttendance;
+ assert.equal(file.name,'suivi-pointage-2026-11.pdf');
+ const pdf=await file.text();
+ assert.match(pdf,/\/Count 2\b/);
+ for(const [,width,height] of pdf.matchAll(/\/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/g)){
+  assert.equal(Number(width).toFixed(2),'595.28');
+  assert.equal(Number(height).toFixed(2),'841.89');
+ }
+ const pages=[...pdf.matchAll(/stream\r?\n([\s\S]*?)endstream/g)].map(match=>match[1]);
+ const manual=pages.find(page=>page.includes('Manual Worker'));
+ const gps=pages.find(page=>page.includes('GPS Worker'));
+ assert(manual?.includes('Manual Site')&&manual.includes('9h00'));
+ assert(!manual.includes('Brussels Site'));
+ assert(gps?.includes('Rue Exemple 10')&&gps.includes('50.123456, 4.123456'));
+ assert(!gps.includes('Manual Site')&&!gps.includes('December Site'));
 });
