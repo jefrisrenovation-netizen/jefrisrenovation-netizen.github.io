@@ -1,7 +1,11 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
- employeePunches:['Pointages de','Pontos de','Time punches for'],
+ attendanceSheet:['Feuille de pointage','Folha de ponto','Attendance sheet'],
+ attendanceChoose:['Sélectionnez un ou plusieurs employés','Selecione um ou mais funcionários','Select one or more employees'],
+ attendanceView:['Voir les pointages','Ver registros de ponto','View time punches'],
+ attendanceNoMembers:['Aucun employé lié à un accès équipe','Nenhum funcionário vinculado ao acesso da equipe','No employees linked to team access'],
+ attendanceClose:['Fermer','Fechar','Close'],
  gpsChooseSite:['Choisissez le chantier','Selecione a obra','Choose the work site'],
  gpsChooseKind:['Entrée ou départ ?','Entrada ou saída?','Clock in or clock out?'],
  gpsVerify:['Confirmer le pointage','Confirmar ponto','Confirm attendance'],
@@ -59,7 +63,6 @@ async function openTeamSheet(id){
  await request;
  if(teamState.pane==='team'&&version===loadVersion&&$('employee').value===id){
   showPane('team-sheet');
-  await showOwnerAttendance(id);
  }
 }
 function renderTeamDirectory(){
@@ -67,7 +70,7 @@ function renderTeamDirectory(){
  $('teamDirectory').querySelectorAll('[data-employee]').forEach(button=>button.onclick=()=>openTeamSheet(button.dataset.employee));
 }
 function showPane(pane){
- if(pane==='team'){$('ownerAttendance')?.remove();renderTeamDirectory();}
+ if(pane==='team')renderTeamDirectory();
  teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamDirectoryPanel','team'],['teamPanel','team-sheet'],['timesheetPanel','team-sheet'],['sitesPanel','sites'],['reportActions','reports'],['reviewPanel','team'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
  closeCompanyReport();closeIndividualReport();document.querySelectorAll('[data-pane]').forEach(e=>e.classList.toggle('selected',e.dataset.pane===(pane==='team-sheet'?'team':pane)));
  $('upgradeNotice').textContent='';$('mainNav')?.scrollIntoView({block:'start',behavior:'smooth'});
@@ -84,6 +87,7 @@ function setupOwnerUI(){
  const directory=document.createElement('section');directory.id='teamDirectoryPanel';directory.className='card hidden no-print';
  directory.innerHTML=`<h2>${teamLabel('team')}</h2><div id="teamDirectory"></div>`;
  $('app').append(directory);
+ setupOwnerAttendance(directory);
  const management=document.createElement('details');management.className='project-tile';management.innerHTML=`<summary>${teamLabel('invite')}</summary>`;
  $('settingsPanel').append(management);
  const addWorker=$('newEmployee').parentElement;
@@ -258,17 +262,60 @@ async function loadAttendanceHistory(panel, employeeId){
  }
  return open?'exit':'entry';
 }
-async function showOwnerAttendance(employeeId){
- if(!teamState.members.some(member=>member.employee_id===employeeId))return;
- const panel=document.createElement('details');
- panel.id='ownerAttendance';
- panel.innerHTML=`<summary>${teamLabel('employeePunches')} ${esc(employees.find(e=>e.id===employeeId)?.name||'')}</summary><div>${teamLabel('loading')}</div>`;
- $('timesheetPanel').append(panel);
- try{
-  const {records}=await gpsCall('gps_history',{employee_id:employeeId});
-  renderAttendanceHistory(panel,records);
-  if(!records.length)panel.querySelector('div').innerHTML=teamLabel('gpsNoRecords');
- }catch(error){panel.querySelector('div').textContent=error.message;}
+function setupOwnerAttendance(directory){
+ const button=document.createElement('button');
+ button.id='openAttendance';
+ button.type='button';
+ button.className='secondary';
+ button.innerHTML=teamLabel('attendanceSheet');
+ directory.insertBefore(button, $('teamDirectory'));
+
+ const dialog=document.createElement('dialog');
+ dialog.className='attendance-dialog';
+ dialog.setAttribute('aria-labelledby','attendanceTitle');
+ dialog.innerHTML=`<h2 id="attendanceTitle">${teamLabel('attendanceSheet')}</h2>
+ <form id="attendanceForm"><fieldset><legend>${teamLabel('attendanceChoose')}</legend>
+ <div id="attendanceChoices"></div></fieldset>
+ <div class="actions"><button type="submit" id="attendanceView" disabled>${teamLabel('attendanceView')}</button>
+ <button type="button" class="secondary" id="attendanceClose">${teamLabel('attendanceClose')}</button></div></form>
+ <div id="attendanceResults" aria-live="polite"></div>`;
+ directory.append(dialog);
+
+ const form=$('attendanceForm');
+ const choices=$('attendanceChoices');
+ const view=$('attendanceView');
+ const results=$('attendanceResults');
+ button.onclick=()=>{
+  const memberIds=new Set(teamState.members.map(member=>member.employee_id));
+  const staff=employees.filter(employee=>memberIds.has(employee.id));
+  choices.innerHTML=staff.map(employee=>`<label class="attendance-option"><input type="checkbox" value="${esc(employee.id)}"> ${esc(employee.name)}</label>`).join('')
+   ||`<p>${teamLabel('attendanceNoMembers')}</p>`;
+  results.replaceChildren();
+  view.disabled=true;
+  dialog.showModal();
+ };
+ choices.onchange=()=>{
+  results.replaceChildren();
+  view.disabled=!choices.querySelector('input:checked');
+ };
+ $('attendanceClose').onclick=()=>dialog.close();
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  const selected=Array.from(choices.querySelectorAll('input:checked'));
+  results.replaceChildren();
+  await Promise.all(selected.map(async input=>{
+   const employee=employees.find(person=>person.id===input.value);
+   if(!employee)return;
+   const panel=document.createElement('article');
+   panel.innerHTML=`<h3>${esc(employee.name)}</h3><div>${teamLabel('loading')}</div>`;
+   results.append(panel);
+   try{
+    const {records}=await gpsCall('gps_history',{employee_id:employee.id});
+    if(records.length)renderAttendanceHistory(panel,records);
+    else panel.querySelector('div').innerHTML=teamLabel('gpsNoRecords');
+   }catch(error){panel.querySelector('div').textContent=error.message;}
+  }));
+ };
 }
 async function setupWorkerAttendance(){
  const panel=document.createElement('section');
