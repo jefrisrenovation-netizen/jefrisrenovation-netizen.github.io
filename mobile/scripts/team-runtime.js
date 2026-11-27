@@ -113,7 +113,7 @@ function setupAccountSettings(){
  <h2 id="accountDialogTitle">${teamLabel('accountManagement')}</h2>
  <div class="account-identity"><span id="accountInitial" aria-hidden="true"></span><img id="accountAvatar" class="hidden" alt=""><div><strong id="accountName"></strong><small id="accountRole"></small></div></div>
  <details open><summary>${teamLabel('accountProfileDetails')}</summary><div class="grid" id="accountProfileFields">
- <div class="account-image-actions"><label for="accountImageFile" id="accountImageLabel"></label><input id="accountImageFile" type="file" accept="image/*"><button type="button" class="secondary" id="accountImageRemove">${teamLabel('removeAccountImage')}</button></div></div></details>
+ <div class="account-image-actions"><button type="button" class="secondary" id="accountImageLabel"></button><input id="accountImageFile" type="file" accept="image/*" hidden><p id="accountImageStatus" class="muted" role="status"></p><button type="button" class="secondary" id="accountImageRemove">${teamLabel('removeAccountImage')}</button></div></div></details>
  <details><summary>${teamLabel('accountPreferences')}</summary><div class="grid" id="accountPreferenceFields"></div></details>
  <button type="button" class="secondary" id="accountEditButton">${teamLabel('accountEdit')}</button>
  <button type="button" class="secondary hidden" id="accountCancelButton">${teamLabel('accountCancel')}</button>
@@ -221,20 +221,31 @@ function setupAccountSettings(){
   $('companyLogo').value='';
   drawIdentity();
  };
+ $('accountImageLabel').onclick=()=>$('accountImageFile').click();
  $('accountImageFile').onchange=async event=>{
   const file=event.target.files[0];
   if(!file)return;
   const request=++imageRequest;
   const remove=$('accountImageRemove');
   save.disabled=true;
-  event.target.disabled=true;
+  $('accountImageLabel').disabled=true;
   remove.disabled=true;
+  const status=$('accountImageStatus');
+  status.textContent='';
   $('accountBack').disabled=true;
-  const url=URL.createObjectURL(file);
   try{
-   const image=new Image();
-   image.src=url;
-   await image.decode();
+   const source=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(reader.error);
+    reader.readAsDataURL(file);
+   });
+   const image=await new Promise((resolve,reject)=>{
+    const candidate=new Image();
+    candidate.onload=()=>resolve(candidate);
+    candidate.onerror=reject;
+    candidate.src=source;
+   });
    if(request!==imageRequest)return;
    const scale=Math.min(1,320/Math.max(image.naturalWidth,image.naturalHeight));
    const canvas=document.createElement('canvas');
@@ -244,17 +255,17 @@ function setupAccountSettings(){
    context.fillStyle='#fff';
    context.fillRect(0,0,canvas.width,canvas.height);
    context.drawImage(image,0,0,canvas.width,canvas.height);
-   const data=canvas.toDataURL('image/jpeg',0.8);
+   let data=canvas.toDataURL('image/jpeg',0.8);
+   if(!profileImageUrl(data))data=canvas.toDataURL('image/jpeg',0.55);
    if(!profileImageUrl(data))throw new Error('Invalid profile image');
    $('companyLogo').value=data;
    $('accountNotice').textContent='';
    drawIdentity();
   }catch{
-   if(request===imageRequest)$('accountNotice').textContent=tt('accountImageError');
+   if(request===imageRequest)status.textContent=tt('accountImageError');
   }finally{
-   URL.revokeObjectURL(url);
    save.disabled=false;
-   event.target.disabled=false;
+   $('accountImageLabel').disabled=false;
    remove.disabled=false;
    $('accountBack').disabled=false;
    event.target.value='';
