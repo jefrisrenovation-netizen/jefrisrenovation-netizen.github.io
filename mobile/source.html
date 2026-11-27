@@ -282,6 +282,7 @@ async function saveProfile(){
     applyLanguage();updateBrand();
     setStatus(tr("Configurações verificadas e salvas na nuvem."));
     alert(tr("Configurações verificadas e salvas na nuvem."));
+    return true;
   }catch(error){setStatus(tr("Falha de conexão ao salvar: ")+(error?.message||String(error)),false)}
   finally{if(button){button.disabled=false;button.textContent=previousLabel;}}
 }
