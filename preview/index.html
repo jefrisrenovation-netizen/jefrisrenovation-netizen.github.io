@@ -144,6 +144,13 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 #workerAddDay{display:block;width:100%;background:#d52228;color:#fff;font-size:22px;font-weight:800;padding:22px 16px;border:0;border-radius:15px;margin:18px 0 24px;min-height:70px;box-shadow:0 4px 12px #d5222825}#workerAddDay:active{transform:translateY(1px)}#workerDays .compact-sheet{width:100%;border-collapse:collapse}#workerDays .compact-sheet th{background:#f5f6f8;font-weight:750}#workerDays .compact-sheet td,#workerDays .compact-sheet th{padding:18px 12px;border-bottom:1px solid #dedfe4;text-align:left;white-space:nowrap}#workerDayDialog{width:min(560px,calc(100vw - 24px));max-width:calc(100vw - 24px);overflow-x:hidden}#workerDayForm .grid{grid-template-columns:repeat(2,minmax(0,1fr))}#workerDayForm .grid>*{min-width:0}#workerDayForm input,#workerDayForm select{width:100%;min-width:0;max-width:100%}#workerDayForm .actions{display:grid;grid-template-columns:1fr}#workerDayForm .actions button{width:100%;padding:16px}
 
 .day-total td{background:#f0f2f5!important;text-align:right!important;font-weight:700}.day-date{vertical-align:middle!important}
+.attendance-dialog{width:min(36rem,calc(100% - 24px));max-height:85dvh;overflow:auto;border:1px solid #ddd;border-radius:16px;padding:20px;color:#171717;background:#fff}
+.attendance-dialog::backdrop{background:#0007}
+.attendance-dialog fieldset{min-width:0;border:1px solid #ddd;border-radius:10px;padding:10px 12px}
+.attendance-dialog .attendance-option{display:flex;align-items:center;gap:10px;min-height:44px;margin:0}
+.attendance-dialog input[type=checkbox]{width:20px;height:20px;margin:0;flex:none}
+.attendance-dialog article h3{margin-bottom:8px}
+#openAttendance{margin-top:12px}
 </style>
 </head>
 <body>
@@ -797,7 +804,11 @@ applyLanguage();
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
- employeePunches:['Pointages de','Pontos de','Time punches for'],
+ attendanceSheet:['Feuille de pointage','Folha de ponto','Attendance sheet'],
+ attendanceChoose:['Sélectionnez un ou plusieurs employés','Selecione um ou mais funcionários','Select one or more employees'],
+ attendanceView:['Voir les pointages','Ver registros de ponto','View time punches'],
+ attendanceNoMembers:['Aucun employé lié à un accès équipe','Nenhum funcionário vinculado ao acesso da equipe','No employees linked to team access'],
+ attendanceClose:['Fermer','Fechar','Close'],
  gpsChooseSite:['Choisissez le chantier','Selecione a obra','Choose the work site'],
  gpsChooseKind:['Entrée ou départ ?','Entrada ou saída?','Clock in or clock out?'],
  gpsVerify:['Confirmer le pointage','Confirmar ponto','Confirm attendance'],
@@ -847,7 +858,6 @@ async function teamCall(action,payload={},endpoint='team-access'){
 function gpsCall(action,payload={}){return teamCall(action,payload,'gps-attendance');}
 function teamNotice(error){const message=typeof error==='string'?error:error instanceof Error?error.message:tt('failed');const target=teamState.role==='employee'?$('workerNotice'):$('upgradeNotice');if(target){target.textContent=message;target.setAttribute('role','status');}else setLogin(message);}
 function showPane(pane){
- if(pane==='team')void showOwnerAttendance($('employee').value);
  teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamPanel','team'],['timesheetPanel','team'],['accessPanel','team'],['sitesPanel','sites'],['reportActions','reports'],['reviewPanel','team'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
  closeCompanyReport();closeIndividualReport();document.querySelectorAll('[data-pane]').forEach(e=>e.classList.toggle('selected',e.dataset.pane===pane));
  $('upgradeNotice').textContent='';$('mainNav')?.scrollIntoView({block:'start',behavior:'smooth'});
@@ -855,13 +865,13 @@ function showPane(pane){
 function teamField(key,id,type='text',value=''){return `<div><label for="${id}">${teamLabel(key)}</label><input id="${id}" type="${type}" value="${esc(value)}" ${type==='number'?'min="0" step="1"':''} required></div>`}
 function setupOwnerUI(){
  if($('mainNav'))return;
- $('employee').addEventListener('change',()=>{if(teamState.pane==='team')void showOwnerAttendance($('employee').value);});
  $('profileHeading').closest('section').id='settingsPanel';$('employee').closest('section').id='teamPanel';
  const defaults=$('employeeDefaults');if(defaults){const details=document.createElement('details');details.className='schedule-settings no-print';details.innerHTML=`<summary>${teamLabel('schedule')}</summary>`;details.append(defaults);$('settingsPanel').append(details);}$('title').closest('section').id='timesheetPanel';
  // Remove inherited test banner from the released interface.
  const banner=$('app').firstElementChild;if(banner?.textContent.includes('VERSÃO DE TESTE')||banner?.textContent.includes('Version de test'))banner.remove();
  const shell=document.createElement('div');shell.id='upgradeShell';shell.className='no-print';shell.innerHTML=`<nav id="mainNav" class="app-nav" aria-label="Navigation">${['home','team','sites','reports','settings'].map((p,i)=>`<button class="secondary" data-pane="${p}" onclick="teamUI.pane('${p}')"><span aria-hidden="true">${['⌂','♙','▦','▤','⚙'][i]}</span>${teamLabel(p)}</button>`).join('')}</nav><p id="upgradeNotice" class="status" role="status"></p><section id="dashboard" class="card"><div class="dashboard-head"><div><small>${teamLabel('owner')}</small><h2 id="dashboardCompany"></h2></div><input id="dashboardMonth" type="month" aria-label="${esc(tt('month'))}" onchange="teamUI.month(this.value)"></div><h2>${teamLabel('month')}</h2><div id="dashboardStats" class="summary"></div><button class="register-button" onclick="teamUI.day()">＋ ${teamLabel('register')}</button><h2>${teamLabel('team')}</h2><div id="dashboardTeam"></div><p class="muted">${teamLabel('payrollApproved')}</p><p class="muted">✓ ${teamLabel('allSaved')}</p></section>`;
  $('app').prepend(shell);
+ setupOwnerAttendance();
  const access=document.createElement('section');access.id='accessPanel';access.className='card hidden no-print';access.innerHTML=`<h2>${teamLabel('invite')}</h2><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
  $('app').append(access);$('invitePhone').required=false;$('inviteEmail').required=false;const syncContact=()=>{$('invitePhone').required=!$('inviteEmail').value.trim();};$('inviteEmail').oninput=syncContact;syncContact();$('inviteUsername').pattern='[a-zA-Z0-9][a-zA-Z0-9._\\x2D]{2,39}';$('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
  $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
@@ -1017,18 +1027,60 @@ async function loadAttendanceHistory(panel, employeeId){
  }
  return open?'exit':'entry';
 }
-async function showOwnerAttendance(employeeId){
- $('ownerAttendance')?.remove();
- if(!teamState.members.some(member=>member.employee_id===employeeId))return;
- const panel=document.createElement('details');
- panel.id='ownerAttendance';
- panel.innerHTML=`<summary>${teamLabel('employeePunches')} ${esc(employees.find(e=>e.id===employeeId)?.name||'')}</summary><div>${teamLabel('loading')}</div>`;
- $('timesheetPanel').append(panel);
- try{
-  const {records}=await gpsCall('gps_history',{employee_id:employeeId});
-  renderAttendanceHistory(panel,records);
-  if(!records.length)panel.querySelector('div').innerHTML=teamLabel('gpsNoRecords');
- }catch(error){panel.querySelector('div').textContent=error.message;}
+function setupOwnerAttendance(){
+ const button=document.createElement('button');
+ button.id='openAttendance';
+ button.type='button';
+ button.className='secondary';
+ button.innerHTML=teamLabel('attendanceSheet');
+ $('teamPanel').append(button);
+
+ const dialog=document.createElement('dialog');
+ dialog.className='attendance-dialog';
+ dialog.setAttribute('aria-labelledby','attendanceTitle');
+ dialog.innerHTML=`<h2 id="attendanceTitle">${teamLabel('attendanceSheet')}</h2>
+ <form id="attendanceForm"><fieldset><legend>${teamLabel('attendanceChoose')}</legend>
+ <div id="attendanceChoices"></div></fieldset>
+ <div class="actions"><button type="submit" id="attendanceView" disabled>${teamLabel('attendanceView')}</button>
+ <button type="button" class="secondary" id="attendanceClose">${teamLabel('attendanceClose')}</button></div></form>
+ <div id="attendanceResults" aria-live="polite"></div>`;
+ $('teamPanel').append(dialog);
+
+ const form=$('attendanceForm');
+ const choices=$('attendanceChoices');
+ const view=$('attendanceView');
+ const results=$('attendanceResults');
+ button.onclick=()=>{
+  const memberIds=new Set(teamState.members.map(member=>member.employee_id));
+  const staff=employees.filter(employee=>memberIds.has(employee.id));
+  choices.innerHTML=staff.map(employee=>`<label class="attendance-option"><input type="checkbox" value="${esc(employee.id)}"> ${esc(employee.name)}</label>`).join('')
+   ||`<p>${teamLabel('attendanceNoMembers')}</p>`;
+  results.replaceChildren();
+  view.disabled=true;
+  dialog.showModal();
+ };
+ choices.onchange=()=>{
+  results.replaceChildren();
+  view.disabled=!choices.querySelector('input:checked');
+ };
+ $('attendanceClose').onclick=()=>dialog.close();
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  const selected=Array.from(choices.querySelectorAll('input:checked'));
+  results.replaceChildren();
+  await Promise.all(selected.map(async input=>{
+   const employee=employees.find(person=>person.id===input.value);
+   if(!employee)return;
+   const panel=document.createElement('article');
+   panel.innerHTML=`<h3>${esc(employee.name)}</h3><div>${teamLabel('loading')}</div>`;
+   results.append(panel);
+   try{
+    const {records}=await gpsCall('gps_history',{employee_id:employee.id});
+    if(records.length)renderAttendanceHistory(panel,records);
+    else panel.querySelector('div').innerHTML=teamLabel('gpsNoRecords');
+   }catch(error){panel.querySelector('div').textContent=error.message;}
+  }));
+ };
 }
 async function setupWorkerAttendance(){
  const panel=document.createElement('section');
