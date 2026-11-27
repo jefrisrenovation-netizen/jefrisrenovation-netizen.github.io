@@ -359,17 +359,18 @@ async function loadEmployees(){
   await loadRecords();
 }
 
-async function addEmployee(){
+async function addEmployee(status=setStatus){
   const name=$("newEmployee").value.trim();
-  if(!name){setStatus(tr("Digite o nome do funcionário."),false);return}
+  if(!name){status(tr("Digite o nome do funcionário."),false);return}
   const {data,error}=await sb.from("employees").insert({owner_id:user.id,name,active:true}).select().single();
-  if(error){setStatus(tr("Erro: ")+error.message,false);return}
+  if(error){status(tr("Erro: ")+error.message,false);return}
   employees.push(data);
   employees.sort((a,b)=>a.name.localeCompare(b.name));
   $("newEmployee").value="";
   $("employee").innerHTML=employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join("");
   $("employee").value=data.id;
   await loadRecords();
+  return true;
 }
 
 async function loadRecords(){

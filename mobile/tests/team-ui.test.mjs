@@ -23,7 +23,7 @@ test('team opens with a directory and shows a sheet only after selecting a worke
  f.run("showPane('team')");assert(f.document.getElementById('timesheetPanel').classList.contains('hidden'));
  const settings=f.document.getElementById('settingsPanel');
  const shortcuts=f.document.querySelectorAll('#teamDirectoryPanel .team-shortcuts button');
- assert.equal(shortcuts.length,6);
+ assert.equal(shortcuts.length,7);
  const access=f.document.getElementById('accessPanel');
  assert(!access.hasAttribute('open'));
  f.document.getElementById('openTeamLink').onclick();
@@ -235,4 +235,26 @@ test('default schedule saves the chosen employee and leaves the team shortcuts i
  dialog.querySelector('[type=button]').onclick();
  assert(!dialog.hasAttribute('open'));
  assert(!f.document.getElementById('teamDirectoryPanel').classList.contains('hidden'));
+});
+
+
+test('add employee opens on demand and returns to the updated team list',async()=>{
+ const f=fixture();
+ f.run(`showPane('team');loadRecords=async()=>{};
+  sb.from=()=>({insert(values){this.employee={id:'new',...values};return this;},
+   select(){return this;},async single(){return {data:this.employee};}});
+ `);
+ const dialog=f.document.getElementById('addEmployeeDialog');
+ assert(!dialog.hasAttribute('open'));
+ f.document.getElementById('openAddEmployee').onclick();
+ assert(dialog.hasAttribute('open'));
+ f.document.getElementById('newEmployee').value='New Worker';
+ await dialog.querySelector('form').onsubmit({preventDefault(){}});
+ assert(!dialog.hasAttribute('open'));
+ assert(f.document.querySelector('#teamDirectory [data-employee="new"]').textContent.includes('New Worker'));
+ f.document.getElementById('openReviewDays').onclick();
+ assert(f.document.getElementById('reviewPanel').hasAttribute('open'));
+ f.document.getElementById('closeReview').onclick();
+ assert(!f.document.getElementById('reviewPanel').hasAttribute('open'));
+ assert.equal(f.run('teamState.pane'),'team');
 });

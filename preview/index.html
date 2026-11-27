@@ -153,7 +153,6 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 .team-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:14px}
 .team-shortcuts button{min-width:0;min-height:48px;margin:0;padding:10px;line-height:1.25}
 #openAttendance{grid-column:1/-1;background:#fae9e9;color:#9e2426}
-#openReviewDays{grid-column:1/-1}
 .team-shortcuts-target{scroll-margin-top:100px}
 </style>
 </head>
@@ -397,17 +396,18 @@ async function loadEmployees(){
   await loadRecords();
 }
 
-async function addEmployee(){
+async function addEmployee(status=setStatus){
   const name=$("newEmployee").value.trim();
-  if(!name){setStatus(tr("Digite o nome do funcionário."),false);return}
+  if(!name){status(tr("Digite o nome do funcionário."),false);return}
   const {data,error}=await sb.from("employees").insert({owner_id:user.id,name,active:true}).select().single();
-  if(error){setStatus(tr("Erro: ")+error.message,false);return}
+  if(error){status(tr("Erro: ")+error.message,false);return}
   employees.push(data);
   employees.sort((a,b)=>a.name.localeCompare(b.name));
   $("newEmployee").value="";
   $("employee").innerHTML=employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join("");
   $("employee").value=data.id;
   await loadRecords();
+  return true;
 }
 
 async function loadRecords(){
@@ -810,6 +810,7 @@ const teamState={role:null,booting:false,access:null,sites:[],members:[],payment
 const teamWords={
  attendanceSheet:['Feuille de pointage','Folha de ponto','Attendance sheet'],
  manageEmployees:['Gestion des employés','Gestão de funcionários','Manage employees'],
+ addTeamEmployee:['Ajouter un employé','Adicionar novo funcionário','Add employee'],
  sendTeamLink:['Envoyer un lien','Enviar link','Send a link'],
  manageAccess:['Accès des employés','Acesso dos funcionários','Employee access'],
  attendanceChoose:['Sélectionnez un ou plusieurs employés','Selecione um ou mais funcionários','Select one or more employees'],
@@ -820,7 +821,6 @@ const teamWords={
  attendanceGpsUnavailable:['Pointages GPS indisponibles','Batidas GPS indisponíveis','GPS punches unavailable'],
  attendancePunch:['Pointage','Batida','Punch'],
  attendanceTotal:['Total des heures','Total de horas','Total hours'],
- attendanceClose:['Fermer','Fechar','Close'],
  teamBack:['Retour','Voltar','Back'],
  gpsChooseSite:['Choisissez le chantier','Selecione a obra','Choose the work site'],
  gpsChooseKind:['Entrée ou départ ?','Entrada ou saída?','Clock in or clock out?'],
@@ -869,30 +869,53 @@ async function teamCall(action,payload={},endpoint='team-access'){
  const data=await response.json();if(!response.ok){const error=new Error(tt(data.error));error.code=data.error;throw error;}return data;
 }
 function gpsCall(action,payload={}){return teamCall(action,payload,'gps-attendance');}
-function teamNotice(error){const message=typeof error==='string'?error:error instanceof Error?error.message:tt('failed');const target=teamState.role==='employee'?$('workerNotice'):($('accessPanel')?.open?$('teamAccessNotice'):$('upgradeNotice'));if(target){target.textContent=message;target.setAttribute('role','status');}else setLogin(message);}
+function teamNotice(error){const message=typeof error==='string'?error:error instanceof Error?error.message:tt('failed');const target=teamState.role==='employee'?$('workerNotice'):($('accessPanel')?.open?$('teamAccessNotice'):($('reviewPanel')?.open?$('reviewNotice'):$('upgradeNotice')));if(target){target.textContent=message;target.setAttribute('role','status');}else setLogin(message);}
+async function openTeamSheet(id){
+ if(!employees.some(employee=>employee.id===id&&employee.active!==false))return;
+ showPane('team');
+ $('employee').value=id;
+ const request=loadRecords();
+ const version=loadVersion;
+ await request;
+ if(teamState.pane==='team'&&version===loadVersion&&$('employee').value===id){
+  showPane('team-sheet');
+ }
+}
+function renderTeamDirectory(){
+ $('teamDirectory').innerHTML=employees.filter(e=>e.active!==false).map(e=>`<button type="button" class="worker-tile secondary" data-employee="${esc(e.id)}"><strong>${esc(e.name)}</strong><span aria-hidden="true">›</span></button>`).join('')||`<p>${teamLabel('noTeam')}</p>`;
+ $('teamDirectory').querySelectorAll('[data-employee]').forEach(button=>button.onclick=()=>openTeamSheet(button.dataset.employee));
+}
 function showPane(pane){
+ if(pane==='team')renderTeamDirectory();
  if(pane!=='team'&&$('accessPanel')?.open)$('accessPanel').close();
- teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamPanel','team'],['timesheetPanel','team'],['sitesPanel','sites'],['reportActions','reports'],['reviewPanel','team'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
- closeCompanyReport();closeIndividualReport();document.querySelectorAll('[data-pane]').forEach(e=>e.classList.toggle('selected',e.dataset.pane===pane));
+ teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamDirectoryPanel','team'],['teamPanel','team-sheet'],['timesheetPanel','team-sheet'],['sitesPanel','sites'],['reportActions','reports'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
+ closeCompanyReport();closeIndividualReport();document.querySelectorAll('[data-pane]').forEach(e=>e.classList.toggle('selected',e.dataset.pane===(pane==='team-sheet'?'team':pane)));
  $('upgradeNotice').textContent='';$('mainNav')?.scrollIntoView({block:'start',behavior:'smooth'});
 }
 function teamField(key,id,type='text',value=''){return `<div><label for="${id}">${teamLabel(key)}</label><input id="${id}" type="${type}" value="${esc(value)}" ${type==='number'?'min="0" step="1"':''} required></div>`}
 function setupOwnerUI(){
  if($('mainNav'))return;
  $('profileHeading').closest('section').id='settingsPanel';$('employee').closest('section').id='teamPanel';
+ const backToTeam=document.createElement('button');backToTeam.type='button';backToTeam.className='secondary';backToTeam.id='backToTeam';
+ backToTeam.innerHTML=`‹ ${teamLabel('teamBack')}`;backToTeam.onclick=()=>showPane('team');
+ $('teamPanel').prepend(backToTeam);
  deletionCard.remove();deletionSummary.removeAttribute('data-text');deletionSummary.innerHTML=teamLabel('accountManagement');$('settingsPanel').prepend(deletionDetails);
  const defaults=$('employeeDefaults');if(defaults){const details=document.createElement('details');details.id='teamSchedule';details.className='schedule-settings no-print';details.innerHTML=`<summary>${teamLabel('schedule')}</summary>`;details.append(defaults);$('teamPanel').append(details);}$('title').closest('section').id='timesheetPanel';
  // Remove inherited test banner from the released interface.
  const banner=$('app').firstElementChild;if(banner?.textContent.includes('VERSÃO DE TESTE')||banner?.textContent.includes('Version de test'))banner.remove();
  const shell=document.createElement('div');shell.id='upgradeShell';shell.className='no-print';shell.innerHTML=`<nav id="mainNav" class="app-nav" aria-label="Navigation">${['home','team','sites','reports','settings'].map((p,i)=>`<button class="secondary" data-pane="${p}" onclick="teamUI.pane('${p}')"><span aria-hidden="true">${['⌂','♙','▦','▤','⚙'][i]}</span>${teamLabel(p)}</button>`).join('')}</nav><p id="upgradeNotice" class="status" role="status"></p><section id="dashboard" class="card"><div class="dashboard-head"><div><small>${teamLabel('owner')}</small><h2 id="dashboardCompany"></h2></div><input id="dashboardMonth" type="month" aria-label="${esc(tt('month'))}" onchange="teamUI.month(this.value)"></div><h2>${teamLabel('month')}</h2><div id="dashboardStats" class="summary"></div><button class="register-button" onclick="teamUI.day()">＋ ${teamLabel('register')}</button><h2>${teamLabel('team')}</h2><div id="dashboardTeam"></div><p class="muted">${teamLabel('payrollApproved')}</p><p class="muted">✓ ${teamLabel('allSaved')}</p></section>`;
  $('app').prepend(shell);
- setupOwnerAttendance();
- const access=document.createElement('dialog');access.id='accessPanel';access.className='no-print';access.setAttribute('aria-labelledby','teamAccessTitle');access.innerHTML=`<h2 id="teamAccessTitle"></h2><button type="button" class="secondary" id="closeTeamAccess">${teamLabel('attendanceClose')}</button><div id="teamInviteFields"><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form></div><p id="teamAccessNotice" class="status" role="status"></p><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
+ const directory=document.createElement('section');directory.id='teamDirectoryPanel';directory.className='card hidden no-print';
+ directory.innerHTML=`<h2>${teamLabel('team')}</h2><div id="teamDirectory"></div>`;
+ $('app').append(directory);
+ setupOwnerAttendance(directory);
+ setupEmployeeOptions();
+ const access=document.createElement('dialog');access.id='accessPanel';access.className='no-print';access.setAttribute('aria-labelledby','teamAccessTitle');access.innerHTML=`<h2 id="teamAccessTitle"></h2><button type="button" class="secondary" id="closeTeamAccess">${teamLabel('teamBack')}</button><div id="teamInviteFields"><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form></div><p id="teamAccessNotice" class="status" role="status"></p><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
  $('app').append(access);$('closeTeamAccess').onclick=()=>access.close();$('invitePhone').required=false;$('inviteEmail').required=false;const syncContact=()=>{$('invitePhone').required=!$('inviteEmail').value.trim();};$('inviteEmail').oninput=syncContact;syncContact();$('inviteUsername').pattern='[a-zA-Z0-9][a-zA-Z0-9._\\x2D]{2,39}';$('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
  $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
  const sites=document.createElement('section');sites.id='sitesPanel';sites.className='card hidden no-print';sites.innerHTML=`<h2>${teamLabel('sites')}</h2><form id="siteForm"><div class="grid">${teamField('siteName','siteName')}${teamField('address','siteAddress')}</div><button type="submit">＋ ${teamLabel('addSite')}</button></form><div id="siteList"></div>`;
  $('app').append(sites);$('siteAddress').required=false;$('siteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,async()=>{const {error}=await sb.from('work_sites').insert({owner_id:user.id,name:$('siteName').value.trim(),address:$('siteAddress').value.trim()});if(error)throw Error(tt('failed'));$('siteForm').reset();await upgradeRefresh();teamNotice(tt('saveOK'));});};
- const review=document.createElement('section');review.id='reviewPanel';review.className='card hidden no-print';review.innerHTML=`<h2>${teamLabel('reviewTitle')}</h2><p class="muted">${teamLabel('reviewHelp')}</p><div id="reviewList"></div>`;$('app').append(review);
+ const review=document.createElement('dialog');review.id='reviewPanel';review.className='no-print';review.setAttribute('aria-labelledby','reviewTitle');review.innerHTML=`<h2 id="reviewTitle">${teamLabel('reviewTitle')}</h2><button type="button" class="secondary" id="closeReview">${teamLabel('teamBack')}</button><p class="muted">${teamLabel('reviewHelp')}</p><p id="reviewNotice" class="status" role="status"></p><div id="reviewList"></div>`;$('app').append(review);$('closeReview').onclick=()=>review.close();
  setupPersonalReportFilters();$('email').type='text';showPane('home');
 }
 async function withTeamButton(button,fn){if(button?.disabled)return;if(button)button.disabled=true;try{await fn()}catch(error){teamNotice(error)}finally{if(button)button.disabled=false}}
@@ -905,7 +928,7 @@ async function upgradeRefresh(){
  const stats=[[tt('hours'),fmt(days.reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes),0))],[tt('days'),report.rows.reduce((sum,r)=>sum+r.days,0)],[tt('advances'),currencies.length>1?'—':formatMoney(report.advance,currency)],[tt('due'),currencies.length>1?'—':formatMoney(report.due,currency)]];
  $('dashboardStats').innerHTML=stats.map(([label,value])=>`<div class="stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join('');$('dashboardCompany').textContent=profile.company_name||'Suivi des heures Pro';$('dashboardMonth').value=month;
  $('dashboardTeam').innerHTML=staff.filter(e=>e.active).map(e=>`<button class="worker-tile secondary" data-employee="${e.id}"><strong>${esc(e.name)}</strong><span>${fmt(days.filter(d=>d.employee_id===e.id).reduce((sum,d)=>sum+minutes(d.entry_time,d.exit_time,d.break_minutes),0))} ›</span></button>`).join('')||`<p>${esc(tt('noTeam'))}</p>`;
- $('dashboardTeam').querySelectorAll('[data-employee]').forEach(b=>b.onclick=async()=>{$('employee').value=b.dataset.employee;await loadRecords();showPane('team');});
+ $('dashboardTeam').querySelectorAll('[data-employee]').forEach(b=>b.onclick=()=>openTeamSheet(b.dataset.employee));
  const selected=$('inviteEmployee').value;$('inviteEmployee').innerHTML=staff.filter(e=>e.active).map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');if(selected)$('inviteEmployee').value=selected;
  $('siteList').innerHTML=sites.map(s=>`<article class="project-tile"><strong>${esc(s.name)}</strong><p>${esc(s.address)}</p></article>`).join('')||`<p>${esc(tt('noSites'))}</p>`;
  $('memberList').innerHTML=teamState.members.map(m=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===m.employee_id)?.name||m.username)}</strong><p>${esc(m.username)} · ${esc(m.activated_at?tt('active'):tt('pending'))}</p><button class="secondary" data-member="${m.id}" data-enabled="${!m.enabled}">${esc(tt(m.enabled?'block':'unblock'))}</button>${m.login_method==='phone'&&m.activated_at&&m.enabled?`<button class="secondary" data-reset-member="${m.id}">${esc(tt('resetMember'))}</button>`:''}</article>`).join('');
@@ -913,6 +936,7 @@ async function upgradeRefresh(){
  $('memberList').querySelectorAll('[data-reset-member]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{showTeamInvitation({...await teamCall('reset_phone',{id:b.dataset.resetMember}),reset:true});}));
  $('reviewList').innerHTML=days.filter(d=>d.approval_status==='pending').map(d=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===d.employee_id)?.name||'')} · ${esc(d.work_date)}</strong><p>${esc(d.entry_time?.slice(0,5)||'')}–${esc(d.exit_time?.slice(0,5)||'')} · ${Number(d.break_minutes)} min · ${esc(d.workplace||'')}</p><div class="actions"><button class="green" data-review="${d.id}" data-status="approved">${esc(tt('approve'))}</button><button class="secondary" data-review="${d.id}" data-status="rejected">${esc(tt('reject'))}</button></div></article>`).join('')||`<p>${esc(tt('noPending'))}</p>`;
  $('reviewList').querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('review_day',{id:b.dataset.review,status:b.dataset.status});await upgradeRefresh();await loadRecords()}));
+ if(teamState.pane==='team')renderTeamDirectory();
  refreshPersonalReportFilters(days,staff);teamTranslate();
 }
 
@@ -1055,11 +1079,6 @@ function openTeamAccess(invite){
  access.scrollTop=0;
 }
 
-function scrollToTeamShortcut(target){
- target.classList.add('team-shortcuts-target');
- target.scrollIntoView({block:'start',behavior:'smooth'});
-}
-
 function chooseScheduleEmployee(){
  const staff=employees.filter(employee=>employee.active!==false);
  if(!staff.length){teamNotice(tt('noTeam'));return;}
@@ -1114,23 +1133,75 @@ function chooseScheduleEmployee(){
  dialog.showModal();
 }
 
-function setupOwnerAttendance(){
+function setupEmployeeOptions(){
+ const add=document.createElement('dialog');
+ add.id='addEmployeeDialog';
+ add.setAttribute('aria-labelledby','addEmployeeTitle');
+ add.innerHTML=`<h2 id="addEmployeeTitle">${teamLabel('addTeamEmployee')}</h2>
+ <form><div id="addEmployeeField"></div><p id="addEmployeeNotice" class="status" role="status"></p>
+ <div class="actions"><button type="submit">${teamLabel('save')}</button>
+ <button type="button" class="secondary">${teamLabel('teamBack')}</button></div></form>`;
+ $('app').append(add);
+ const field=$('newEmployee');
+ field.required=true;
+ field.parentElement.querySelector('label').htmlFor=field.id;
+ $('addEmployeeField').append(field.parentElement);
+ document.querySelector('[onclick="addEmployee()"]').remove();
+ const save=add.querySelector('[type=submit]');
+ const back=add.querySelector('[type=button]');
+ back.onclick=()=>add.close();
+ add.addEventListener('cancel',event=>{if(back.disabled)event.preventDefault();});
+ add.querySelector('form').onsubmit=async event=>{
+  event.preventDefault();
+  if(save.disabled)return;
+  const notice=$('addEmployeeNotice');
+  save.disabled=back.disabled=field.disabled=true;
+  notice.textContent=tt('loading');
+  try{
+   const added=await addEmployee(message=>{notice.textContent=message;});
+   if(added){renderTeamDirectory();add.close();}
+  }catch(error){notice.textContent=error.message||tt('failed');}
+  finally{save.disabled=back.disabled=field.disabled=false;}
+ };
+ const management=document.createElement('dialog');
+ management.id='manageEmployeesDialog';
+ management.setAttribute('aria-labelledby','manageEmployeesTitle');
+ management.innerHTML=`<h2 id="manageEmployeesTitle">${teamLabel('manageEmployees')}</h2>
+ <button type="button" class="secondary">${teamLabel('teamBack')}</button><div id="manageEmployeesList"></div>`;
+ $('app').append(management);
+ management.querySelector('button').onclick=()=>management.close();
+}
+
+function setupOwnerAttendance(directory){
  const shortcuts=document.createElement('div');
  shortcuts.className='team-shortcuts';
  shortcuts.innerHTML=`<button type="button" class="secondary" id="openAttendance">${teamLabel('attendanceSheet')}</button>
  <button type="button" class="secondary" id="openManageEmployees">${teamLabel('manageEmployees')}</button>
+ <button type="button" class="secondary" id="openAddEmployee">${teamLabel('addTeamEmployee')}</button>
  <button type="button" class="secondary" id="openTeamLink">${teamLabel('sendTeamLink')}</button>
  <button type="button" class="secondary" id="openManageAccess">${teamLabel('manageAccess')}</button>
  <button type="button" class="secondary" id="openTeamSchedule">${teamLabel('schedule')}</button>
  <button type="button" class="secondary" id="openReviewDays">${teamLabel('reviewTitle')}</button>`;
- const panel=$('teamPanel');
- panel.prepend(shortcuts);
+ directory.prepend(shortcuts);
  const button=$('openAttendance');
- $('openManageEmployees').onclick=()=>scrollToTeamShortcut($('employee').closest('.grid'));
+ $('openManageEmployees').onclick=()=>{
+  const management=$('manageEmployeesDialog');
+  $('manageEmployeesList').innerHTML=$('teamDirectory').innerHTML;
+  management.querySelectorAll('[data-employee]').forEach(item=>item.onclick=()=>{
+   management.close();
+   openTeamSheet(item.dataset.employee).catch(teamNotice);
+  });
+  management.showModal();
+ };
+ $('openAddEmployee').onclick=()=>{
+  $('addEmployeeNotice').textContent='';
+  $('newEmployee').value='';
+  $('addEmployeeDialog').showModal();
+ };
  $('openTeamLink').onclick=()=>openTeamAccess(true);
  $('openManageAccess').onclick=()=>openTeamAccess(false);
  $('openTeamSchedule').onclick=()=>chooseScheduleEmployee();
- $('openReviewDays').onclick=()=>scrollToTeamShortcut($('reviewPanel'));
+ $('openReviewDays').onclick=()=>{$('reviewNotice').textContent='';$('reviewPanel').showModal();};
 
  const dialog=document.createElement('dialog');
  dialog.className='attendance-dialog';
@@ -1140,9 +1211,9 @@ function setupOwnerAttendance(){
  <input type="month" id="attendanceMonth" required><fieldset><legend>${teamLabel('attendanceChoose')}</legend>
  <div id="attendanceChoices"></div></fieldset>
  <div class="actions"><button type="submit" id="attendanceView" disabled>${teamLabel('attendanceView')}</button>
- <button type="button" class="secondary" id="attendanceClose">${teamLabel('attendanceClose')}</button></div></form>
+ <button type="button" class="secondary" id="attendanceClose">${teamLabel('teamBack')}</button></div></form>
  <div id="attendanceResults" aria-live="polite"></div>`;
- $('teamPanel').append(dialog);
+ directory.append(dialog);
 
  const form=$('attendanceForm');
  const choices=$('attendanceChoices');
