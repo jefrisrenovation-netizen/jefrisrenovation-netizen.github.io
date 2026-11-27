@@ -1,6 +1,15 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
+ reviewLoading:['Chargement…','Carregando…','Loading…'],
+ editAccountProfile:['Modifier le profil','Editar perfil','Edit profile'],
+ accountPreferences:['Préférences','Preferências','Preferences'],
+ accountControls:['Gestion des accès au compte','Controle da conta','Account controls'],
+ accountPhoto:['Choisir une photo de profil','Escolher foto de perfil','Choose profile photo'],
+ accountLogo:['Choisir un logo','Escolher logo da empresa','Choose company logo'],
+ removeAccountImage:['Retirer l’image','Remover imagem','Remove image'],
+ accountImageError:['Impossible de lire cette image. Essayez un fichier JPEG ou PNG.','Não foi possível abrir a imagem. Tente um arquivo JPEG ou PNG.','Could not open this image. Try a JPEG or PNG file.'],
+ accountFreelance:['Indépendant','Freelancer','Freelancer'],
  attendanceSheet:['Feuille de pointage','Folha de ponto','Attendance sheet'],
  manageEmployees:['Gestion des employés','Gestão de funcionários','Manage employees'],
  addTeamEmployee:['Ajouter un employé','Adicionar novo funcionário','Add employee'],
@@ -86,6 +95,120 @@ function showPane(pane){
  $('upgradeNotice').textContent='';$('mainNav')?.scrollIntoView({block:'start',behavior:'smooth'});
 }
 function teamField(key,id,type='text',value=''){return `<div><label for="${id}">${teamLabel(key)}</label><input id="${id}" type="${type}" value="${esc(value)}" ${type==='number'?'min="0" step="1"':''} required></div>`}
+function setupAccountSettings(){
+ const settings=$('settingsPanel');
+ const shortcuts=document.createElement('div');
+ shortcuts.className='team-shortcuts account-shortcuts';
+ shortcuts.innerHTML=`<button type="button" class="secondary" id="openAccountSettings">${teamLabel('accountManagement')}</button>`;
+ settings.prepend(shortcuts);
+
+ const dialog=document.createElement('dialog');
+ dialog.id='accountDialog';
+ dialog.className='account-dialog';
+ dialog.setAttribute('aria-labelledby','accountDialogTitle');
+ dialog.innerHTML=`<button type="button" class="secondary" id="accountBack">‹ ${teamLabel('teamBack')}</button>
+ <h2 id="accountDialogTitle">${teamLabel('accountManagement')}</h2>
+ <div class="account-identity"><span id="accountInitial" aria-hidden="true"></span><img id="accountAvatar" class="hidden" alt=""><div><strong id="accountName"></strong><small id="accountRole"></small></div></div>
+ <details open><summary>${teamLabel('editAccountProfile')}</summary><div class="grid" id="accountProfileFields">
+ <div class="account-image-actions"><label for="accountImageFile" id="accountImageLabel"></label><input id="accountImageFile" type="file" accept="image/*"><button type="button" class="secondary" id="accountImageRemove">${teamLabel('removeAccountImage')}</button></div></div></details>
+ <details><summary>${teamLabel('accountPreferences')}</summary><div class="grid" id="accountPreferenceFields"></div></details>
+ <p id="accountNotice" class="status" role="status"></p>`;
+ settings.append(dialog);
+
+ for(const id of ['companyName','vatNumber','companyAddress','companyPhone','companyEmail','companyLogo']){
+  $('accountProfileFields').append($(id).parentElement);
+ }
+ for(const id of ['accountType','languageCode','preferredCurrency']){
+  $('accountPreferenceFields').append($(id).parentElement);
+ }
+ $('companyLogo').parentElement.classList.add('hidden');
+ const save=$('saveProfileButton');
+ dialog.append(save);
+ deletionCard.remove();
+ deletionSummary.removeAttribute('data-text');
+ deletionSummary.innerHTML=teamLabel('accountControls');
+ dialog.append(deletionDetails);
+ $('profileHeading').classList.add('hidden');
+ $('accountModeHint').classList.add('hidden');
+ settings.querySelector(':scope > .grid')?.remove();
+
+ const drawIdentity=()=>{
+  const individual=$('accountType').value==='individual';
+  const name=$('companyName').value.trim()||user?.email||'Suivi des heures';
+  const url=$('companyLogo').value.trim();
+  $('accountName').textContent=name;
+  $('accountRole').textContent=tt(individual?'accountFreelance':'owner');
+  $('accountImageLabel').textContent=tt(individual?'accountPhoto':'accountLogo');
+  $('accountInitial').textContent=Array.from(name)[0]?.toUpperCase()||'S';
+  $('accountAvatar').classList.toggle('hidden',!profileImageUrl(url));
+  $('accountInitial').classList.toggle('hidden',profileImageUrl(url));
+  if(profileImageUrl(url))$('accountAvatar').src=url;
+  else $('accountAvatar').removeAttribute('src');
+  $('accountImageRemove').classList.toggle('hidden',!url);
+ };
+ $('accountAvatar').onerror=()=>{
+  $('accountAvatar').classList.add('hidden');
+  $('accountInitial').classList.remove('hidden');
+ };
+ let imageRequest=0;
+ $('openAccountSettings').onclick=()=>{
+  $('accountNotice').textContent='';
+  drawIdentity();
+  dialog.showModal();
+ };
+ $('accountBack').onclick=()=>{if(!save.disabled)dialog.close()};
+ dialog.addEventListener('cancel',event=>{if(save.disabled)event.preventDefault()});
+ dialog.addEventListener('close',()=>{imageRequest++;$('accountImageFile').value=''});
+ $('companyName').addEventListener('input',drawIdentity);
+ $('accountType').addEventListener('change',drawIdentity);
+ $('languageCode').addEventListener('change',drawIdentity);
+ $('accountImageRemove').onclick=()=>{
+  imageRequest++;
+  $('accountImageFile').value='';
+  $('companyLogo').value='';
+  drawIdentity();
+ };
+ $('accountImageFile').onchange=async event=>{
+  const file=event.target.files[0];
+  if(!file)return;
+  const request=++imageRequest;
+  const remove=$('accountImageRemove');
+  save.disabled=true;
+  event.target.disabled=true;
+  remove.disabled=true;
+  $('accountBack').disabled=true;
+  const url=URL.createObjectURL(file);
+  try{
+   const image=new Image();
+   image.src=url;
+   await image.decode();
+   if(request!==imageRequest)return;
+   const scale=Math.min(1,320/Math.max(image.naturalWidth,image.naturalHeight));
+   const canvas=document.createElement('canvas');
+   canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+   canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+   const context=canvas.getContext('2d');
+   context.fillStyle='#fff';
+   context.fillRect(0,0,canvas.width,canvas.height);
+   context.drawImage(image,0,0,canvas.width,canvas.height);
+   const data=canvas.toDataURL('image/jpeg',0.8);
+   if(!profileImageUrl(data))throw new Error('Invalid profile image');
+   $('companyLogo').value=data;
+   $('accountNotice').textContent='';
+   drawIdentity();
+  }catch{
+   if(request===imageRequest)$('accountNotice').textContent=tt('accountImageError');
+  }finally{
+   URL.revokeObjectURL(url);
+   save.disabled=false;
+   event.target.disabled=false;
+   remove.disabled=false;
+   $('accountBack').disabled=false;
+   event.target.value='';
+  }
+ };
+}
+
 function setupOwnerUI(){
  if($('mainNav'))return;
  $('profileHeading').closest('section').id='settingsPanel';$('employee').closest('section').id='teamPanel';
@@ -93,7 +216,7 @@ function setupOwnerUI(){
  backToTeam.innerHTML=`‹ ${teamLabel('teamBack')}`;backToTeam.onclick=()=>showPane('team');
  $('teamPanel').prepend(backToTeam);
 
- deletionCard.remove();deletionSummary.removeAttribute('data-text');deletionSummary.innerHTML=teamLabel('accountManagement');$('settingsPanel').prepend(deletionDetails);
+ setupAccountSettings();
  const defaults=$('employeeDefaults');if(defaults){const details=document.createElement('details');details.id='teamSchedule';details.className='schedule-settings no-print';details.innerHTML=`<summary>${teamLabel('schedule')}</summary>`;details.append(defaults);$('teamPanel').append(details);}$('title').closest('section').id='timesheetPanel';
  // Remove inherited test banner from the released interface.
  const banner=$('app').firstElementChild;if(banner?.textContent.includes('VERSÃO DE TESTE')||banner?.textContent.includes('Version de test'))banner.remove();
@@ -136,10 +259,20 @@ async function upgradeRefresh(){
  $('memberList').innerHTML=teamState.members.filter(m=>staff.some(e=>e.id===m.employee_id&&e.active!==false)).map(m=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===m.employee_id)?.name||m.username)}</strong><p>${esc(m.username)} · ${esc(m.activated_at?tt('active'):tt('pending'))}</p><button class="secondary" data-member="${m.id}" data-enabled="${!m.enabled}">${esc(tt(m.enabled?'block':'unblock'))}</button>${m.login_method==='phone'&&m.activated_at&&m.enabled?`<button class="secondary" data-reset-member="${m.id}">${esc(tt('resetMember'))}</button>`:''}</article>`).join('');
  $('memberList').querySelectorAll('[data-member]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('set_access',{id:b.dataset.member,enabled:b.dataset.enabled==='true'});await upgradeRefresh()}));
  $('memberList').querySelectorAll('[data-reset-member]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{showTeamInvitation({...await teamCall('reset_phone',{id:b.dataset.resetMember}),reset:true});}));
- $('reviewList').innerHTML=days.filter(d=>d.approval_status==='pending').map(d=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===d.employee_id)?.name||'')} · ${esc(d.work_date)}</strong><p>${esc(d.entry_time?.slice(0,5)||'')}–${esc(d.exit_time?.slice(0,5)||'')} · ${Number(d.break_minutes)} min · ${esc(d.workplace||'')}</p><div class="actions"><button class="green" data-review="${d.id}" data-status="approved">${esc(tt('approve'))}</button><button class="secondary" data-review="${d.id}" data-status="rejected">${esc(tt('reject'))}</button></div></article>`).join('')||`<p>${esc(tt('noPending'))}</p>`;
- $('reviewList').querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('review_day',{id:b.dataset.review,status:b.dataset.status});await upgradeRefresh();await loadRecords()}));
  if(teamState.pane==='team')renderTeamDirectory();
  refreshPersonalReportFilters(days,staff);teamTranslate();
+}
+
+let pendingReviewRequest=0;
+async function refreshPendingReview(){
+ const request=++pendingReviewRequest;
+ const {data,error}=await sb.from('work_days').select('id,employee_id,work_date,entry_time,exit_time,break_minutes,workplace')
+  .eq('owner_id',user.id).eq('approval_status','pending').order('work_date',{ascending:false}).order('id');
+ if(request!==pendingReviewRequest||!$('reviewPanel').open)return;
+ if(error)throw error;
+ $('reviewNotice').textContent='';
+ $('reviewList').innerHTML=(data||[]).map(d=>`<article class="project-tile"><strong>${esc(employees.find(e=>e.id===d.employee_id)?.name||'')} · ${esc(d.work_date)}</strong><p>${esc(d.entry_time?.slice(0,5)||'')}–${esc(d.exit_time?.slice(0,5)||'')} · ${Number(d.break_minutes)} min · ${esc(d.workplace||'')}</p><div class="actions"><button class="green" data-review="${d.id}" data-status="approved">${esc(tt('approve'))}</button><button class="secondary" data-review="${d.id}" data-status="rejected">${esc(tt('reject'))}</button></div></article>`).join('')||`<p>${esc(tt('noPending'))}</p>`;
+ $('reviewList').querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('review_day',{id:b.dataset.review,status:b.dataset.status});await refreshPendingReview();await upgradeRefresh();await loadRecords()}));
 }
 
 async function createTeamInvite(){
@@ -407,7 +540,12 @@ function setupOwnerAttendance(directory){
  $('openTeamLink').onclick=()=>openTeamAccess(true);
  $('openManageAccess').onclick=()=>openTeamAccess(false);
  $('openTeamSchedule').onclick=()=>chooseScheduleEmployee();
- $('openReviewDays').onclick=()=>{$('reviewNotice').textContent='';$('reviewPanel').showModal();};
+ $('openReviewDays').onclick=()=>{
+  $('reviewNotice').textContent=tt('reviewLoading');
+  $('reviewList').replaceChildren();
+  $('reviewPanel').showModal();
+  refreshPendingReview().catch(teamNotice);
+ };
 
  const dialog=document.createElement('dialog');
  dialog.className='attendance-dialog';
