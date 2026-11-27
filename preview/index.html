@@ -150,7 +150,7 @@ input{border:0!important;padding:2px!important;width:100%!important;font-size:10
 .attendance-dialog .attendance-option{display:flex;align-items:center;gap:10px;min-height:44px;margin:0}
 .attendance-dialog input[type=checkbox]{width:20px;height:20px;margin:0;flex:none}
 .attendance-dialog article h3{margin-bottom:8px}
-#openAttendance{margin-top:12px}
+#openAttendance{margin-bottom:14px}
 </style>
 </head>
 <body>
@@ -1033,7 +1033,7 @@ function setupOwnerAttendance(){
  button.type='button';
  button.className='secondary';
  button.innerHTML=teamLabel('attendanceSheet');
- $('teamPanel').append(button);
+ $('teamPanel').prepend(button);
 
  const dialog=document.createElement('dialog');
  dialog.className='attendance-dialog';
