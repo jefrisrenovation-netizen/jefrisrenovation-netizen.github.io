@@ -14,7 +14,7 @@ const teamWords={
  attendancePunch:['Pointage','Batida','Punch'],
  attendanceTotal:['Total des heures','Total de horas','Total hours'],
  attendanceClose:['Fermer','Fechar','Close'],
- attendanceContinue:['Continuer','Continuar','Continue'],
+ teamBack:['Retour','Voltar','Back'],
  gpsChooseSite:['Choisissez le chantier','Selecione a obra','Choose the work site'],
  gpsChooseKind:['Entrée ou départ ?','Entrada ou saída?','Clock in or clock out?'],
  gpsVerify:['Confirmer le pointage','Confirmar ponto','Confirm attendance'],
@@ -89,6 +89,10 @@ function teamField(key,id,type='text',value=''){return `<div><label for="${id}">
 function setupOwnerUI(){
  if($('mainNav'))return;
  $('profileHeading').closest('section').id='settingsPanel';$('employee').closest('section').id='teamPanel';
+ const backToTeam=document.createElement('button');backToTeam.type='button';backToTeam.className='secondary';backToTeam.id='backToTeam';
+ backToTeam.innerHTML=`‹ ${teamLabel('teamBack')}`;backToTeam.onclick=()=>showPane('team');
+ $('teamPanel').prepend(backToTeam);
+
  deletionCard.remove();deletionSummary.removeAttribute('data-text');deletionSummary.innerHTML=teamLabel('accountManagement');$('settingsPanel').prepend(deletionDetails);
  const defaults=$('employeeDefaults');if(defaults){const details=document.createElement('details');details.id='teamSchedule';details.className='schedule-settings no-print';details.innerHTML=`<summary>${teamLabel('schedule')}</summary>`;details.append(defaults);$('teamPanel').append(details);}$('title').closest('section').id='timesheetPanel';
  // Remove inherited test banner from the released interface.
@@ -111,7 +115,7 @@ function setupOwnerUI(){
   showPane('team');
   await upgradeRefresh().catch(teamNotice);
  };
- const access=document.createElement('dialog');access.id='accessPanel';access.className='no-print';access.setAttribute('aria-labelledby','teamAccessTitle');access.innerHTML=`<h2 id="teamAccessTitle"></h2><div id="teamInviteFields"><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form></div><p id="teamAccessNotice" class="status" role="status"></p><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div><button type="button" class="secondary" id="closeTeamAccess">${teamLabel('attendanceClose')}</button>`;
+ const access=document.createElement('dialog');access.id='accessPanel';access.className='no-print';access.setAttribute('aria-labelledby','teamAccessTitle');access.innerHTML=`<h2 id="teamAccessTitle"></h2><button type="button" class="secondary" id="closeTeamAccess">${teamLabel('attendanceClose')}</button><div id="teamInviteFields"><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form></div><p id="teamAccessNotice" class="status" role="status"></p><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
  $('app').append(access);$('closeTeamAccess').onclick=()=>access.close();$('invitePhone').required=false;$('inviteEmail').required=false;const syncContact=()=>{$('invitePhone').required=!$('inviteEmail').value.trim();};$('inviteEmail').oninput=syncContact;syncContact();$('inviteUsername').pattern='[a-zA-Z0-9][a-zA-Z0-9._\\x2D]{2,39}';$('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
  $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
  const sites=document.createElement('section');sites.id='sitesPanel';sites.className='card hidden no-print';sites.innerHTML=`<h2>${teamLabel('sites')}</h2><form id="siteForm"><div class="grid">${teamField('siteName','siteName')}${teamField('address','siteAddress')}</div><button type="submit">＋ ${teamLabel('addSite')}</button></form><div id="siteList"></div>`;
@@ -158,8 +162,8 @@ function showTeamInvitation(invitation){
  $('copyInvite').onclick=async()=>{try{await navigator.clipboard.writeText(message);$('copyInvite').textContent=tt('copied')}catch{result.querySelector('input').select()}};
 }
 function selectSiteHtml(id){return `<select id="${id}" aria-label="${esc(tt('sites'))}"><option value="">—</option>${teamState.sites.map(s=>`<option value="${esc(s.name+(s.address?' — '+s.address:''))}">${esc(s.name)}</option>`).join('')}</select>`}
-function scheduleHTML(prefix){
- return `<section class="default-schedule"><h2>${teamLabel('schedule')}</h2>${['entry','exit','pause'].map((key,i)=>`<div class="schedule-row"><label for="${prefix}${['Entry','Exit','Pause'][i]}">${teamLabel(key)}</label><input id="${prefix}${['Entry','Exit','Pause'][i]}" type="${i===2?'number':'time'}" ${i===2?'min="0" max="1440" step="1"':''} required></div>`).join('')}<p id="${prefix}Status" class="status" role="status"></p></section>`;
+function scheduleHTML(prefix,showTitle=true){
+ return `<section class="default-schedule">${showTitle?`<h2>${teamLabel('schedule')}</h2>`:''}${['entry','exit','pause'].map((key,i)=>`<div class="schedule-row"><label for="${prefix}${['Entry','Exit','Pause'][i]}">${teamLabel(key)}</label><input id="${prefix}${['Entry','Exit','Pause'][i]}" type="${i===2?'number':'time'}" ${i===2?'min="0" max="1440" step="1"':''} required></div>`).join('')}<p id="${prefix}Status" class="status" role="status"></p></section>`;
 }
 function wireSchedule(prefix,getEmployee,isWorker=false){
  const fill=()=>{const emp=getEmployee()||{};$(prefix+'Entry').value=(emp.default_entry_time||'08:00').slice(0,5);$(prefix+'Exit').value=(emp.default_exit_time||'17:30').slice(0,5);$(prefix+'Pause').value=emp.default_break_minutes??30;};fill();
@@ -298,23 +302,47 @@ function chooseScheduleEmployee(){
  <form><label for="scheduleEmployee">${teamLabel('worker')}</label>
  <select id="scheduleEmployee" required><option value="">—</option>
  ${staff.map(employee=>`<option value="${esc(employee.id)}">${esc(employee.name)}</option>`).join('')}</select>
- <div class="actions"><button type="submit">${teamLabel('attendanceContinue')}</button>
- <button type="button" class="secondary">${teamLabel('cancel')}</button></div></form>`;
+ <div id="teamScheduleFields" class="hidden">${scheduleHTML('teamDefault',false)}</div>
+ <div class="actions"><button type="submit" disabled>${teamLabel('save')}</button>
+ <button type="button" class="secondary">${teamLabel('teamBack')}</button></div></form>`;
  $('app').append(dialog);
- const select=dialog.querySelector('select');
+ const select=$('scheduleEmployee');
+ const save=dialog.querySelector('[type=submit]');
+ const back=dialog.querySelector('[type=button]');
+ const status=$('teamDefaultStatus');
+ const entry=$('teamDefaultEntry'),exit=$('teamDefaultExit'),pause=$('teamDefaultPause');
+ select.onchange=()=>{
+  const employee=staff.find(person=>person.id===select.value);
+  $('teamScheduleFields').classList.toggle('hidden',!employee);
+  save.disabled=!employee;
+  status.textContent='';
+  if(!employee)return;
+  entry.value=(employee.default_entry_time||'08:00').slice(0,5);
+  exit.value=(employee.default_exit_time||'17:30').slice(0,5);
+  pause.value=employee.default_break_minutes??30;
+ };
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
- dialog.querySelector('[type=button]').onclick=()=>dialog.close();
+ dialog.addEventListener('cancel',event=>{if(back.disabled)event.preventDefault();});
+ back.onclick=()=>dialog.close();
  dialog.querySelector('form').onsubmit=async event=>{
   event.preventDefault();
-  if(!select.value)return;
-  dialog.close();
+  const employee=staff.find(person=>person.id===select.value);
+  if(!employee||save.disabled)return;
+  const values={default_entry_time:entry.value,default_exit_time:exit.value,default_break_minutes:Number(pause.value)};
+  save.disabled=back.disabled=select.disabled=entry.disabled=exit.disabled=pause.disabled=true;
+  status.textContent=tt('loading');
   try{
-  await openTeamSheet(select.value);
-  if(teamState.pane!=='team-sheet')return;
-   const schedule=$('teamSchedule');
-   schedule.open=true;
-   scrollToTeamShortcut(schedule);
-  }catch(error){teamNotice(error);}
+   const {data,error}=await sb.from('employees').update(values).eq('id',employee.id).eq('owner_id',user.id).select('*').single();
+   if(error)throw Error(tt('failed'));
+   Object.assign(employee,data);
+   if($('employee').value===employee.id){
+    $('defaultEntry').value=entry.value;
+    $('defaultExit').value=exit.value;
+    $('defaultBreak').value=pause.value;
+   }
+   status.textContent=tt('saveOK');
+  }catch(error){status.textContent=error.message||tt('failed');}
+  finally{save.disabled=back.disabled=select.disabled=entry.disabled=exit.disabled=pause.disabled=false;}
  };
  dialog.showModal();
 }

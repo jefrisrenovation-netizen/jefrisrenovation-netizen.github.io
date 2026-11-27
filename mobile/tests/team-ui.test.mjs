@@ -209,3 +209,30 @@ test('attendance PDF separates manual workdays and GPS location by employee',asy
  assert(gps?.includes('Rue Exemple 10')&&gps.includes('50.123456, 4.123456'));
  assert(!gps.includes('Manual Site')&&!gps.includes('December Site'));
 });
+
+test('default schedule saves the chosen employee and leaves the team shortcuts in place',async()=>{
+ const f=fixture();
+ f.run(`showPane('team');
+  employees.push({id:'second',name:'Second Worker',active:true,default_entry_time:'07:00:00'});
+  let updatedId,updates;
+  sb.from=()=>({update(values){updates=values;return this;},eq(key,value){if(key==='id')updatedId=value;return this;},
+   select(){return this;},async single(){return {data:updates};}});
+ `);
+ f.document.getElementById('openTeamSchedule').onclick();
+ const select=f.document.getElementById('scheduleEmployee');
+ const dialog=select.closest('dialog');
+ assert(dialog.hasAttribute('open'));
+ assert(dialog.querySelector('[type=submit]').disabled);
+ select.value='second';
+ select.onchange();
+ const start=f.document.getElementById('teamDefaultEntry');
+ assert.equal(start.value,'07:00');
+ start.value='07:30';
+ await dialog.querySelector('form').onsubmit({preventDefault(){}});
+ assert.equal(f.run('updatedId'),'second');
+ assert.equal(f.run('updates.default_entry_time'),'07:30');
+ assert.equal(f.run('teamState.pane'),'team');
+ dialog.querySelector('[type=button]').onclick();
+ assert(!dialog.hasAttribute('open'));
+ assert(!f.document.getElementById('teamDirectoryPanel').classList.contains('hidden'));
+});
