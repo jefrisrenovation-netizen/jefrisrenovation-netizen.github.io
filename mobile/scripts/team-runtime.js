@@ -2,6 +2,9 @@
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
  reviewLoading:['Chargement…','Carregando…','Loading…'],
+ accountEdit:['Modifier','Editar','Edit'],
+ accountCancel:['Annuler','Cancelar','Cancel'],
+ accountProfileDetails:['Profil','Perfil','Profile'],
  editAccountProfile:['Modifier le profil','Editar perfil','Edit profile'],
  accountPreferences:['Préférences','Preferências','Preferences'],
  accountControls:['Gestion des accès au compte','Controle da conta','Account controls'],
@@ -109,9 +112,11 @@ function setupAccountSettings(){
  dialog.innerHTML=`<button type="button" class="secondary" id="accountBack">‹ ${teamLabel('teamBack')}</button>
  <h2 id="accountDialogTitle">${teamLabel('accountManagement')}</h2>
  <div class="account-identity"><span id="accountInitial" aria-hidden="true"></span><img id="accountAvatar" class="hidden" alt=""><div><strong id="accountName"></strong><small id="accountRole"></small></div></div>
- <details open><summary>${teamLabel('editAccountProfile')}</summary><div class="grid" id="accountProfileFields">
+ <details open><summary>${teamLabel('accountProfileDetails')}</summary><div class="grid" id="accountProfileFields">
  <div class="account-image-actions"><label for="accountImageFile" id="accountImageLabel"></label><input id="accountImageFile" type="file" accept="image/*"><button type="button" class="secondary" id="accountImageRemove">${teamLabel('removeAccountImage')}</button></div></div></details>
  <details><summary>${teamLabel('accountPreferences')}</summary><div class="grid" id="accountPreferenceFields"></div></details>
+ <button type="button" class="secondary" id="accountEditButton">${teamLabel('accountEdit')}</button>
+ <button type="button" class="secondary hidden" id="accountCancelButton">${teamLabel('accountCancel')}</button>
  <p id="accountNotice" class="status" role="status"></p>`;
  settings.append(dialog);
 
@@ -151,14 +156,62 @@ function setupAccountSettings(){
   $('accountInitial').classList.remove('hidden');
  };
  let imageRequest=0;
+ let draft=null;
+ const fields=Object.values(PROFILE_FIELDS).map($);
+ const edit=$('accountEditButton');
+ const cancel=$('accountCancelButton');
+ const setEditing=editing=>{
+  for(const field of fields){
+   if(field.tagName==='SELECT')field.disabled=!editing;
+   else field.readOnly=!editing;
+  }
+  $('accountImageFile').disabled=!editing;
+  $('accountImageFile').closest('.account-image-actions').classList.toggle('hidden',!editing);
+  edit.classList.toggle('hidden',editing);
+  cancel.classList.toggle('hidden',!editing);
+  save.classList.toggle('hidden',!editing);
+ };
+ const finishEditing=restore=>{
+  if(restore&&draft){
+   for(const [field,value] of draft)field.value=value;
+   applyLanguage();
+  }
+  draft=null;
+  setEditing(false);
+  drawIdentity();
+ };
+ edit.onclick=()=>{
+  draft=fields.map(field=>[field,field.value]);
+  $('accountNotice').textContent='';
+  setEditing(true);
+  $('companyName').focus();
+ };
+ cancel.onclick=()=>{
+  if(save.disabled)return;
+  $('accountNotice').textContent='';
+  finishEditing(true);
+  edit.focus();
+ };
+ save.onclick=async()=>{
+  if(!draft||save.disabled)return;
+  if(await saveProfile()){
+   finishEditing(false);
+   edit.focus();
+  }
+ };
  $('openAccountSettings').onclick=()=>{
+  setEditing(false);
   $('accountNotice').textContent='';
   drawIdentity();
   dialog.showModal();
  };
  $('accountBack').onclick=()=>{if(!save.disabled)dialog.close()};
  dialog.addEventListener('cancel',event=>{if(save.disabled)event.preventDefault()});
- dialog.addEventListener('close',()=>{imageRequest++;$('accountImageFile').value=''});
+ dialog.addEventListener('close',()=>{
+  imageRequest++;
+  $('accountImageFile').value='';
+  if(draft)finishEditing(true);
+ });
  $('companyName').addEventListener('input',drawIdentity);
  $('accountType').addEventListener('change',drawIdentity);
  $('languageCode').addEventListener('change',drawIdentity);
