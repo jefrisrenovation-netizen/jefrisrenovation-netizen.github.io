@@ -21,7 +21,15 @@ test('team opens with a directory and shows a sheet only after selecting a worke
  await list[1].onclick();assert.equal(f.document.getElementById('employee').value,'another');
  assert(!f.document.getElementById('timesheetPanel').classList.contains('hidden'));
  f.run("showPane('team')");assert(f.document.getElementById('timesheetPanel').classList.contains('hidden'));
- f.run("showPane('settings')");assert(f.document.getElementById('accessPanel').closest('details'));assert(!f.document.getElementById('accessPanel').closest('details').hasAttribute('open'));
+ const settings=f.document.getElementById('settingsPanel');
+ const shortcuts=f.document.querySelectorAll('#teamDirectoryPanel .team-shortcuts button');
+ assert.equal(shortcuts.length,6);
+ assert(!f.document.getElementById('teamAccess').classList.contains('hidden'));
+ f.document.getElementById('openTeamLink').onclick();
+ assert(f.document.getElementById('teamAccess').open);
+ f.run("showPane('settings')");
+ assert(f.document.getElementById('teamAccess').classList.contains('hidden'));
+ assert(settings.firstElementChild.textContent.includes('Gestão da conta'));
  f.run("showPane('sites')");assert(!f.document.getElementById('sitesPanel').classList.contains('hidden'));
  f.run("showPane('reports')");assert(!f.document.getElementById('reportActions').classList.contains('hidden'));
 });
@@ -57,8 +65,8 @@ test('saved owner days are compact rows and editing opens a separate form',()=>{
  const rows=f.document.getElementById('rows');assert.equal(rows.querySelectorAll('tr[data-record-id]').length,1);assert.equal(rows.querySelectorAll('input').length,0);assert(rows.textContent.includes('03/11'));assert(rows.textContent.includes('9h00'));
  f.run('window.teamUI.editDay("day1")');assert.equal(f.document.getElementById('ownerDayDate').value,'2026-11-03');assert.equal(f.document.getElementById('ownerDayWorkplace').value,'Forest');
 });
-test('default hours live in collapsed settings, outside the monthly sheet',()=>{
- const f=fixture();const defaults=f.document.getElementById('employeeDefaults');assert(defaults.closest('#settingsPanel'));assert(defaults.closest('details'));assert(!defaults.closest('details').hasAttribute('open'));assert(!f.document.getElementById('timesheetPanel').querySelector('#defaultEntry'));
+test('default hours are available to the manager from the team shortcuts',()=>{
+ const f=fixture();const defaults=f.document.getElementById('employeeDefaults');assert(defaults.closest('#teamPanel'));assert(f.document.getElementById('openTeamSchedule'));assert(defaults.closest('details'));assert(!defaults.closest('details').hasAttribute('open'));assert(!f.document.getElementById('timesheetPanel').querySelector('#defaultEntry'));
 });
 
 test('employee entry keeps employer defaults private and starts each new period with no deducted break',async()=>{
