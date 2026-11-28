@@ -281,7 +281,7 @@ function setupOwnerUI(){
  $('teamPanel').prepend(backToTeam);
 
  setupAccountSettings();
- setupAttendancePush();
+ if(typeof setupAttendancePush==='function')setupAttendancePush();
  const defaults=$('employeeDefaults');if(defaults){const details=document.createElement('details');details.id='teamSchedule';details.className='schedule-settings no-print';details.innerHTML=`<summary>${teamLabel('schedule')}</summary>`;details.append(defaults);$('teamPanel').append(details);}$('title').closest('section').id='timesheetPanel';
  // Remove inherited test banner from the released interface.
  const banner=$('app').firstElementChild;if(banner?.textContent.includes('VERSÃO DE TESTE')||banner?.textContent.includes('Version de test'))banner.remove();
