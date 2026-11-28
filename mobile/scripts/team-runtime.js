@@ -1,6 +1,10 @@
 // Employee identities are resolved server-side. Company records keep their existing owner_id.
 const teamState={role:null,booting:false,access:null,sites:[],members:[],payment:null,currency:'EUR',days:[],month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),pane:'home',refresh:0};
 const teamWords={
+ inactiveEmployees:['Employés inactifs','Funcionários inativos','Inactive employees'],
+ noInactiveEmployees:['Aucun employé inactif.','Nenhum funcionário inativo.','No inactive employees.'],
+ reactivateEmployee:['Réactiver','Reativar','Reactivate'],
+ employeeReactivated:['Employé réactivé.','Funcionário reativado.','Employee reactivated.'],
  reviewLoading:['Chargement…','Carregando…','Loading…'],
  accountEdit:['Modifier','Editar','Edit'],
  accountCancel:['Annuler','Cancelar','Cancel'],
@@ -288,7 +292,7 @@ function setupOwnerUI(){
  const shell=document.createElement('div');shell.id='upgradeShell';shell.className='no-print';shell.innerHTML=`<nav id="mainNav" class="app-nav" aria-label="Navigation">${['home','team','sites','reports','settings'].map((p,i)=>`<button class="secondary" data-pane="${p}" onclick="teamUI.pane('${p}')"><span aria-hidden="true">${['⌂','♙','▦','▤','⚙'][i]}</span>${teamLabel(p)}</button>`).join('')}</nav><p id="upgradeNotice" class="status" role="status"></p><section id="dashboard" class="card"><div class="dashboard-head"><div><small>${teamLabel('owner')}</small><h2 id="dashboardCompany"></h2></div><input id="dashboardMonth" type="month" aria-label="${esc(tt('month'))}" onchange="teamUI.month(this.value)"></div><h2>${teamLabel('month')}</h2><div id="dashboardStats" class="summary"></div><button class="register-button" onclick="teamUI.day()">＋ ${teamLabel('register')}</button><h2>${teamLabel('team')}</h2><div id="dashboardTeam"></div><p class="muted">${teamLabel('payrollApproved')}</p><p class="muted">✓ ${teamLabel('allSaved')}</p></section>`;
  $('app').prepend(shell);
  const directory=document.createElement('section');directory.id='teamDirectoryPanel';directory.className='card hidden no-print';
- directory.innerHTML=`<h2>${teamLabel('team')}</h2><div id="teamDirectory"></div>`;
+ directory.innerHTML=`<h2>${teamLabel('team')}</h2><div id="teamDirectory"></div><details id="inactiveEmployeesPanel" class="schedule-settings"><summary>${teamLabel('inactiveEmployees')}</summary><div id="inactiveEmployeesList"><p>${teamLabel('noInactiveEmployees')}</p></div></details><p id="inactiveEmployeesStatus" class="status" role="status"></p>`;
  $('app').append(directory);
  setupOwnerAttendance(directory);
  setupEmployeeOptions();
@@ -309,6 +313,20 @@ function setupOwnerUI(){
  setupPersonalReportFilters();$('email').type='text';showPane('home');
 }
 async function withTeamButton(button,fn){if(button?.disabled)return;if(button)button.disabled=true;try{await fn()}catch(error){teamNotice(error)}finally{if(button)button.disabled=false}}
+function renderInactiveEmployees(staff){
+ const list=$('inactiveEmployeesList');
+ if(!list)return;
+ list.innerHTML=staff.filter(e=>e.active===false).map(e=>`<article class="project-tile"><strong>${esc(e.name)}</strong><div><button type="button" class="secondary" data-reactivate="${esc(e.id)}">${teamLabel('reactivateEmployee')}</button></div></article>`).join('')||`<p>${teamLabel('noInactiveEmployees')}</p>`;
+ list.querySelectorAll('[data-reactivate]').forEach(button=>button.onclick=()=>withTeamButton(button,async()=>{
+  const status=$('inactiveEmployeesStatus');
+  status.textContent='';
+  const {data,error}=await sb.from('employees').update({active:true}).eq('owner_id',user.id).eq('id',button.dataset.reactivate).select('id').single();
+  if(error||!data)throw Error(tt('failed'));
+  await loadEmployees();
+  await upgradeRefresh();
+  status.textContent=tt('employeeReactivated');
+ }));
+}
 async function upgradeRefresh(){
  if(teamState.role!=='owner'||!$('dashboard'))return;const request=++teamState.refresh,month=ym();if(!/^\d{4}-\d{2}$/.test(month))return;
  const results=await Promise.all([sb.from('employees').select('*').eq('owner_id',user.id).order('name'),sb.from('work_days').select('*').eq('owner_id',user.id).gte('work_date',monthStart()).lte('work_date',monthEnd()),sb.from('monthly_payments').select('*').eq('owner_id',user.id).eq('month',monthStart()),sb.from('work_sites').select('id,name,address').eq('owner_id',user.id).eq('active',true).order('name'),teamCall('members')]);
@@ -324,6 +342,7 @@ async function upgradeRefresh(){
  $('memberList').innerHTML=teamState.members.filter(m=>staff.some(e=>e.id===m.employee_id&&e.active!==false)).map(m=>`<article class="project-tile"><strong>${esc(staff.find(e=>e.id===m.employee_id)?.name||m.username)}</strong><p>${esc(m.username)} · ${esc(m.activated_at?tt('active'):tt('pending'))}</p><button class="secondary" data-member="${m.id}" data-enabled="${!m.enabled}">${esc(tt(m.enabled?'block':'unblock'))}</button>${m.login_method==='phone'&&m.activated_at&&m.enabled?`<button class="secondary" data-reset-member="${m.id}">${esc(tt('resetMember'))}</button>`:''}</article>`).join('');
  $('memberList').querySelectorAll('[data-member]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{await teamCall('set_access',{id:b.dataset.member,enabled:b.dataset.enabled==='true'});await upgradeRefresh()}));
  $('memberList').querySelectorAll('[data-reset-member]').forEach(b=>b.onclick=()=>withTeamButton(b,async()=>{showTeamInvitation({...await teamCall('reset_phone',{id:b.dataset.resetMember}),reset:true});}));
+ renderInactiveEmployees(staff);
  if(teamState.pane==='team')renderTeamDirectory();
  refreshPersonalReportFilters(days,staff);teamTranslate();
 }
