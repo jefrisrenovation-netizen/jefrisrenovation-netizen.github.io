@@ -10,7 +10,7 @@ workflows:
       xcode: latest
       ios_signing:
         provisioning_profiles:
-          - suivi_heures_appstore_domains
+          - suivi_heures_appstore_push
         certificates:
           - suivi_heures_distribution
     scripts:
