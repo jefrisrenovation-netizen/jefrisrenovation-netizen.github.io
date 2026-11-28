@@ -61,7 +61,7 @@ as $$
 declare
   account_owner uuid := auth.uid();
 begin
-  if account_owner is null or device_token is null or device_token !~ '^[0-9a-f]{64,256}$' then
+  if account_owner is null or device_token is null or length(device_token) not between 64 and 256 or device_token !~ '^[0-9a-f]+$' then
     raise exception 'Invalid push registration';
   end if;
 
