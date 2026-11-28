@@ -1,6 +1,6 @@
 workflows:
   ios-testflight:
-    name: iPhone - TestFlight
+    name: iPhone - TestFlight (notifications)
     instance_type: mac_mini_m2
     max_build_duration: 40
     triggering:
