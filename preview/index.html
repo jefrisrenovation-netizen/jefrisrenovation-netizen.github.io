@@ -858,6 +858,9 @@ const teamWords={
  gpsWrongKind:['Prochain pointage attendu','Próxima batida esperada','Next expected punch'],
  gpsNoSites:['Aucun chantier avec une adresse. Contactez votre responsable.','Nenhuma obra com endereço cadastrado. Fale com seu responsável.','No work site with an address. Contact your manager.'],
  gpsNoRecords:['Aucun pointage GPS','Nenhuma batida com GPS','No GPS punches'],
+ attendanceMode:['Mode de pointage','Modo de ponto','Time entry mode'],
+ attendanceManual:['Saisie manuelle','Manual','Manual'],
+ attendanceNeedsAccess:['Créez un lien pour choisir le mode de pointage.','Crie um link para escolher o modo de ponto.','Create an invite to choose the time entry mode.'],
  attendanceGps:['Pointage GPS','Ponto com GPS','GPS clock-in'],
  gpsEntry:['Pointer l’arrivée','Registrar entrada','Clock in'],
  gpsExit:['Pointer le départ','Registrar saída','Clock out'],
@@ -918,6 +921,7 @@ function showPane(pane){
  if(pane==='team')renderTeamDirectory();
  if(pane!=='team'&&$('accessPanel')?.open)$('accessPanel').close();
  teamState.pane=pane;for(const [id,p] of [['dashboard','home'],['teamDirectoryPanel','team'],['teamPanel','team-sheet'],['timesheetPanel','team-sheet'],['sitesPanel','sites'],['reportActions','reports'],['settingsPanel','settings']])$(id)?.classList.toggle('hidden',p!==pane);
+ if(pane==='team-sheet')$('teamPanel').refreshAttendanceMode();
  closeCompanyReport();closeIndividualReport();document.querySelectorAll('[data-pane]').forEach(e=>e.classList.toggle('selected',e.dataset.pane===(pane==='team-sheet'?'team':pane)));
  $('upgradeNotice').textContent='';$('mainNav')?.scrollIntoView({block:'start',behavior:'smooth'});
 }
@@ -1097,6 +1101,66 @@ function setupAccountSettings(){
  };
 }
 
+function attendanceModeField(id){
+ return `<div><label for="${id}">${teamLabel('attendanceMode')}</label><select id="${id}" required disabled><option value="manual" data-team-text="attendanceManual">${esc(tt('attendanceManual'))}</option><option value="gps" data-team-text="attendanceGps">${esc(tt('attendanceGps'))}</option></select></div>`;
+}
+function setupAttendanceModes(){
+ const profileMode=$('profileAttendanceMode');
+ const inviteMode=$('inviteAttendanceMode');
+ const profileNotice=$('profileAttendanceNotice');
+ let profileRequest=0;
+ let inviteRequest=0;
+ async function refreshMode(isInvite){
+  const select=isInvite?inviteMode:profileMode;
+  const employee=isInvite?$('inviteEmployee'):$('employee');
+  const notice=isInvite?$('teamAccessNotice'):profileNotice;
+  const id=employee.value;
+  const request=isInvite?++inviteRequest:++profileRequest;
+  const isCurrent=()=>request===(isInvite?inviteRequest:profileRequest)&&employee.value===id;
+  select.disabled=true;
+  notice.textContent='';
+  if(!id)return;
+  if(!isInvite&&!teamState.members.some(member=>member.employee_id===id&&member.enabled)){
+   notice.textContent=tt('attendanceNeedsAccess');
+   return;
+  }
+  try{
+   const {employees:withGps}=await gpsCall('gps_modes');
+   if(!isCurrent())return;
+   select.value=withGps.includes(id)?'gps':'manual';
+   select.disabled=false;
+  }catch(error){
+   if(isCurrent())notice.textContent=error.message;
+  }
+ }
+ $('employee').addEventListener('change',()=>refreshMode(false));
+ $('inviteEmployee').addEventListener('change',()=>refreshMode(true));
+ $('teamPanel').refreshAttendanceMode=()=>refreshMode(false);
+ $('accessPanel').refreshAttendanceMode=()=>refreshMode(true);
+ $('profileAttendanceForm').onsubmit=async event=>{
+  event.preventDefault();
+  if(profileMode.disabled)return;
+  const id=$('employee').value;
+  const enabled=profileMode.value==='gps';
+  const request=++profileRequest;
+  profileMode.disabled=true;
+  event.submitter.disabled=true;
+  profileNotice.textContent='';
+  try{
+   await gpsCall('gps_configure',{employee_id:id,enabled});
+   if(request===profileRequest)profileNotice.textContent=tt('saveOK');
+  }catch(error){
+   if(request===profileRequest){
+    await refreshMode(false);
+    if(profileRequest===request+1)profileNotice.textContent=error.message;
+   }
+  }finally{
+   if(request===profileRequest)profileMode.disabled=false;
+   event.submitter.disabled=false;
+  }
+ };
+}
+
 function setupOwnerUI(){
  if($('mainNav'))return;
  $('profileHeading').closest('section').id='settingsPanel';$('employee').closest('section').id='teamPanel';
@@ -1114,8 +1178,14 @@ function setupOwnerUI(){
  $('app').append(directory);
  setupOwnerAttendance(directory);
  setupEmployeeOptions();
- const access=document.createElement('dialog');access.id='accessPanel';access.className='no-print';access.setAttribute('aria-labelledby','teamAccessTitle');access.innerHTML=`<h2 id="teamAccessTitle"></h2><button type="button" class="secondary" id="closeTeamAccess">${teamLabel('teamBack')}</button><div id="teamInviteFields"><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}</div><button type="submit">${teamLabel('createInvite')}</button></form></div><p id="teamAccessNotice" class="status" role="status"></p><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
+ const attendanceForm=document.createElement('form');
+ attendanceForm.id='profileAttendanceForm';
+ attendanceForm.className='no-print';
+ attendanceForm.innerHTML=`${attendanceModeField('profileAttendanceMode')}<button type="submit" class="secondary">${teamLabel('save')}</button><p id="profileAttendanceNotice" class="status" role="status"></p>`;
+ $('teamPanel').append(attendanceForm);
+ const access=document.createElement('dialog');access.id='accessPanel';access.className='no-print';access.setAttribute('aria-labelledby','teamAccessTitle');access.innerHTML=`<h2 id="teamAccessTitle"></h2><button type="button" class="secondary" id="closeTeamAccess">${teamLabel('teamBack')}</button><div id="teamInviteFields"><p class="muted">${teamLabel('inviteHelp')}</p><form id="inviteForm"><div class="grid"><div><label for="inviteEmployee">${teamLabel('worker')}</label><select id="inviteEmployee" required></select></div>${teamField('username','inviteUsername')}${teamField('email','inviteEmail','email')}${teamField('phone','invitePhone','tel')}${attendanceModeField('inviteAttendanceMode')}</div><button type="submit">${teamLabel('createInvite')}</button></form></div><p id="teamAccessNotice" class="status" role="status"></p><div id="inviteResult" class="hidden"></div><div id="memberList" class="access-list"></div>`;
  $('app').append(access);$('closeTeamAccess').onclick=()=>access.close();$('invitePhone').required=false;$('inviteEmail').required=false;const syncContact=()=>{$('invitePhone').required=!$('inviteEmail').value.trim();};$('inviteEmail').oninput=syncContact;syncContact();$('inviteUsername').pattern='[a-zA-Z0-9][a-zA-Z0-9._\\x2D]{2,39}';$('inviteUsername').maxLength=40;$('inviteUsername').placeholder='ex: teste.funcionario';$('inviteUsername').title='3–40: A–Z, a–z, 0–9, . _ -';
+ setupAttendanceModes();
  $('inviteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,createTeamInvite)};
  const sites=document.createElement('section');sites.id='sitesPanel';sites.className='card hidden no-print';sites.innerHTML=`<h2>${teamLabel('sites')}</h2><form id="siteForm"><div class="grid">${teamField('siteName','siteName')}${teamField('address','siteAddress')}</div><button type="submit">＋ ${teamLabel('addSite')}</button></form><div id="siteList"></div>`;
  $('app').append(sites);$('siteAddress').required=false;$('siteForm').onsubmit=async e=>{e.preventDefault();await withTeamButton(e.submitter,async()=>{const {error}=await sb.from('work_sites').insert({owner_id:user.id,name:$('siteName').value.trim(),address:$('siteAddress').value.trim()});if(error)throw Error(tt('failed'));$('siteForm').reset();await upgradeRefresh();teamNotice(tt('saveOK'));});};
@@ -1155,7 +1225,9 @@ async function refreshPendingReview(){
 }
 
 async function createTeamInvite(){
- const invitation=await teamCall('invite',{employee_id:$('inviteEmployee').value,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value});
+ const mode=$('inviteAttendanceMode');
+ if(mode.disabled)return;
+ const invitation=await teamCall('invite',{employee_id:$('inviteEmployee').value,username:$('inviteUsername').value,email:$('inviteEmail').value,phone:$('invitePhone').value,gps_attendance:mode.value==='gps'});
  showTeamInvitation(invitation);await upgradeRefresh();
 }
 function showTeamInvitation(invitation){
@@ -1290,6 +1362,7 @@ function openTeamAccess(invite){
  $('inviteResult').classList.add('hidden');
  $('inviteResult').replaceChildren();
  access.showModal();
+ if(invite)access.refreshAttendanceMode();
  access.scrollTop=0;
 }
 
