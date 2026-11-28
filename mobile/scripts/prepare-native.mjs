@@ -24,6 +24,19 @@ if(platform==='ios'){
   pbx=pbx.replace('504EC30F1FED79650016851F /* Assets.xcassets in Resources */,','504EC30F1FED79650016851F /* Assets.xcassets in Resources */,\n\t\t\t\tA00000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */,');
   fs.writeFileSync('ios/App/App.xcodeproj/project.pbxproj',pbx);
   fs.copyFileSync('native/PrivacyInfo.xcprivacy','ios/App/App/PrivacyInfo.xcprivacy');
+  const delegatePath='ios/App/App/AppDelegate.swift';
+  const delegate=fs.readFileSync(delegatePath,'utf8');
+  const declaration='class AppDelegate: UIResponder, UIApplicationDelegate {';
+  if(!delegate.includes(declaration))throw new Error('Capacitor AppDelegate declaration changed');
+  fs.writeFileSync(delegatePath,delegate.replace(declaration,declaration+`
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
+`));
   fs.copyFileSync('native/App.entitlements','ios/App/App/App.entitlements');
   fs.copyFileSync('native/icon-1024.png','ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png');
   let plist=fs.readFileSync('ios/App/App/Info.plist','utf8');

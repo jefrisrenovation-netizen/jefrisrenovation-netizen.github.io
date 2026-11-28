@@ -13,11 +13,13 @@ html=html.replace('</style>','@media(max-width:600px){table{min-width:720px}.bra
 code=code.replace('const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);','const sb=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{detectSessionInUrl:false}});');
 const names=[...code.matchAll(/(?:async\s+)?function\s+(\w+)\(/g)].map(m=>m[1]);
 fs.mkdirSync('src',{recursive:true});
-const imports=`import {createClient} from '@supabase/supabase-js';\nimport {Capacitor} from '@capacitor/core';\nimport {App} from '@capacitor/app';\nimport {Filesystem,Directory} from '@capacitor/filesystem';\nimport {Share} from '@capacitor/share';\nimport {jsPDF} from 'jspdf';\nimport {autoTable} from 'jspdf-autotable';\nimport {authTokens,reportFilename} from './helpers.mjs';\n`;
+const imports=`import {createClient} from '@supabase/supabase-js';\nimport {Capacitor} from '@capacitor/core';\nimport {App} from '@capacitor/app';
+import {PushNotifications} from '@capacitor/push-notifications';\nimport {Filesystem,Directory} from '@capacitor/filesystem';\nimport {Share} from '@capacitor/share';\nimport {jsPDF} from 'jspdf';\nimport {autoTable} from 'jspdf-autotable';\nimport {authTokens,reportFilename} from './helpers.mjs';\n`;
 const mobile=fs.readFileSync('scripts/mobile-runtime.js','utf8');
+const push=fs.readFileSync('scripts/attendance-push.js','utf8');
 const team=fs.readFileSync('scripts/team-runtime.js','utf8');
 html=html.replace('</style>',fs.readFileSync('scripts/upgrade.css','utf8')+'</style>');
-fs.writeFileSync('src/main.js',imports+code+'\n'+mobile+'\n'+team+'\nObject.assign(window,{'+[...new Set(names.concat(['exportMobileReport','requestAccountDeletion']))].join(',')+'});\n');
+fs.writeFileSync('src/main.js',imports+code+'\n'+mobile+'\n'+push+'\n'+team+'\nObject.assign(window,{'+[...new Set(names.concat(['exportMobileReport','requestAccountDeletion']))].join(',')+'});\n');
 fs.writeFileSync('index.html',html);
 fs.mkdirSync('public/assets',{recursive:true});
 fs.cpSync('../preview/assets','public/assets',{recursive:true});

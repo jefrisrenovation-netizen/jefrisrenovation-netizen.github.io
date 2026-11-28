@@ -54,3 +54,38 @@ for each row execute function public.queue_attendance_push_event();
 
 create trigger attendance_push_gps after insert on public.gps_attendance
 for each row execute function public.queue_attendance_push_event();
+
+create function public.set_attendance_push_device(device_token text, enabled boolean)
+returns void language plpgsql security definer set search_path = ''
+as $$
+declare
+  account_owner uuid := auth.uid();
+begin
+  if account_owner is null or device_token is null or device_token !~ '^[0-9a-f]{64,256}$' then
+    raise exception 'Invalid push registration';
+  end if;
+
+  if enabled then
+    if not exists (select 1 from public.employees e where e.owner_id = account_owner and e.active) then
+      raise exception 'Only team owners can register a device';
+    end if;
+
+    insert into public.attendance_push_devices(token, owner_id)
+    values (device_token, account_owner)
+    on conflict (token) do nothing;
+
+    if not exists (
+      select 1 from public.attendance_push_devices d
+      where d.token = device_token and d.owner_id = account_owner
+    ) then
+      raise exception 'Push registration unavailable';
+    end if;
+  else
+    delete from public.attendance_push_devices
+    where token = device_token and owner_id = account_owner;
+  end if;
+end;
+$$;
+
+revoke all on function public.set_attendance_push_device(text, boolean) from public, anon;
+grant execute on function public.set_attendance_push_device(text, boolean) to authenticated;
