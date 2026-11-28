@@ -2,9 +2,6 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { importPKCS8, SignJWT } from "npm:jose@6";
 
 const topic = "io.github.jefrisrenovation-netizen.suividesheures";
-const timeFormat = new Intl.DateTimeFormat("pt-BR", {
-  timeZone: "Europe/Brussels", hour: "2-digit", minute: "2-digit",
-});
 
 let providerToken: { value: string; expires: number } | undefined;
 
@@ -19,6 +16,11 @@ async function getProviderToken() {
   return value;
 }
 
+async function collapseId(kind: string, id: string) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(kind + ":" + id));
+  return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
 Deno.serve(async (request) => {
   const secret = Deno.env.get("ATTENDANCE_PUSH_WORKER_SECRET");
   if (request.method !== "POST" || !secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -28,18 +30,14 @@ Deno.serve(async (request) => {
   try {
     const bearer = await getProviderToken();
     const { data: events } = await sb.from("attendance_push_events")
-      .select("kind,record_id,owner_id,occurred_at,queued_at,site_name,employees!inner(name)")
+      .select("kind,record_id,owner_id,queued_at")
       .order("queued_at").limit(20).throwOnError();
     let deferred = 0;
     for (const event of events ?? []) {
       const expiration = Math.floor(new Date(event.queued_at).getTime() / 1000) + 900;
-      const time = timeFormat.format(new Date(event.occurred_at));
-      const employee = event.employees as unknown as { name: string };
-      const name = employee.name.slice(0, 100);
-      const site = event.site_name ? ` na obra ${event.site_name.slice(0, 120)}` : "";
       const body = event.kind === "manual"
-        ? `${name} registrou um dia de trabalho.`
-        : `${name} registrou a ${event.kind === "entry" ? "entrada" : "saída"} às ${time}${site}.`;
+        ? "Novo dia de trabalho registrado."
+        : event.kind === "entry" ? "Nova entrada GPS registrada." : "Nova saída GPS registrada.";
       let retry = false;
       if (expiration > Math.floor(Date.now() / 1000)) {
         const { data: devices } = await sb.from("attendance_push_devices")
@@ -55,7 +53,7 @@ Deno.serve(async (request) => {
               "apns-push-type": "alert",
               "apns-priority": "10",
               "apns-expiration": String(expiration),
-              "apns-collapse-id": `${event.kind}:${event.record_id}`,
+              "apns-collapse-id": await collapseId(event.kind, event.record_id),
             },
             body: JSON.stringify({ aps: { alert: { title: "Suivi des heures Pro", body }, sound: "default" } }),
           }).catch(() => null);
